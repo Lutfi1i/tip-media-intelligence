@@ -147,8 +147,56 @@ def _entries_from_bluesky(payload: Any, limit: int) -> List[Dict[str, Any]]:
     return entries
 
 
+def _entries_from_twitter_syndication(url: str, limit: int = MAX_ENTRIES_PER_SOURCE) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """Tarik timeline resmi X/Twitter tanpa API key via Syndication endpoint."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+    try:
+        with httpx.Client(timeout=HTTP_TIMEOUT, follow_redirects=True, headers=headers) as client:
+            resp = client.get(url)
+        if resp.status_code >= 400:
+            return [], f"Twitter Syndication HTTP {resp.status_code}"
+
+        match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', resp.text, re.DOTALL)
+        if not match:
+            return [], "Tidak dapat mengekstrak timeline Twitter dari payload HTML"
+
+        data = json.loads(match.group(1))
+        timeline = data.get("props", {}).get("pageProps", {}).get("timeline", {})
+        raw_entries = timeline.get("entries", [])
+
+        entries: List[Dict[str, Any]] = []
+        for e in raw_entries[:limit]:
+            tweet = e.get("content", {}).get("tweet", {})
+            if not tweet:
+                continue
+            text = tweet.get("text", "").strip()
+            if not text:
+                continue
+            user = tweet.get("user", {}).get("screen_name", "twitter")
+            tweet_id = tweet.get("id_str", "")
+            created_at = tweet.get("created_at")
+            entries.append({
+                "title": text[:140] + ("..." if len(text) > 140 else ""),
+                "link": f"https://x.com/{user}/status/{tweet_id}" if tweet_id else f"https://x.com/{user}",
+                "summary": text,
+                "author": f"@{user}",
+                "_published_iso": created_at,
+                "_feed_title": f"X / Twitter (@{user})",
+            })
+        return entries, None
+    except Exception as exc:
+        return [], f"Gagal parsing Twitter syndication: {exc}"
+
+
 def fetch_source_entries(url: str, limit: int = MAX_ENTRIES_PER_SOURCE) -> Tuple[List[Any], Optional[str]]:
-    """Ambil dan parse feed (RSS/Atom) atau API JSON resmi/Bluesky. Mengembalikan (entries, error_message)."""
+    """Ambil dan parse feed (RSS/Atom) atau API JSON resmi/Bluesky/Twitter. Mengembalikan (entries, error_message)."""
+    # Jalur Twitter Syndication
+    if "syndication.twitter.com" in url.lower():
+        return _entries_from_twitter_syndication(url, limit)
+
     try:
         with httpx.Client(
             timeout=HTTP_TIMEOUT,
