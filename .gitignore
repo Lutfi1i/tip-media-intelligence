@@ -1,0 +1,21 @@
+# Environments
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Database & local data
+*.db
+*.sqlite3
+backend/data/
+
+# OS files
+.DS_Store
+Thumbs.db

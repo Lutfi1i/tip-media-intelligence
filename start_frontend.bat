@@ -1,0 +1,3 @@
+@echo off
+echo Starting TIP Media Intelligence Frontend Next.js App...
+npm --prefix frontend run dev

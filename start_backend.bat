@@ -1,0 +1,3 @@
+@echo off
+echo Starting TIP Media Intelligence Backend API...
+backend\venv\Scripts\uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
