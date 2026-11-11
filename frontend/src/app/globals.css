@@ -6,6 +6,7 @@
 
 :root {
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --background: #FFFFFF;
   --foreground: #09090B;
   --panel: #FAFAFA;
@@ -25,12 +26,16 @@
   --accent: #FFFFFF;
 }
 
+*, *::before, *::after, html, body, button, input, select, textarea, pre, code, kbd, samp, table, th, td {
+  font-family: var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+}
+
 body {
-  font-family: var(--font-sans);
   color: var(--foreground);
   background-color: var(--background);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 

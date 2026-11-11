@@ -10,6 +10,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ["'Plus Jakarta Sans'", "sans-serif"],
+        mono: ["'Plus Jakarta Sans'", "sans-serif"],
       },
       colors: {
         brand: {
