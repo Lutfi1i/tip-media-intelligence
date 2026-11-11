@@ -267,10 +267,10 @@ export async function fetchAiEvaluation() {
   return res.json();
 }
 
-export async function triggerFloodScenario() {
-  const res = await fetch(`${API_BASE_URL}/simulation/trigger-flood-scenario`, {
+export async function pollSources(force: boolean = true) {
+  const res = await fetch(`${API_BASE_URL}/sources/poll?force=${force}`, {
     method: "POST",
   });
-  if (!res.ok) throw new Error("Gagal memicu simulasi skenario");
+  if (!res.ok) throw new Error("Gagal menyinkronkan data berita nyata");
   return res.json();
 }

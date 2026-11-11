@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { triggerFloodScenario } from "@/lib/api";
+import { pollSources } from "@/lib/api";
 
 const navItems = [
   { label: "Dashboard", href: "/", pathDisplay: "app.tipmedia.id/dashboard" },
@@ -11,12 +11,12 @@ const navItems = [
   {
     label: "Monitoring",
     href: "/monitoring",
-    pathDisplay: "app.tipmedia.id/monitoring/banjir-jaksel",
+    pathDisplay: "app.tipmedia.id/monitoring",
   },
   {
     label: "Isu & Alert",
     href: "/isu",
-    pathDisplay: "app.tipmedia.id/isu/2611-0042",
+    pathDisplay: "app.tipmedia.id/isu",
   },
   { label: "Kasus", href: "/kasus", pathDisplay: "app.tipmedia.id/kasus" },
   {
@@ -34,27 +34,29 @@ const navItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [role, setRole] = useState("Pimpinan");
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simMessage, setSimMessage] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const activeNav =
     navItems.find((item) =>
       item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
     ) || navItems[0];
 
-  const handleTriggerSimulation = async () => {
-    setIsSimulating(true);
-    setSimMessage(null);
+  const handleSyncRealData = async () => {
+    setIsPolling(true);
+    setSyncMessage(null);
     try {
-      const res = await triggerFloodScenario();
-      setSimMessage(res.message || "Skenario Banjir Kemang berhasil dimuat.");
+      const res = await pollSources(true);
+      const baru = res.total_baru ?? 0;
+      const dibaca = res.total_dibaca ?? 0;
+      setSyncMessage(`Sinkronisasi berhasil: ${baru} berita baru dari ${dibaca} item feed resmi.`);
       setTimeout(() => {
         window.location.reload();
-      }, 900);
+      }, 1200);
     } catch (err: any) {
-      setSimMessage(err.message || "Gagal memicu simulasi");
+      setSyncMessage(err.message || "Gagal menyinkronkan data berita nyata");
     } finally {
-      setIsSimulating(false);
+      setIsPolling(false);
     }
   };
 
@@ -76,11 +78,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center space-x-2.5">
           <button
             type="button"
-            onClick={handleTriggerSimulation}
-            disabled={isSimulating}
-            className="min-h-[36px] px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors disabled:opacity-50"
+            onClick={handleSyncRealData}
+            disabled={isPolling}
+            className="min-h-[36px] px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-700 hover:bg-blue-600 text-white transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
-            {isSimulating ? "Memuat Skenario..." : "Muat Skenario Banjir"}
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isPolling ? "bg-amber-300 animate-pulse" : "bg-emerald-400"
+              }`}
+            />
+            {isPolling ? "Menarik Feed Nyata..." : "Tarik Berita Nyata"}
           </button>
 
           <div className="hidden md:flex items-center bg-slate-100 border border-slate-200 rounded-md px-2.5 py-1">
@@ -96,22 +103,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <option value="Pimpinan">Pimpinan</option>
               <option value="Analis">Analis / Verifikator</option>
               <option value="Supervisor">Supervisor</option>
-              <option value="PIC Unit">PIC Unit (Dinas SDA)</option>
+              <option value="PIC Unit">PIC Unit</option>
               <option value="Admin">Admin</option>
               <option value="Auditor">Auditor</option>
             </select>
           </div>
 
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FFEDD5] text-[#9A3412] border border-[#FDBA74]">
-            Data simulasi
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
+            Feed Nyata Aktif
           </span>
         </div>
       </header>
 
-      {simMessage && (
-        <div className="bg-blue-950 text-blue-100 text-xs px-6 py-2 flex items-center justify-between border-b border-blue-800">
-          <span>{simMessage}</span>
-          <span className="font-mono text-[11px] text-blue-300">Memuat ulang...</span>
+      {syncMessage && (
+        <div className="bg-slate-900 text-emerald-300 text-xs px-6 py-2 flex items-center justify-between border-b border-slate-800">
+          <span>{syncMessage}</span>
+          <span className="font-mono text-[11px] text-slate-400">Memperbarui tampilan...</span>
         </div>
       )}
 

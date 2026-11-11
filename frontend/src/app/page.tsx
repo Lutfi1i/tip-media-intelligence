@@ -298,8 +298,8 @@ export default function DashboardPage() {
 
             {priorityIssues.length === 0 ? (
               <div className="py-8 text-center text-sm text-slate-500">
-                Belum ada isu prioritas. Klik tombol &ldquo;Muat Skenario
-                Banjir&rdquo; di atas untuk memuat simulasi.
+                Belum ada isu prioritas terdeteksi. Klik tombol &ldquo;Tarik Berita
+                Nyata&rdquo; di bilah atas untuk menyinkronkan feed terkini.
               </div>
             ) : (
               <div className="divide-y divide-slate-100">

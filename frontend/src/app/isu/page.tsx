@@ -119,8 +119,8 @@ export default function IsuListPage() {
               Tidak ada isu yang cocok dengan filter saat ini.
             </p>
             <p className="text-xs text-slate-500 mt-1">
-              Ubah pilihan filter di atas atau klik &ldquo;Muat Skenario
-              Banjir&rdquo; pada bilah atas.
+              Ubah pilihan filter di atas atau klik &ldquo;Tarik Berita
+              Nyata&rdquo; pada bilah atas untuk memperbarui feed.
             </p>
           </div>
         ) : (

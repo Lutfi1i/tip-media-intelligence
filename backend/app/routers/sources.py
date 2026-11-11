@@ -7,6 +7,7 @@ from backend.app.models import Source
 from backend.app.schemas import SourceCreate, SourceOut
 from backend.app.services.audit import record_audit
 from backend.app.services.collector import collect_all
+from backend.app.services.issue_clustering import cluster_and_sync_issues
 
 router = APIRouter(prefix="/sources", tags=["Sources Registry"])
 
@@ -17,11 +18,13 @@ def list_sources(db: Session = Depends(get_db)):
 
 @router.post("/poll")
 def poll_sources(force: bool = True, db: Session = Depends(get_db)):
-    """Tarik data nyata dari semua sumber berizin aktif (RSS/Atom/API resmi).
+    """Tarik data nyata dari semua sumber berizin aktif (RSS/Atom/API resmi) dan kluster isu otomatis.
 
     `force=true` mengabaikan jeda frekuensi; default true agar tombol UI selalu memberi hasil.
     """
     hasil = collect_all(db, force=force)
+    clustering = cluster_and_sync_issues(db)
+    hasil["clustering"] = clustering
     record_audit(
         db,
         aktor="sistem",
@@ -33,6 +36,7 @@ def poll_sources(force: bool = True, db: Session = Depends(get_db)):
             "baru": hasil["total_baru"],
             "duplikat": hasil["total_duplikat"],
             "gagal": hasil["total_gagal"],
+            "clustering": clustering,
         },
     )
     return hasil

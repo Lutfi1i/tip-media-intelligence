@@ -4,7 +4,7 @@ from backend.app.config import settings
 from backend.app.database import engine, Base
 from backend.app.seed_data import seed_database
 from backend.app.routers import (
-    profiles, sources, issues, alerts, cases, reports, dashboard, audit, simulation
+    profiles, sources, issues, alerts, cases, reports, dashboard, audit
 )
 
 Base.metadata.create_all(bind=engine)
@@ -36,7 +36,6 @@ app.include_router(alerts.router, prefix=settings.API_V1_STR)
 app.include_router(cases.router, prefix=settings.API_V1_STR)
 app.include_router(reports.router, prefix=settings.API_V1_STR)
 app.include_router(audit.router, prefix=settings.API_V1_STR)
-app.include_router(simulation.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

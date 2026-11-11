@@ -161,12 +161,12 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     lewat_tenggat = len([c for c in cases if c.status != "selesai" and c.tenggat < now_utc])
 
     kpi = DashboardKPI(
-        mention_unik=vol_now,
+        mention_unik=vol_now if vol_now > 0 else konten_terkumpul,
         mention_growth_pct=mention_growth_pct,
         isu_prioritas=critical_count + high_count,
         critical_count=critical_count,
         high_count=high_count,
-        wilayah_terdampak=len([rs for rs in region_summaries if rs.sumber == "live"]),
+        wilayah_terdampak=len([rs for rs in region_summaries if rs.mention_count > 0]),
         total_wilayah_terpantau=len(region_summaries),
         menunggu_aksi=menunggu_aksi,
         lewat_tenggat=lewat_tenggat,

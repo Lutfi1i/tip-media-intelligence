@@ -96,6 +96,8 @@ export default function PapanKasusPage() {
   const waitingCases = cases.filter((c) => c.status === "menunggu");
   const inProgressCases = cases.filter((c) => c.status === "ditangani");
   const completedCases = cases.filter((c) => c.status === "selesai");
+  const topPriorityIssue =
+    Object.values(issuesMap).sort((a, b) => b.skor - a.skor)[0] || null;
 
   return (
     <div className="space-y-6">
@@ -117,57 +119,81 @@ export default function PapanKasusPage() {
       {/* Main Split matching Slide 12: Mobile Frame (Left) + Case Board (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 4 Cols: Simulated Mobile Alert matching Slide 12 */}
+        {/* Left 4 Cols: Executive Alert Card Preview matching Slide 10 */}
         <div className="lg:col-span-4 flex justify-center">
           <div className="w-full max-w-[290px] bg-white border-[8px] border-[#0F172A] rounded-[28px] p-5 flex flex-col justify-between min-h-[430px] shadow-sm">
-            <div>
-              <div className="text-center text-xs text-slate-500 pb-3 mb-4 border-b border-slate-200">
-                06.05 &middot; Notifikasi
-              </div>
+            {topPriorityIssue ? (
+              <>
+                <div>
+                  <div className="text-center text-xs text-slate-500 pb-3 mb-4 border-b border-slate-200">
+                    Notifikasi Pimpinan Siaga
+                  </div>
 
-              <div className="space-y-2.5">
-                <div className="text-xs font-extrabold uppercase tracking-wide text-[#C2410C]">
-                  ALERT HIGH
+                  <div className="space-y-2.5">
+                    <div
+                      className={`text-xs font-extrabold uppercase tracking-wide ${
+                        topPriorityIssue.level === "CRITICAL"
+                          ? "text-[#B91C1C]"
+                          : topPriorityIssue.level === "HIGH"
+                          ? "text-[#C2410C]"
+                          : "text-blue-700"
+                      }`}
+                    >
+                      ALERT {topPriorityIssue.level} (Skor {topPriorityIssue.skor})
+                    </div>
+
+                    <h2 className="text-base font-extrabold text-slate-900 leading-snug line-clamp-3">
+                      {topPriorityIssue.judul}
+                    </h2>
+
+                    <p className="text-sm text-slate-600 leading-relaxed line-clamp-4">
+                      {topPriorityIssue.ringkasan || "Isu teridentifikasi dan membutuhkan penanganan unit terkait."}
+                    </p>
+
+                    <div className="pt-2 text-sm text-slate-900 space-y-0.5">
+                      <div>
+                        <strong className="font-bold">Wilayah:</strong> {topPriorityIssue.wilayah}
+                      </div>
+                      <div>
+                        <strong className="font-bold">Kategori:</strong> {topPriorityIssue.kategori}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <h2 className="text-base font-extrabold text-slate-900 leading-snug">
-                  Banjir Jakarta Selatan
+                <div className="grid grid-cols-2 gap-2.5 pt-6">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setApprovalFeedback(
+                        `Rekomendasi untuk isu "${topPriorityIssue.judul.slice(0, 40)}..." telah disetujui Pimpinan.`
+                      )
+                    }
+                    className="min-h-[42px] py-2 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors"
+                  >
+                    Setujui
+                  </button>
+                  <Link
+                    href={`/isu/${topPriorityIssue.id}`}
+                    className="min-h-[42px] inline-flex items-center justify-center py-2 bg-white hover:bg-blue-50 text-[#2563EB] border-2 border-[#2563EB] text-xs font-bold rounded-lg transition-colors text-center"
+                  >
+                    Detail
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                <div className="text-xs font-extrabold uppercase tracking-wide text-emerald-600 mb-2">
+                  STATUS AMAN
+                </div>
+                <h2 className="text-base font-extrabold text-slate-900 mb-2">
+                  Tidak Ada Alert Aktif
                 </h2>
-
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Genangan 30&ndash;50 cm di Kemang &amp; Pejaten. Terverifikasi:
-                  pompa Kemang rusak.
+                <p className="text-xs text-slate-500">
+                  Semua feed terpantau normal tanpa lonjakan isu kritis saat ini.
                 </p>
-
-                <div className="pt-2 text-sm text-slate-900 space-y-0.5">
-                  <div>
-                    <strong className="font-bold">PIC:</strong> Dinas SDA
-                  </div>
-                  <div>
-                    <strong className="font-bold">Tenggat:</strong> 2 jam
-                  </div>
-                </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5 pt-6">
-              <button
-                type="button"
-                onClick={() =>
-                  setApprovalFeedback(
-                    "Rekomendasi tindakan disetujui Pimpinan. Instruksi penugasan dikirim ke PIC Dinas SDA (SLA 2 jam)."
-                  )
-                }
-                className="min-h-[42px] py-2 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors"
-              >
-                Setujui
-              </button>
-              <Link
-                href="/isu/1"
-                className="min-h-[42px] inline-flex items-center justify-center py-2 bg-white hover:bg-blue-50 text-[#2563EB] border-2 border-[#2563EB] text-xs font-bold rounded-lg transition-colors"
-              >
-                Detail
-              </Link>
-            </div>
+            )}
           </div>
         </div>
 

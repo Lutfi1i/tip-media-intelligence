@@ -18,10 +18,10 @@ export default function PetaWilayahPage() {
     try {
       const data = await fetchDashboardSummary();
       setRegions(data.regions);
-      const jaksel = data.regions.find(
-        (r: RegionSummary) => r.nama === "Jakarta Selatan"
+      const sorted = [...data.regions].sort(
+        (a: RegionSummary, b: RegionSummary) => b.mention_count - a.mention_count
       );
-      setSelectedRegion(jaksel || data.regions[0] || null);
+      setSelectedRegion(sorted[0] || null);
     } catch (err: any) {
       setError(err.message || "Gagal memuat data sebaran wilayah");
     } finally {

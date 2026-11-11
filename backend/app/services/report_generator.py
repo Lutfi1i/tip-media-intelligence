@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 from jinja2 import Template
 from sqlalchemy.orm import Session
-from backend.app.models import Report, Issue, Case, Region
+from backend.app.models import Report, Issue, Case, Region, RawItem
 
 REPORT_HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -206,9 +206,13 @@ REPORT_HTML_TEMPLATE = """
 
   <div class="section-title">3. Rekomendasi & Tindak Lanjut Unit (SLA)</div>
   <ul style="font-size: 13px; color: #334155; line-height: 1.8;">
-    <li>Prioritaskan pengerahan pompa bergerak mobile di titik krusial Jakarta Selatan (Kemang & Pejaten) dengan target penurunan genangan kurang dari 2 jam.</li>
-    <li>Publikasikan kanal informasi resmi mengenai rekayasa lalu lintas jalur alternatif untuk meredam kekhawatiran warga di media online.</li>
-    <li>Jadwalkan pemeliharaan berkala pompa stasioner oleh Dinas Sumber Daya Air guna memitigasi anomali berulang saat cuaca ekstrem.</li>
+    {% if issues %}
+      {% for iss in issues[:3] %}
+      <li>Prioritaskan penanganan isu <strong>{{ iss.judul }}</strong> di {{ iss.wilayah }} (Level: {{ iss.level }}, Skor: {{ iss.skor }}). Koordinasikan dengan unit teknis terkait.</li>
+      {% endfor %}
+    {% else %}
+      <li>Terus pantau feed resmi portal berita dan instansi secara berkala guna deteksi dini potensi lonjakan isu.</li>
+    {% endif %}
   </ul>
 
   <div class="footer">
@@ -228,15 +232,17 @@ def generate_report_document(
     issues = db.query(Issue).order_by(Issue.skor.desc()).all()
     regions = db.query(Region).order_by(Region.mention_count.desc()).all()
     
-    total_mention = sum(r.mention_count for r in regions) or 1284
-    priority_count = len([i for i in issues if i.level in ("CRITICAL", "HIGH")]) or 8
+    raw_count = db.query(RawItem).count()
+    total_mention = sum(r.mention_count for r in regions) or raw_count
+    priority_count = len([i for i in issues if i.level in ("CRITICAL", "HIGH")])
     cases = db.query(Case).all()
-    completed_cases = len([c for c in cases if c.status == "selesai"]) or 6
+    completed_cases = len([c for c in cases if c.status == "selesai"])
+    affected_regions = len([r for r in regions if r.mention_count > 0])
 
     kpi = {
         "mention_unik": total_mention,
         "isu_prioritas": priority_count,
-        "wilayah_terdampak": len([r for r in regions if r.mention_count > 0]) or 7,
+        "wilayah_terdampak": affected_regions,
         "kasus_selesai": completed_cases,
     }
 
