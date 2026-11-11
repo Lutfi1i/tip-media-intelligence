@@ -147,9 +147,9 @@ tip-media-intelligence/
 # Di terminal 1:
 .\start_backend.bat
 # Atau:
-backend\venv\Scripts\uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+backend\venv\Scripts\uvicorn backend.app.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8001
 ```
-Backend akan aktif di `http://127.0.0.1:8000`. Dokumentasi OpenAPI Swagger interaktif tersedia di: `http://127.0.0.1:8000/docs`.
+Backend akan aktif di `http://127.0.0.1:8001`. Dokumentasi OpenAPI Swagger interaktif tersedia di: `http://127.0.0.1:8001/docs`.
 
 #### 2. Jalankan Frontend (Next.js):
 ```powershell
