@@ -213,6 +213,15 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     base_health = 100.0
     crit_penalty = critical_count * 12.0
     high_penalty = high_count * 5.0
+    neg_now = (
+        db.query(ItemAnalysis)
+        .join(RawItem, ItemAnalysis.item_id == RawItem.id)
+        .filter(
+            RawItem.published_at >= window_now_start,
+            func.lower(ItemAnalysis.sentimen).in_(("negatif", "negative")),
+        )
+        .count()
+    )
     neg_ratio = (neg_now / vol_now) if vol_now > 0 else 0.1
     sentiment_penalty = max(0.0, (neg_ratio - 0.20) * 40.0)
     health_index = max(18.0, min(98.5, round(base_health - crit_penalty - high_penalty - sentiment_penalty, 1)))
@@ -304,7 +313,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "id": itm.id,
             "judul": itm.judul,
             "penerbit": itm.penerbit,
-            "url": itm.url,
+            "url": itm.url_kanonik,
             "published_at": itm.published_at.isoformat() if itm.published_at else None,
             "sentimen": an.sentimen if an else "netral",
             "topik": an.topik if an else "Umum",

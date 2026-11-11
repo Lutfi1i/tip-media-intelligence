@@ -9,12 +9,18 @@ import { ThemeToggle } from "./ThemeToggle";
 
 const navSections = [
   {
-    group: "MONITOR",
+    group: "MONITORING LIVE",
+    groupColor: "text-sky-500 dark:text-sky-400",
     items: [
       {
         label: "Dashboard",
         href: "/",
         pathDisplay: "radar.tipmedia.id/dashboard",
+        iconColor: "text-sky-500",
+        activeClass: "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25",
+        hoverClass: "hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400",
+        badge: "LIVE",
+        badgeColor: "bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -25,6 +31,11 @@ const navSections = [
         label: "Peta Wilayah",
         href: "/peta",
         pathDisplay: "radar.tipmedia.id/peta-sebaran",
+        iconColor: "text-emerald-500",
+        activeClass: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25",
+        hoverClass: "hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400",
+        badge: "PIXEL",
+        badgeColor: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -35,6 +46,11 @@ const navSections = [
         label: "Monitoring Feed",
         href: "/monitoring",
         pathDisplay: "radar.tipmedia.id/listening-rules",
+        iconColor: "text-purple-500",
+        activeClass: "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/25",
+        hoverClass: "hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400",
+        badge: "RULES",
+        badgeColor: "bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -45,11 +61,17 @@ const navSections = [
   },
   {
     group: "ANALISIS & RESPON",
+    groupColor: "text-amber-500 dark:text-amber-400",
     items: [
       {
         label: "Isu & Alert",
         href: "/isu",
         pathDisplay: "radar.tipmedia.id/antrean-isu",
+        iconColor: "text-amber-500",
+        activeClass: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/25",
+        hoverClass: "hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400",
+        badge: "ANOMALI",
+        badgeColor: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -60,6 +82,11 @@ const navSections = [
         label: "Papan Kasus",
         href: "/kasus",
         pathDisplay: "radar.tipmedia.id/penanganan-kasus",
+        iconColor: "text-rose-500",
+        activeClass: "bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-md shadow-rose-500/25",
+        hoverClass: "hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400",
+        badge: "SLA",
+        badgeColor: "bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -70,6 +97,11 @@ const navSections = [
         label: "Laporan Eksekutif",
         href: "/laporan",
         pathDisplay: "radar.tipmedia.id/briefing-pimpinan",
+        iconColor: "text-cyan-500",
+        activeClass: "bg-gradient-to-r from-cyan-500 to-blue-700 text-white shadow-md shadow-cyan-500/25",
+        hoverClass: "hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400",
+        badge: "BRIEF",
+        badgeColor: "bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -80,11 +112,17 @@ const navSections = [
   },
   {
     group: "TATA KELOLA",
+    groupColor: "text-teal-500 dark:text-teal-400",
     items: [
       {
         label: "Audit Trail",
         href: "/audit",
         pathDisplay: "radar.tipmedia.id/integritas-log",
+        iconColor: "text-teal-500",
+        activeClass: "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/25",
+        hoverClass: "hover:bg-teal-500/10 hover:text-teal-600 dark:hover:text-teal-400",
+        badge: "AUDIT",
+        badgeColor: "bg-teal-500/20 text-teal-600 dark:text-teal-300 border border-teal-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -128,21 +166,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-black text-zinc-900 dark:text-zinc-100 antialiased selection:bg-zinc-300 dark:selection:bg-zinc-800 transition-colors">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-black text-zinc-900 dark:text-zinc-100 antialiased selection:bg-sky-500/20 transition-colors">
       {/* Top Tactical Command Header */}
       <header className="bg-white/95 dark:bg-black/95 backdrop-blur border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 h-14 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center space-x-3 min-w-0">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="relative p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 group-hover:border-zinc-500 transition-colors">
-              <BrandMark className="w-5 h-5 text-zinc-900 dark:text-zinc-100" />
+            <div className="relative p-1.5 rounded-lg bg-gradient-to-br from-sky-500/20 to-blue-600/20 border border-sky-500/40 text-sky-500 group-hover:border-sky-500 transition-colors shadow-xs">
+              <BrandMark className="w-5 h-5 text-sky-500" />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-radarblip" />
             </div>
             <div className="hidden sm:block">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black tracking-wider text-zinc-900 dark:text-white uppercase">
+                <span className="text-xs font-black tracking-wider bg-gradient-to-r from-sky-500 to-blue-600 bg-clip-text text-transparent uppercase">
                   RADAR
                 </span>
-                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
                   MEDIA INTELLIGENCE
                 </span>
               </div>
@@ -161,17 +199,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             type="button"
             onClick={handleSyncRealData}
             disabled={isPolling}
-            className="min-h-[36px] px-3.5 py-1.5 rounded-md text-xs font-mono font-semibold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 transition-all disabled:opacity-50 flex items-center gap-2 shadow-xs"
+            className="min-h-[36px] px-3.5 py-1.5 rounded-md text-xs font-mono font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-sky-500/20"
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                isPolling ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
+                isPolling ? "bg-amber-300 animate-pulse" : "bg-emerald-300"
               }`}
             />
             {isPolling ? "Menarik Feed..." : "Tarik Berita Nyata"}
           </button>
 
-          <div className="hidden md:flex items-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-md px-2.5 py-1">
+          <div className="hidden md:flex items-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md px-2.5 py-1">
             <label htmlFor="role-select" className="text-xs text-zinc-500 dark:text-zinc-400 mr-1.5 font-medium font-mono">
               Peran:
             </label>
@@ -192,7 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <ThemeToggle />
 
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-800">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="hidden sm:inline">Feed Live</span>
             <span className="sm:hidden">Live</span>
@@ -201,33 +239,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {syncMessage && (
-        <div className="bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs px-6 py-2 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 font-mono">
+        <div className="bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-200 text-xs px-6 py-2 flex items-center justify-between border-b border-sky-200 dark:border-sky-800 font-mono">
           <span className="font-medium">{syncMessage}</span>
-          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Memperbarui tampilan...</span>
+          <span className="text-[11px] text-sky-600 dark:text-sky-400">Memperbarui tampilan...</span>
         </div>
       )}
 
-      {/* Main Workspace with Left Radar Command Sidebar */}
+      {/* Main Workspace with Left Colorful Radar Command Sidebar */}
       <div className="flex-1 flex flex-col md:flex-row">
-        {/* Left Vertical Sidebar (Desktop) */}
-        <aside className="hidden md:flex md:w-56 lg:w-60 bg-zinc-50 dark:bg-black border-r border-zinc-200 dark:border-zinc-800 flex-col justify-between shrink-0 select-none">
+        {/* Left Colorful Sidebar (Desktop) */}
+        <aside className="hidden md:flex md:w-60 lg:w-64 bg-zinc-50/80 dark:bg-[#07090E] border-r border-zinc-200 dark:border-zinc-800/80 flex-col justify-between shrink-0 select-none backdrop-blur-sm">
           <div className="p-4 space-y-6">
-            <div className="px-3 pt-1">
-              <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-zinc-400 dark:text-zinc-500">
-                PUSAT KOMANDO
-              </p>
-              <p className="text-xs font-bold text-zinc-900 dark:text-zinc-200 mt-0.5">
+            <div className="px-3 pt-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 animate-pulse" />
+                <p className="text-[10px] font-mono font-black tracking-widest uppercase text-sky-600 dark:text-sky-400">
+                  PUSAT KOMANDO
+                </p>
+              </div>
+              <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                 DKI Jakarta &amp; Bodetabek
               </p>
             </div>
 
-            <nav className="space-y-5" aria-label="Menu Pusat Komando">
+            <nav className="space-y-6" aria-label="Menu Pusat Komando">
               {navSections.map((sec) => (
-                <div key={sec.group} className="space-y-1">
-                  <p className="px-3 text-[10px] font-mono font-bold tracking-wider uppercase text-zinc-400 dark:text-zinc-500">
-                    {sec.group}
-                  </p>
-                  <div className="space-y-0.5">
+                <div key={sec.group} className="space-y-1.5">
+                  <div className="px-3 flex items-center justify-between">
+                    <p className={`text-[10px] font-mono font-bold tracking-wider uppercase ${sec.groupColor}`}>
+                      {sec.group}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
                     {sec.items.map((item) => {
                       const isActive =
                         item.href === "/"
@@ -237,16 +280,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <Link
                           key={item.href}
                           href={item.href}
-                          className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                          className={`flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-all group ${
                             isActive
-                              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black font-semibold shadow-xs"
-                              : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/50 dark:hover:bg-zinc-900"
+                              ? item.activeClass
+                              : `text-zinc-600 dark:text-zinc-400 ${item.hoverClass} hover:bg-zinc-100 dark:hover:bg-zinc-900/60`
                           }`}
                         >
-                          <span className={isActive ? "text-white dark:text-black" : "text-zinc-400 dark:text-zinc-500"}>
-                            {item.icon}
-                          </span>
-                          <span>{item.label}</span>
+                          <div className="flex items-center gap-2.5">
+                            <span className={isActive ? "text-white" : item.iconColor}>
+                              {item.icon}
+                            </span>
+                            <span className={isActive ? "font-bold text-white" : "font-semibold"}>
+                              {item.label}
+                            </span>
+                          </div>
+                          {item.badge && (
+                            <span
+                              className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                isActive
+                                  ? "bg-white/20 text-white"
+                                  : item.badgeColor
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
@@ -256,14 +314,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
 
-          <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-950/60 text-xs text-zinc-500 dark:text-zinc-400 space-y-1.5">
+          <div className="p-4 border-t border-zinc-200 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 text-xs space-y-2">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-zinc-500">Jalur Radar</span>
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">ONLINE</span>
+              <span className="text-zinc-500 font-mono">Radar Status</span>
+              <span className="font-mono text-emerald-500 font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                ONLINE
+              </span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-zinc-500">Kemendagri</span>
-              <span className="font-mono text-zinc-700 dark:text-zinc-300">14 Wilayah</span>
+              <span className="text-zinc-500 font-mono">Kemendagri</span>
+              <span className="font-mono text-sky-500 font-bold">14 Wilayah Aktif</span>
             </div>
             <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
               PT Technosoft Indo Prima
@@ -273,7 +334,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile Navigation Bar (< md) */}
         <nav
-          className="flex md:hidden overflow-x-auto bg-zinc-50 dark:bg-black px-3 py-2 space-x-1.5 border-b border-zinc-200 dark:border-zinc-800"
+          className="flex md:hidden overflow-x-auto bg-white dark:bg-black px-3 py-2 space-x-1.5 border-b border-zinc-200 dark:border-zinc-800"
           aria-label="Menu Mobile"
         >
           {allItems.map((item) => {
@@ -287,10 +348,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={`whitespace-nowrap min-h-[40px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                   isActive
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
-                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white"
+                    ? item.activeClass
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
+                <span className={isActive ? "text-white" : item.iconColor}>
+                  {item.icon}
+                </span>
                 <span>{item.label}</span>
               </Link>
             );
