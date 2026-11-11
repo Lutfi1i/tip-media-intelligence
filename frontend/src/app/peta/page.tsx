@@ -33,24 +33,28 @@ export default function PetaWilayahPage() {
     loadData();
   }, []);
 
-  const getTierStyle = (tier: string) => {
+  const getTierStyle = (tier: string, isSelected: boolean) => {
+    if (isSelected) {
+      return "bg-sky-500/20 border-sky-400 text-white ring-2 ring-sky-400/80 shadow-md shadow-sky-500/10";
+    }
     switch (tier) {
       case ">=60":
-        return "bg-[#1E3A8A] text-white border-[#1E3A8A]";
+        return "bg-sky-950/70 text-sky-200 border-sky-600/70 hover:border-sky-400";
       case "30-59":
-        return "bg-[#2563EB] text-white border-[#2563EB]";
+        return "bg-blue-950/60 text-blue-200 border-blue-700/60 hover:border-blue-500";
       case "15-29":
-        return "bg-[#BFDBFE] text-slate-900 border-[#93C5FD]";
+        return "bg-[#16203C] text-slate-200 border-[#1E2A4A] hover:border-slate-500";
       default:
-        return "bg-[#EFF6FF] text-slate-900 border-slate-200";
+        return "bg-[#10172E] text-slate-300 border-[#1E2A4A] hover:border-slate-600";
     }
   };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
-        <p className="text-sm font-semibold text-slate-700">
-          Memuat peta skematis sebaran mention DKI Jakarta &amp; Bodetabek...
+      <div className="panel p-12 text-center">
+        <div className="inline-block w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-sm font-bold text-slate-200">
+          Memindai Sebaran Wilayah Kemendagri...
         </p>
       </div>
     );
@@ -58,15 +62,13 @@ export default function PetaWilayahPage() {
 
   if (error) {
     return (
-      <div className="bg-white border border-red-200 rounded-xl p-8 max-w-lg mx-auto my-8">
-        <h2 className="text-base font-bold text-red-900">
-          Gagal Memuat Peta Wilayah
-        </h2>
-        <p className="text-sm text-slate-600 mt-1 mb-4">{error}</p>
+      <div className="panel border-red-500/40 p-8 max-w-lg mx-auto my-8 bg-red-950/20">
+        <h2 className="text-base font-bold text-red-400">Gagal Memuat Peta Wilayah</h2>
+        <p className="text-xs text-slate-300 mt-1 mb-4">{error}</p>
         <button
           type="button"
           onClick={loadData}
-          className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg"
+          className="min-h-[40px] px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg"
         >
           Coba Lagi
         </button>
@@ -76,30 +78,40 @@ export default function PetaWilayahPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
-          Peta Wilayah
-        </p>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-          Di mana isu paling ramai dibicarakan
-        </h1>
+      <div className="pb-2 border-b border-[#1E2A4A]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-sky-400">
+            GEOGRAPHIC RADAR &bull; SEBARAN INSIDEN
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+            Sebaran Wilayah &amp; Deteksi Titik Panas
+          </h1>
+        </div>
+        <div className="text-xs font-mono text-slate-400">
+          Agregasi Data: 24 Jam Terakhir
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left 7 Cols: Schematic Choropleth Map matching Slide 9 */}
-        <section className="lg:col-span-7 bg-white rounded-xl border border-slate-200/90 p-6 flex flex-col justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left 7 Cols: Schematic Tactical Radar Grid */}
+        <section className="lg:col-span-7 panel p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-base font-bold text-slate-900">
-                Sebaran mention per wilayah &middot; 24 jam (peta skematis)
-              </h2>
-              <span className="text-xs text-slate-500">
-                Klik wilayah untuk detail
+            <div className="flex items-center justify-between pb-3 mb-5 border-b border-[#1E2A4A]">
+              <div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Matriks Skematis DKI Jakarta &amp; Bodetabek
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Klik petak wilayah untuk melihat detail metrik dan isu aktif
+                </p>
+              </div>
+              <span className="text-[11px] font-mono font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                11 WILAYAH
               </span>
             </div>
 
-            {/* 4-Column Schematic Layout matching Slide 9 */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto my-2">
+            {/* Tactical Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto my-3">
               {/* Row 1 */}
               <div className="hidden sm:block" />
               <div>{renderRegionTile("Jakarta Utara", "Jakut")}</div>
@@ -115,92 +127,127 @@ export default function PetaWilayahPage() {
               {/* Row 3 */}
               <div className="hidden sm:block" />
               <div>{renderRegionTile("Jakarta Selatan", "Jaksel")}</div>
-              <div className="hidden sm:block" />
+              <div>{renderRegionTile("Tangerang", "Tangerang")}</div>
               <div className="hidden sm:block" />
 
               {/* Row 4 */}
               <div className="hidden sm:block" />
               <div>{renderRegionTile("Depok", "Depok")}</div>
               <div>{renderRegionTile("Bogor", "Bogor")}</div>
-              <div className="hidden sm:block" />
+              <div>{renderRegionTile("Tangerang Selatan", "Tangsel")}</div>
             </div>
           </div>
 
-          {/* Legend matching Slide 9 */}
-          <div className="mt-8 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-5 text-xs font-medium text-slate-600">
-            <span className="inline-flex items-center">
-              <span className="w-3.5 h-3.5 rounded-sm bg-[#EFF6FF] border border-slate-300 mr-1.5" />
-              &lt;15
-            </span>
-            <span className="inline-flex items-center">
-              <span className="w-3.5 h-3.5 rounded-sm bg-[#BFDBFE] mr-1.5" />
-              15&ndash;29
-            </span>
-            <span className="inline-flex items-center">
-              <span className="w-3.5 h-3.5 rounded-sm bg-[#2563EB] mr-1.5" />
-              30&ndash;59
-            </span>
-            <span className="inline-flex items-center">
-              <span className="w-3.5 h-3.5 rounded-sm bg-[#1E3A8A] mr-1.5" />
-              &ge;60
-            </span>
+          {/* Tactical Legend */}
+          <div className="mt-8 pt-4 border-t border-[#1E2A4A] flex flex-wrap items-center justify-between gap-3 text-xs">
+            <span className="text-slate-400 font-mono text-[11px]">Kepadatan Sebaran:</span>
+            <div className="flex items-center space-x-3 text-[11px] font-mono">
+              <span className="inline-flex items-center text-slate-300">
+                <span className="w-3 h-3 rounded bg-[#10172E] border border-[#1E2A4A] mr-1.5" />
+                &lt;15
+              </span>
+              <span className="inline-flex items-center text-slate-300">
+                <span className="w-3 h-3 rounded bg-[#16203C] border border-[#1E2A4A] mr-1.5" />
+                15-29
+              </span>
+              <span className="inline-flex items-center text-blue-300">
+                <span className="w-3 h-3 rounded bg-blue-900 border border-blue-600 mr-1.5" />
+                30-59
+              </span>
+              <span className="inline-flex items-center text-sky-300 font-bold">
+                <span className="w-3 h-3 rounded bg-sky-800 border border-sky-400 mr-1.5" />
+                &ge;60
+              </span>
+            </div>
           </div>
         </section>
 
-        {/* Right 5 Cols: Region Detail Card matching Slide 9 */}
-        <section className="lg:col-span-5 bg-white rounded-xl border border-slate-200/90 p-6 flex flex-col justify-between">
+        {/* Right 5 Cols: Tactical Region Intel Panel */}
+        <section className="lg:col-span-5 panel p-6 flex flex-col justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900 pb-4 border-b border-slate-100">
-              Detail: {selectedRegion ? selectedRegion.nama : "Pilih Wilayah"}
-            </h2>
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E2A4A]">
+              <div>
+                <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-sky-400">
+                  DETAIL SINYAL WILAYAH
+                </span>
+                <h2 className="text-base font-black text-white mt-0.5">
+                  {selectedRegion ? selectedRegion.nama : "Pilih Wilayah"}
+                </h2>
+              </div>
+              {selectedRegion && (
+                <span className="font-mono text-xs px-2 py-0.5 bg-[#16203C] text-slate-300 rounded border border-[#1E2A4A]">
+                  Kode {selectedRegion.kode_wilayah}
+                </span>
+              )}
+            </div>
 
             {selectedRegion ? (
-              <dl className="divide-y divide-slate-100 text-sm mt-2">
-                <div className="py-3.5 flex items-center justify-between">
-                  <dt className="text-slate-500">Mention</dt>
-                  <dd className="font-extrabold text-slate-900 text-base">
-                    {selectedRegion.mention_count}
-                  </dd>
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-[#16203C] p-3.5 rounded-lg border border-[#1E2A4A]">
+                    <div className="text-[11px] font-mono text-slate-400 uppercase">
+                      Total Berita Terkait
+                    </div>
+                    <div className="text-2xl font-black font-mono text-sky-400 mt-1">
+                      {selectedRegion.mention_count}
+                    </div>
+                  </div>
+
+                  <div className="bg-[#16203C] p-3.5 rounded-lg border border-[#1E2A4A]">
+                    <div className="text-[11px] font-mono text-slate-400 uppercase">
+                      Sentimen Negatif
+                    </div>
+                    <div
+                      className={`text-2xl font-black font-mono mt-1 ${
+                        selectedRegion.sentiment_negative_pct > 50
+                          ? "text-red-400"
+                          : "text-slate-200"
+                      }`}
+                    >
+                      {selectedRegion.sentiment_negative_pct}%
+                    </div>
+                  </div>
                 </div>
-                <div className="py-3.5 flex items-center justify-between">
-                  <dt className="text-slate-500">Konten unik</dt>
-                  <dd className="font-extrabold text-slate-900 text-base">
-                    {selectedRegion.unique_content_count}
-                  </dd>
+
+                <div className="bg-[#16203C] p-4 rounded-lg border border-[#1E2A4A] space-y-3">
+                  <div>
+                    <div className="text-[11px] font-mono text-slate-400 uppercase">
+                      Isu Dominan / Terkini
+                    </div>
+                    <div className="text-sm font-bold text-slate-200 mt-1">
+                      {selectedRegion.top_issue || "Situasi aman dan kondusif"}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-[#1E2A4A] flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Keyakinan Lokasi Gazetir:</span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      {Math.round(selectedRegion.confidence * 100)}%
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Koordinat Pusat:</span>
+                    <span className="font-mono text-slate-300">
+                      {selectedRegion.lat.toFixed(4)}, {selectedRegion.lng.toFixed(4)}
+                    </span>
+                  </div>
                 </div>
-                <div className="py-3.5 flex items-center justify-between">
-                  <dt className="text-slate-500">Sentimen negatif</dt>
-                  <dd className="font-extrabold text-slate-900 text-base">
-                    {selectedRegion.sentiment_negative_pct}%
-                  </dd>
-                </div>
-                <div className="py-3.5 flex items-center justify-between">
-                  <dt className="text-slate-500">Isu utama</dt>
-                  <dd className="font-extrabold text-slate-900 text-right">
-                    {selectedRegion.top_issue || "Kondusif"}
-                  </dd>
-                </div>
-                <div className="py-3.5 flex items-center justify-between">
-                  <dt className="text-slate-500">Keyakinan lokasi</dt>
-                  <dd className="font-extrabold text-slate-900 font-mono">
-                    {selectedRegion.confidence.toFixed(2).replace(".", ",")}
-                  </dd>
-                </div>
-              </dl>
+              </div>
             ) : (
-              <p className="text-sm text-slate-500 py-8">
-                Pilih salah satu kotak wilayah di samping untuk melihat rincian.
+              <p className="text-xs text-slate-400 py-10 text-center">
+                Pilih salah satu kotak wilayah pada radar untuk melihat telemetri.
               </p>
             )}
           </div>
 
           {selectedRegion && (
-            <div className="mt-6 pt-2">
+            <div className="mt-6 pt-4 border-t border-[#1E2A4A]">
               <Link
                 href={`/isu?wilayah=${encodeURIComponent(selectedRegion.nama)}`}
-                className="w-full min-h-[44px] inline-flex items-center justify-center py-2.5 px-4 bg-[#2563EB] hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors"
+                className="w-full min-h-[42px] inline-flex items-center justify-center py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
               >
-                Buka isu terkait
+                Telusuri Isu di {selectedRegion.nama} &rarr;
               </Link>
             </div>
           )}
@@ -219,16 +266,20 @@ export default function PetaWilayahPage() {
       <button
         type="button"
         onClick={() => reg && setSelectedRegion(reg)}
-        className={`w-full min-h-[78px] p-3.5 rounded-xl border text-left transition-all cursor-pointer ${getTierStyle(
-          tier
-        )} ${
+        className={`w-full min-h-[76px] p-3 rounded-xl border text-left transition-all cursor-pointer relative ${getTierStyle(
+          tier,
           isSelected
-            ? "ring-2 ring-offset-2 ring-blue-600"
-            : "hover:opacity-95"
-        }`}
+        )}`}
       >
-        <div className="text-xs font-semibold opacity-90">{shortLabel}</div>
-        <div className="text-2xl font-extrabold leading-tight mt-1">{count}</div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold">{shortLabel}</span>
+          {count > 0 && (
+            <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+          )}
+        </div>
+        <div className="text-xl font-black font-mono mt-1 leading-tight">
+          {count}
+        </div>
       </button>
     );
   }

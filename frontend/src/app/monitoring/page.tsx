@@ -127,9 +127,10 @@ export default function MonitoringPage() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
-        <p className="text-sm font-semibold text-slate-700">
-          Memuat parameter profil monitoring...
+      <div className="panel p-12 text-center">
+        <div className="inline-block w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-sm font-bold text-slate-200">
+          Memuat Aturan &amp; Profil Pemantauan...
         </p>
       </div>
     );
@@ -137,29 +138,39 @@ export default function MonitoringPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
-          Monitoring
-        </p>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-          Atur wilayah, kata kunci, dan ambang alert
-        </h1>
+      <div className="pb-2 border-b border-[#1E2A4A]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-sky-400">
+            LISTENING STUDIO &bull; QUERY BUILDER
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+            Konfigurasi Profil &amp; Ambang Alert
+          </h1>
+        </div>
+        <div className="text-xs font-mono text-slate-400">
+          Versi Aktif: v{activeProfile?.versi || 1}
+        </div>
       </div>
 
-      {/* Main Card matching Slide 10 */}
-      <section className="bg-white rounded-xl border border-slate-200/90 p-6 sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-6">
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
-            Profil:{" "}
-            {activeProfile?.nama || "Kesiapsiagaan Banjir - Jakarta Selatan"}
-          </h2>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-            Aktif &middot; v{activeProfile?.versi || 3}
+      <section className="panel p-6 sm:p-8 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#1E2A4A]">
+          <div>
+            <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-sky-400">
+              PROFIL AKTIF
+            </span>
+            <h2 className="text-lg sm:text-xl font-bold text-white mt-0.5">
+              {activeProfile?.nama || "Pemantauan Isu Publik & Layanan"}
+            </h2>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            ONLINE &bull; v{activeProfile?.versi || 1}
           </span>
         </div>
 
         {saveMessage && (
-          <div className="mb-6 p-3.5 bg-emerald-50 border border-emerald-300 rounded-lg text-sm text-emerald-900 font-semibold">
+          <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/30 rounded-lg text-xs text-emerald-300 font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             {saveMessage}
           </div>
         )}
@@ -168,22 +179,20 @@ export default function MonitoringPage() {
           {/* Left Column: Wilayah, Kata kunci, Pengecualian */}
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-500 mb-2">
-                Wilayah
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Wilayah Pantauan (Gazetteer)
               </label>
               <div className="flex flex-wrap gap-2 mb-2.5">
                 {wilayahList.map((w) => (
                   <span
                     key={w}
-                    className="inline-flex items-center bg-[#EFF6FF] text-[#1E3A8A] text-xs font-bold px-3 py-1.5 rounded-full border border-blue-200"
+                    className="inline-flex items-center bg-[#16203C] text-sky-300 text-xs font-semibold px-3 py-1.5 rounded-full border border-[#1E2A4A]"
                   >
                     {w}
                     <button
                       type="button"
-                      onClick={() =>
-                        handleRemoveTag(wilayahList, setWilayahList, w)
-                      }
-                      className="ml-2 text-blue-700 hover:text-red-700 font-bold"
+                      onClick={() => handleRemoveTag(wilayahList, setWilayahList, w)}
+                      className="ml-2 text-slate-400 hover:text-red-400 font-bold"
                       aria-label={`Hapus wilayah ${w}`}
                     >
                       &times;
@@ -194,7 +203,7 @@ export default function MonitoringPage() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Tambah wilayah pantauan..."
+                  placeholder="Tambah wilayah..."
                   value={newWilayah}
                   onChange={(e) => setNewWilayah(e.target.value)}
                   onKeyDown={(e) =>
@@ -206,7 +215,7 @@ export default function MonitoringPage() {
                       () => setNewWilayah("")
                     )
                   }
-                  className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-600 focus:outline-none"
+                  className="flex-1 text-xs bg-[#16203C] border border-[#1E2A4A] rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -218,7 +227,7 @@ export default function MonitoringPage() {
                       () => setNewWilayah("")
                     )
                   }
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300"
+                  className="px-3 py-2 bg-[#16203C] hover:bg-[#1E2A4A] text-slate-200 text-xs font-semibold rounded-lg border border-[#1E2A4A]"
                 >
                   Tambah
                 </button>
@@ -226,22 +235,20 @@ export default function MonitoringPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-500 mb-2">
-                Kata kunci
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Kata Kunci &amp; Sinyal Insiden
               </label>
               <div className="flex flex-wrap gap-2 mb-2.5">
                 {keywordList.map((k) => (
                   <span
                     key={k}
-                    className="inline-flex items-center bg-[#EFF6FF] text-[#1E3A8A] text-xs font-bold px-3 py-1.5 rounded-full border border-blue-200"
+                    className="inline-flex items-center bg-[#16203C] text-sky-300 text-xs font-semibold px-3 py-1.5 rounded-full border border-[#1E2A4A]"
                   >
                     {k}
                     <button
                       type="button"
-                      onClick={() =>
-                        handleRemoveTag(keywordList, setKeywordList, k)
-                      }
-                      className="ml-2 text-blue-700 hover:text-red-700 font-bold"
+                      onClick={() => handleRemoveTag(keywordList, setKeywordList, k)}
+                      className="ml-2 text-slate-400 hover:text-red-400 font-bold"
                       aria-label={`Hapus kata kunci ${k}`}
                     >
                       &times;
@@ -252,7 +259,7 @@ export default function MonitoringPage() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Tambah kata kunci..."
+                  placeholder="Tambah kata kunci insiden..."
                   value={newKeyword}
                   onChange={(e) => setNewKeyword(e.target.value)}
                   onKeyDown={(e) =>
@@ -264,7 +271,7 @@ export default function MonitoringPage() {
                       () => setNewKeyword("")
                     )
                   }
-                  className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-600 focus:outline-none"
+                  className="flex-1 text-xs bg-[#16203C] border border-[#1E2A4A] rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -276,7 +283,7 @@ export default function MonitoringPage() {
                       () => setNewKeyword("")
                     )
                   }
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300"
+                  className="px-3 py-2 bg-[#16203C] hover:bg-[#1E2A4A] text-slate-200 text-xs font-semibold rounded-lg border border-[#1E2A4A]"
                 >
                   Tambah
                 </button>
@@ -284,26 +291,20 @@ export default function MonitoringPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-500 mb-2">
-                Pengecualian
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Pengecualian / Noise Filter
               </label>
               <div className="flex flex-wrap gap-2 mb-2.5">
                 {pengecualianList.map((p) => (
                   <span
                     key={p}
-                    className="inline-flex items-center bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-300"
+                    className="inline-flex items-center bg-[#16203C] text-red-300 text-xs font-semibold px-3 py-1.5 rounded-full border border-red-500/20"
                   >
                     {p}
                     <button
                       type="button"
-                      onClick={() =>
-                        handleRemoveTag(
-                          pengecualianList,
-                          setPengecualianList,
-                          p
-                        )
-                      }
-                      className="ml-2 text-slate-500 hover:text-red-700 font-bold"
+                      onClick={() => handleRemoveTag(pengecualianList, setPengecualianList, p)}
+                      className="ml-2 text-slate-400 hover:text-red-400 font-bold"
                       aria-label={`Hapus pengecualian ${p}`}
                     >
                       &times;
@@ -326,7 +327,7 @@ export default function MonitoringPage() {
                       () => setNewPengecualian("")
                     )
                   }
-                  className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:border-blue-600 focus:outline-none"
+                  className="flex-1 text-xs bg-[#16203C] border border-[#1E2A4A] rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -338,7 +339,7 @@ export default function MonitoringPage() {
                       () => setNewPengecualian("")
                     )
                   }
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300"
+                  className="px-3 py-2 bg-[#16203C] hover:bg-[#1E2A4A] text-slate-200 text-xs font-semibold rounded-lg border border-[#1E2A4A]"
                 >
                   Tambah
                 </button>
@@ -349,14 +350,14 @@ export default function MonitoringPage() {
           {/* Right Column: Kategori, Sumber data, Ambang alert */}
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-500 mb-2">
-                Kategori
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Kategori Masalah
               </label>
               <div className="flex flex-wrap gap-2">
                 {kategoriList.map((kat) => (
                   <span
                     key={kat}
-                    className="bg-[#EFF6FF] text-[#1E3A8A] text-xs font-bold px-3.5 py-1.5 rounded-full border border-blue-200"
+                    className="bg-[#16203C] text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-full border border-[#1E2A4A]"
                   >
                     {kat}
                   </span>
@@ -365,36 +366,41 @@ export default function MonitoringPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-500 mb-2">
-                Sumber data
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Sumber Data Terhubung
               </label>
               <div className="flex flex-wrap gap-2">
-                {["Media online", "RSS", "Situs resmi", "Pengaduan"].map(
-                  (src) => (
-                    <span
-                      key={src}
-                      className="bg-[#EFF6FF] text-[#1E3A8A] text-xs font-bold px-3.5 py-1.5 rounded-full border border-blue-200"
-                    >
-                      {src}
-                    </span>
-                  )
-                )}
+                {[
+                  "Antara News Terkini",
+                  "Antara Metro",
+                  "detikcom",
+                  "CNN Indonesia",
+                  "Situs Dishub DKI",
+                  "BMKG Gempa Terkini",
+                ].map((src) => (
+                  <span
+                    key={src}
+                    className="bg-sky-500/10 text-sky-300 text-xs font-semibold px-3 py-1.5 rounded-full border border-sky-500/20"
+                  >
+                    {src}
+                  </span>
+                ))}
               </div>
             </div>
 
             <div>
               <label
                 htmlFor="ambang-range"
-                className="block text-sm font-medium text-slate-500 mb-1.5"
+                className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-1.5"
               >
-                Ambang alert
+                Ambang Deteksi Lonjakan (Anomali)
               </label>
-              <div className="text-sm font-medium text-slate-900 mb-3">
+              <div className="text-xs font-mono text-slate-200 mb-3">
                 Lonjakan{" "}
-                <strong className="font-extrabold">
+                <strong className="text-sky-400 font-bold">
                   &ge; {ambangMultiplier}&times; baseline
                 </strong>{" "}
-                &rarr; HIGH ke analis piket
+                &rarr; Otomatis eskalasi HIGH ke analis piket
               </div>
               <input
                 id="ambang-range"
@@ -403,74 +409,71 @@ export default function MonitoringPage() {
                 max="5.0"
                 step="0.5"
                 value={ambangMultiplier}
-                onChange={(e) =>
-                  setAmbangMultiplier(parseFloat(e.target.value))
-                }
-                className="w-full accent-blue-600 cursor-pointer"
+                onChange={(e) => setAmbangMultiplier(parseFloat(e.target.value))}
+                className="w-full accent-sky-400 cursor-pointer"
               />
-              <div className="flex justify-between text-xs text-slate-500 mt-1">
+              <div className="flex justify-between text-[11px] font-mono text-slate-400 mt-1">
                 <span>1,5&times;</span>
-                <span>3&times; baseline</span>
+                <span className="text-sky-400 font-bold">3&times; baseline</span>
                 <span>5&times;</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Action Buttons matching Slide 10 */}
-        <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap items-center gap-3">
+        {/* Action Buttons */}
+        <div className="mt-8 pt-6 border-t border-[#1E2A4A] flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="min-h-[44px] px-5 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+            className="min-h-[40px] px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 shadow-sm"
           >
-            {saving ? "Menyimpan..." : "Simpan & aktifkan"}
+            {saving ? "Menyimpan..." : "Simpan & Aktifkan"}
           </button>
           <button
             type="button"
             onClick={handleRun7dTest}
             disabled={testing}
-            className="min-h-[44px] px-5 py-2.5 bg-white hover:bg-blue-50 text-[#2563EB] text-sm font-bold rounded-lg border-2 border-[#2563EB] transition-colors disabled:opacity-50"
+            className="min-h-[40px] px-5 py-2.5 bg-[#16203C] hover:bg-[#1E2A4A] text-sky-400 text-xs font-bold rounded-lg border border-[#1E2A4A] transition-colors disabled:opacity-50"
           >
-            {testing ? "Menguji Data 7 Hari..." : "Uji dengan data 7 hari"}
+            {testing ? "Menguji Data 7 Hari..." : "Uji Retrospektif 7 Hari"}
           </button>
         </div>
 
+        {/* Retrospective Test Result */}
         {testResult && (
-          <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-            <div className="font-bold text-slate-900 text-sm mb-2">
-              Hasil Uji Retrospektif 7 Hari (FR-03)
+          <div className="mt-6 p-4 bg-[#16203C] border border-[#1E2A4A] rounded-xl text-xs space-y-3">
+            <div className="font-bold text-white text-xs font-mono uppercase tracking-wider">
+              HASIL UJI RETROSPEKTIF 7 HARI (FR-03)
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-white p-3 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block">Konten Diperiksa</span>
-                <span className="font-extrabold text-slate-900 text-base">
+              <div className="bg-[#10172E] p-3 rounded-lg border border-[#1E2A4A]">
+                <span className="text-slate-400 block text-[11px]">Konten Diperiksa</span>
+                <span className="font-black text-white text-base font-mono">
                   {testResult.total_historical_items_checked}
                 </span>
               </div>
-              <div className="bg-white p-3 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block">Cocok Kata Kunci</span>
-                <span className="font-extrabold text-blue-700 text-base">
+              <div className="bg-[#10172E] p-3 rounded-lg border border-[#1E2A4A]">
+                <span className="text-slate-400 block text-[11px]">Cocok Kata Kunci</span>
+                <span className="font-black text-sky-400 text-base font-mono">
                   {testResult.matches_found}
                 </span>
               </div>
-              <div className="bg-white p-3 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block">
-                  Dieliminasi Pengecualian
-                </span>
-                <span className="font-extrabold text-slate-900 text-base">
+              <div className="bg-[#10172E] p-3 rounded-lg border border-[#1E2A4A]">
+                <span className="text-slate-400 block text-[11px]">Noise Dieliminasi</span>
+                <span className="font-black text-slate-200 text-base font-mono">
                   {testResult.exclusions_filtered}
                 </span>
               </div>
-              <div className="bg-white p-3 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block">Estimasi Isu/Hari</span>
-                <span className="font-extrabold text-slate-900 text-base">
+              <div className="bg-[#10172E] p-3 rounded-lg border border-[#1E2A4A]">
+                <span className="text-slate-400 block text-[11px]">Estimasi Tangkapan/Hari</span>
+                <span className="font-black text-white text-base font-mono">
                   &plusmn;{testResult.estimated_daily_catch}
                 </span>
               </div>
             </div>
-            <p className="mt-3 text-slate-700 font-medium">
+            <p className="text-slate-300 font-medium leading-relaxed">
               {testResult.recommendation}
             </p>
           </div>

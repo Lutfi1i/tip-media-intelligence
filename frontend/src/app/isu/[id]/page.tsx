@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { fetchIssueDetail, submitIssueReview, IssueDetail } from "@/lib/api";
+import { ThreatLevelPill, SourceBadge } from "@/components/RadarUi";
 
 export default function IssueDetailPage() {
   const params = useParams();
@@ -66,9 +67,10 @@ export default function IssueDetailPage() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
-        <p className="text-sm font-semibold text-slate-700">
-          Memuat rincian isu, kutipan sumber, dan rincian skor AI...
+      <div className="panel p-12 text-center">
+        <div className="inline-block w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-sm font-bold text-slate-200">
+          Memindai Berkas Isu &amp; Kredibilitas Sumber...
         </p>
       </div>
     );
@@ -76,69 +78,60 @@ export default function IssueDetailPage() {
 
   if (error || !issue) {
     return (
-      <div className="bg-white border border-red-200 rounded-xl p-8 max-w-lg mx-auto my-8">
-        <h2 className="text-base font-bold text-red-900">
-          Isu Tidak Ditemukan
-        </h2>
-        <p className="text-sm text-slate-600 mt-1 mb-4">
-          {error || "Data isu tidak tersedia."}
+      <div className="panel border-red-500/40 p-8 max-w-lg mx-auto my-8 bg-red-950/20">
+        <h2 className="text-base font-bold text-red-400">Isu Tidak Ditemukan</h2>
+        <p className="text-xs text-slate-300 mt-1 mb-4">
+          {error || "Data isu tidak tersedia dalam basis data radar."}
         </p>
         <Link
           href="/isu"
-          className="text-blue-700 text-sm font-bold hover:underline"
+          className="text-sky-400 text-xs font-bold hover:underline"
         >
-          Kembali ke daftar antrean isu
+          &larr; Kembali ke daftar antrean isu
         </Link>
       </div>
     );
   }
 
-  const badgeStyle =
-    {
-      CRITICAL: "bg-[#B91C1C] text-white",
-      HIGH: "bg-[#FED7AA] text-[#9A3412]",
-      MEDIUM: "bg-[#DBEAFE] text-[#1E40AF]",
-      LOW: "bg-slate-200 text-slate-800",
-    }[issue.level] || "bg-slate-200 text-slate-800";
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="pb-2 border-b border-[#1E2A4A]/60 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
-            Isu &amp; Alert
+          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-sky-400">
+            RADAR INCIDENT &bull; #{issue.kode_referensi}
           </p>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-            Detail isu dan verifikasi oleh analis
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+            Verifikasi Analis &amp; Bukti Sumber
           </h1>
         </div>
         <Link
           href="/isu"
-          className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white px-3 py-2 rounded-lg border border-slate-200"
+          className="text-xs font-mono font-bold text-slate-300 hover:text-white bg-[#10172E] px-3.5 py-2 rounded-lg border border-[#1E2A4A] transition-colors"
         >
           &larr; Kembali ke Antrean
         </Link>
       </div>
 
       {actionSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-sm text-emerald-900 font-semibold">
+        <div className="p-4 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-semibold flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           {actionSuccess}
         </div>
       )}
 
-      {/* Two Separate Cards matching Slide 11 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left 8 Cols: Issue Overview & Sources */}
-        <section className="lg:col-span-8 bg-white rounded-xl border border-slate-200/90 p-6 sm:p-7 space-y-5">
-          {/* Header Row: HIGH · skor 78  Jakarta Selatan · Bencana · 05.40 WIB */}
-          <div className="flex flex-wrap items-center gap-3">
-            <span
-              className={`text-xs font-extrabold px-3 py-1 rounded-md ${badgeStyle}`}
-            >
-              {issue.level} &middot; skor {Math.round(issue.skor)}
-            </span>
-            <span className="text-sm text-slate-600 font-medium">
-              {issue.wilayah} &middot; {issue.kategori} &middot;{" "}
+      {/* Main Split: Incident Evidence & Analyst Decisions */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left 8 Cols: Issue Dossier & Real News Items */}
+        <section className="lg:col-span-8 panel p-6 sm:p-7 space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#1E2A4A]">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <ThreatLevelPill level={issue.level} score={issue.skor} />
+              <span className="text-xs font-mono text-slate-300">
+                {issue.wilayah} &bull; {issue.kategori}
+              </span>
+            </div>
+            <span className="text-xs font-mono text-slate-400">
+              Pertama dilihat:{" "}
               {new Date(issue.first_seen).toLocaleTimeString("id-ID", {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -147,184 +140,183 @@ export default function IssueDetailPage() {
             </span>
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-            {issue.judul}
-          </h2>
-
-          {/* AI Summary Box matching Slide 11 */}
-          <div className="bg-slate-100/80 rounded-xl p-4 text-sm text-slate-800 leading-relaxed">
-            <strong className="font-bold text-slate-900">Ringkasan AI:</strong>{" "}
-            {issue.ringkasan}
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-tight leading-snug">
+              {issue.judul}
+            </h2>
           </div>
 
-          {/* Sources Section matching Slide 11 */}
-          <div>
-            <h3 className="text-sm font-extrabold text-slate-900 pb-3 border-b border-slate-100">
-              Sumber &middot; {Math.max(issue.items.length, 12)} unik dari{" "}
-              {issue.current_volume || 85} konten
-            </h3>
+          {/* AI Intelligence Brief */}
+          <div className="bg-[#16203C] border border-[#1E2A4A] rounded-xl p-4 space-y-1.5">
+            <div className="text-[11px] font-mono font-bold tracking-wider uppercase text-sky-400">
+              RINGKASAN INTELIJEN AI
+            </div>
+            <p className="text-xs text-slate-200 leading-relaxed">
+              {issue.ringkasan}
+            </p>
+          </div>
 
-            <div className="divide-y divide-slate-100 text-sm">
+          {/* Evidence Articles from Real Sources */}
+          <div>
+            <div className="flex items-center justify-between pb-3 mb-2 border-b border-[#1E2A4A]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                Artikel Bukti &bull; {issue.items.length} Laporan Terverifikasi
+              </h3>
+              <span className="text-xs font-mono text-slate-400">
+                Volume: {issue.current_volume} konten
+              </span>
+            </div>
+
+            <div className="divide-y divide-[#1E2A4A]">
               {issue.items.length > 0 ? (
                 issue.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-900">
-                        {item.penerbit}: {item.judul}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                  <div key={item.id} className="py-4 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <SourceBadge source={item.penerbit} />
+                      <span className="text-[11px] font-mono text-slate-400">
+                        {new Date(item.published_at).toLocaleTimeString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        WIB
+                      </span>
+                    </div>
+
+                    <a
+                      href={item.url_kanonik}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-bold text-slate-100 hover:text-sky-300 transition-colors block"
+                    >
+                      {item.judul} &nearr;
+                    </a>
+
+                    {item.isi && (
+                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
                         {item.isi}
                       </p>
-                    </div>
-                    <div className="text-xs text-slate-500 font-mono shrink-0">
-                      {new Date(item.published_at).toLocaleTimeString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}{" "}
-                      &middot; kredibel
-                    </div>
+                    )}
                   </div>
                 ))
               ) : (
-                <>
-                  <div className="py-3.5 flex items-center justify-between">
-                    <span className="font-medium text-slate-800">
-                      Media online A
-                    </span>
-                    <span className="text-slate-500 text-xs font-mono">
-                      05.31 &middot; kredibel
-                    </span>
-                  </div>
-                  <div className="py-3.5 flex items-center justify-between">
-                    <span className="font-medium text-slate-800">
-                      Kanal pengaduan resmi
-                    </span>
-                    <span className="text-slate-500 text-xs font-mono">
-                      05.36
-                    </span>
-                  </div>
-                  <div className="py-3.5 flex items-center justify-between">
-                    <span className="font-medium text-slate-800">
-                      Unggahan publik + foto
-                    </span>
-                    <span className="text-slate-500 text-xs font-mono">
-                      05.38 &middot; cek keaslian
-                    </span>
-                  </div>
-                </>
+                <div className="py-6 text-center text-xs text-slate-400">
+                  Belum ada artikel terhubung ke isu ini.
+                </div>
               )}
             </div>
           </div>
 
           {/* 6-Factor Risk Score Breakdown */}
           {issue.alasan_skor && issue.alasan_skor.faktor && (
-            <div className="pt-4 border-t border-slate-100">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-                Rincian 6 Faktor Skor Risiko (Total:{" "}
-                {Math.round(issue.skor)}/100)
+            <div className="pt-4 border-t border-[#1E2A4A]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 font-mono">
+                Rincian 6 Faktor Skor Risiko ({Math.round(issue.skor)}/100)
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                {Object.entries(issue.alasan_skor.faktor).map(
-                  ([key, f]: any) => (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/70"
-                    >
-                      <span className="text-slate-700 capitalize font-medium">
-                        {key.replace(/_/g, " ")} ({f.bobot})
-                      </span>
-                      <span className="font-mono font-bold text-slate-900">
-                        {f.nilai}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {Object.entries(issue.alasan_skor.faktor).map(([key, f]: any) => (
+                  <div
+                    key={key}
+                    className="p-3 rounded-lg bg-[#16203C] border border-[#1E2A4A] flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 capitalize">
+                      <span>{key.replace(/_/g, " ")}</span>
+                      <span className="font-mono text-sky-400">
+                        Bobot {f.bobot}
                       </span>
                     </div>
-                  )
-                )}
+                    <div className="text-lg font-black font-mono text-white mt-1">
+                      {f.nilai}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </section>
 
-        {/* Right 4 Cols: AI Labels & Verification Buttons matching Slide 11 */}
-        <section className="lg:col-span-4 bg-white rounded-xl border border-slate-200/90 p-6 flex flex-col justify-between space-y-6">
-          <div className="space-y-5">
-            <h2 className="text-base font-extrabold text-slate-900 pb-3 border-b border-slate-100">
-              Label AI
+        {/* Right 4 Cols: Verification Action Panel */}
+        <section className="lg:col-span-4 panel p-6 space-y-6">
+          <div className="pb-3 border-b border-[#1E2A4A]">
+            <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-sky-400">
+              KEPUTUSAN ANALIS
+            </p>
+            <h2 className="text-base font-bold text-white mt-0.5">
+              Status: <span className="capitalize">{issue.status}</span>
             </h2>
-
-            <div>
-              <div className="text-sm text-slate-500">Sentimen</div>
-              <div className="text-base font-extrabold text-slate-900 mt-0.5">
-                Negatif &middot; 0,82
-              </div>
-            </div>
-
-            <div>
-              <div className="text-sm text-slate-500">Lokasi</div>
-              <div className="text-base font-extrabold text-slate-900 mt-0.5">
-                Kemang &middot; 0,71
-              </div>
-            </div>
-
-            <div>
-              <div className="text-sm text-slate-500">Status saat ini</div>
-              <div className="mt-1">
-                <span className="inline-block text-xs font-bold capitalize px-2.5 py-1 rounded bg-slate-100 text-slate-800">
-                  {issue.status}
-                </span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100">
-              <label
-                htmlFor="analyst-notes"
-                className="block text-xs font-semibold text-slate-600 mb-1.5"
-              >
-                Catatan Analis (Human-in-the-Loop)
-              </label>
-              <textarea
-                id="analyst-notes"
-                rows={3}
-                value={reviewerCatatan}
-                onChange={(e) => setReviewerCatatan(e.target.value)}
-                placeholder="Contoh: Foto dicek bukan arsip lama. Dinas SDA konfirmasi pompa Kemang rusak."
-                className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
-              />
-            </div>
           </div>
 
-          {/* 3 Verification Action Buttons matching Slide 11 */}
-          <div className="space-y-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => handleDecision("verifikasi")}
-              disabled={submitting}
-              className="w-full min-h-[44px] py-2.5 px-4 bg-[#2563EB] hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
-            >
-              Verifikasi
-            </button>
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="catatan-analis"
+                className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5"
+              >
+                Catatan Verifikasi Lapangan
+              </label>
+              <textarea
+                id="catatan-analis"
+                rows={4}
+                value={reviewerCatatan}
+                onChange={(e) => setReviewerCatatan(e.target.value)}
+                placeholder="Tuliskan hasil konfirmasi dengan unit dinas terkait atau catatan khusus..."
+                className="w-full text-xs p-3 rounded-lg bg-[#16203C] border border-[#1E2A4A] text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
+              />
+            </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => handleDecision("verifikasi")}
+                disabled={submitting}
+                className="w-full min-h-[42px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {submitting ? "Memproses..." : "Verifikasi Isu Valid"}
+              </button>
+
               <button
                 type="button"
                 onClick={() => handleDecision("koreksi")}
                 disabled={submitting}
-                className="min-h-[44px] py-2 px-3 bg-white hover:bg-blue-50 text-[#2563EB] rounded-lg border-2 border-[#2563EB] text-sm font-bold transition-colors disabled:opacity-50"
+                className="w-full min-h-[42px] px-4 py-2.5 bg-[#16203C] hover:bg-[#1E2A4A] text-slate-200 text-xs font-bold border border-[#1E2A4A] rounded-lg transition-colors disabled:opacity-50"
               >
-                Koreksi
+                Koreksi Data / Label
               </button>
+
               <button
                 type="button"
                 onClick={() => handleDecision("tolak")}
                 disabled={submitting}
-                className="min-h-[44px] py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-300 text-sm font-bold transition-colors disabled:opacity-50"
+                className="w-full min-h-[42px] px-4 py-2.5 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs font-bold border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
               >
-                Tolak
+                Tolak Isu (False Alarm)
               </button>
             </div>
           </div>
+
+          {/* Audit Trail Preview */}
+          {issue.reviews && issue.reviews.length > 0 && (
+            <div className="pt-4 border-t border-[#1E2A4A] space-y-2">
+              <div className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">
+                RIWAYAT VERIFIKASI TERAKHIR
+              </div>
+              {issue.reviews.map((rev) => (
+                <div
+                  key={rev.id}
+                  className="p-3 bg-[#16203C] rounded-lg border border-[#1E2A4A] text-xs space-y-1"
+                >
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="font-bold text-slate-200">
+                      {rev.reviewer_nama}
+                    </span>
+                    <span className="font-mono text-[10px] uppercase text-sky-400">
+                      {rev.keputusan}
+                    </span>
+                  </div>
+                  <p className="text-slate-300 text-[11px]">{rev.catatan}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

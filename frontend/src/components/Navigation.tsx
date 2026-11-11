@@ -4,30 +4,93 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { pollSources } from "@/lib/api";
+import { BrandMark } from "./RadarUi";
 
-const navItems = [
-  { label: "Dashboard", href: "/", pathDisplay: "app.tipmedia.id/dashboard" },
-  { label: "Peta Wilayah", href: "/peta", pathDisplay: "app.tipmedia.id/peta" },
+const navSections = [
   {
-    label: "Monitoring",
-    href: "/monitoring",
-    pathDisplay: "app.tipmedia.id/monitoring",
+    group: "MONITOR",
+    items: [
+      {
+        label: "Dashboard",
+        href: "/",
+        pathDisplay: "radar.tipmedia.id/dashboard",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Peta Wilayah",
+        href: "/peta",
+        pathDisplay: "radar.tipmedia.id/peta-sebaran",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+          </svg>
+        ),
+      },
+      {
+        label: "Monitoring Feed",
+        href: "/monitoring",
+        pathDisplay: "radar.tipmedia.id/listening-rules",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    label: "Isu & Alert",
-    href: "/isu",
-    pathDisplay: "app.tipmedia.id/isu",
+    group: "ANALISIS & RESPON",
+    items: [
+      {
+        label: "Isu & Alert",
+        href: "/isu",
+        pathDisplay: "radar.tipmedia.id/antrean-isu",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Papan Kasus",
+        href: "/kasus",
+        pathDisplay: "radar.tipmedia.id/papan-kasus",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        ),
+      },
+    ],
   },
-  { label: "Kasus", href: "/kasus", pathDisplay: "app.tipmedia.id/kasus" },
   {
-    label: "Laporan",
-    href: "/laporan",
-    pathDisplay: "app.tipmedia.id/laporan",
-  },
-  {
-    label: "Audit & Evaluasi",
-    href: "/audit",
-    pathDisplay: "app.tipmedia.id/audit",
+    group: "OUTPUT & TATA KELOLA",
+    items: [
+      {
+        label: "Laporan",
+        href: "/laporan",
+        pathDisplay: "radar.tipmedia.id/laporan-eksekutif",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Audit & Evaluasi",
+        href: "/audit",
+        pathDisplay: "radar.tipmedia.id/audit-governance",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        ),
+      },
+    ],
   },
 ];
 
@@ -37,10 +100,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isPolling, setIsPolling] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  const allItems = navSections.flatMap((s) => s.items);
   const activeNav =
-    navItems.find((item) =>
+    allItems.find((item) =>
       item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-    ) || navItems[0];
+    ) || allItems[0];
 
   const handleSyncRealData = async () => {
     setIsPolling(true);
@@ -49,7 +113,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const res = await pollSources(true);
       const baru = res.total_baru ?? 0;
       const dibaca = res.total_dibaca ?? 0;
-      setSyncMessage(`Sinkronisasi berhasil: ${baru} berita baru dari ${dibaca} item feed resmi.`);
+      setSyncMessage(
+        `Sinkronisasi berhasil: ${baru} berita baru dari ${dibaca} item feed resmi.`
+      );
       setTimeout(() => {
         window.location.reload();
       }, 1200);
@@ -61,16 +127,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F1F5F9] text-slate-900">
-      {/* Top Context Bar matching PRD mockup header */}
-      <header className="bg-white border-b border-slate-200 px-4 sm:px-6 h-14 flex items-center justify-between sticky top-0 z-40">
+    <div className="min-h-screen flex flex-col bg-[#0A0F1F] text-slate-100 antialiased selection:bg-sky-500/25 selection:text-sky-200">
+      {/* Top Tactical Command Header */}
+      <header className="bg-[#0C1226]/95 backdrop-blur border-b border-[#1E2A4A] px-4 sm:px-6 h-14 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center space-x-3 min-w-0">
-          <div className="hidden sm:flex items-center space-x-1.5" aria-hidden="true">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-          </div>
-          <span className="text-xs sm:text-sm font-mono text-slate-500 truncate">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="relative p-1.5 rounded-lg bg-[#10172E] border border-[#1E2A4A] text-sky-400 group-hover:border-sky-500/40 transition-colors">
+              <BrandMark className="w-5 h-5 text-sky-400" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-radarblip" />
+            </div>
+            <div className="hidden sm:block">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black tracking-wider text-white uppercase">
+                  RADAR
+                </span>
+                <span className="text-xs font-semibold text-slate-400">
+                  MEDIA INTELLIGENCE
+                </span>
+              </div>
+            </div>
+          </Link>
+
+          <span className="text-slate-600 hidden sm:inline">|</span>
+
+          <span className="text-xs font-mono text-slate-400 truncate hidden md:inline">
             {activeNav.pathDisplay}
           </span>
         </div>
@@ -80,93 +160,109 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             type="button"
             onClick={handleSyncRealData}
             disabled={isPolling}
-            className="min-h-[36px] px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-700 hover:bg-blue-600 text-white transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            className="min-h-[36px] px-3.5 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                isPolling ? "bg-amber-300 animate-pulse" : "bg-emerald-400"
+                isPolling ? "bg-amber-300 animate-pulse" : "bg-emerald-300"
               }`}
             />
-            {isPolling ? "Menarik Feed Nyata..." : "Tarik Berita Nyata"}
+            {isPolling ? "Menarik Feed..." : "Tarik Berita Nyata"}
           </button>
 
-          <div className="hidden md:flex items-center bg-slate-100 border border-slate-200 rounded-md px-2.5 py-1">
-            <label htmlFor="role-select" className="text-xs text-slate-500 mr-1.5">
+          <div className="hidden md:flex items-center bg-[#10172E] border border-[#1E2A4A] rounded-lg px-2.5 py-1">
+            <label htmlFor="role-select" className="text-xs text-slate-400 mr-1.5 font-medium">
               Peran:
             </label>
             <select
               id="role-select"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer"
             >
-              <option value="Pimpinan">Pimpinan</option>
-              <option value="Analis">Analis / Verifikator</option>
-              <option value="Supervisor">Supervisor</option>
-              <option value="PIC Unit">PIC Unit</option>
-              <option value="Admin">Admin</option>
-              <option value="Auditor">Auditor</option>
+              <option value="Pimpinan" className="bg-[#10172E] text-slate-200">Pimpinan</option>
+              <option value="Analis" className="bg-[#10172E] text-slate-200">Analis / Verifikator</option>
+              <option value="Supervisor" className="bg-[#10172E] text-slate-200">Supervisor</option>
+              <option value="PIC Unit" className="bg-[#10172E] text-slate-200">PIC Unit</option>
+              <option value="Admin" className="bg-[#10172E] text-slate-200">Admin</option>
+              <option value="Auditor" className="bg-[#10172E] text-slate-200">Auditor</option>
             </select>
           </div>
 
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
-            Feed Nyata Aktif
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="hidden sm:inline">Feed Nyata Aktif</span>
+            <span className="sm:hidden">Live</span>
           </span>
         </div>
       </header>
 
       {syncMessage && (
-        <div className="bg-slate-900 text-emerald-300 text-xs px-6 py-2 flex items-center justify-between border-b border-slate-800">
-          <span>{syncMessage}</span>
+        <div className="bg-[#10172E] text-sky-300 text-xs px-6 py-2 flex items-center justify-between border-b border-[#1E2A4A]">
+          <span className="font-medium">{syncMessage}</span>
           <span className="font-mono text-[11px] text-slate-400">Memperbarui tampilan...</span>
         </div>
       )}
 
-      {/* Main Workspace with Left Dark Navy Sidebar */}
+      {/* Main Workspace with Left Radar Command Sidebar */}
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Left Vertical Sidebar (Desktop) */}
-        <aside className="hidden md:flex md:w-56 lg:w-60 bg-[#0F172A] text-white flex-col justify-between shrink-0 select-none">
-          <div className="p-5">
-            {/* Brand Logo matching PRD Slide 8-11 */}
-            <Link
-              href="/"
-              className="flex items-baseline space-x-1.5 px-3 pb-6 mb-4 border-b border-slate-800"
-            >
-              <span className="text-xl font-extrabold tracking-tight text-white">
-                TIP
-              </span>
-              <span className="text-xl font-extrabold tracking-tight text-blue-400">
-                MI
-              </span>
-            </Link>
+        <aside className="hidden md:flex md:w-56 lg:w-60 bg-[#0C1226] border-r border-[#1E2A4A] flex-col justify-between shrink-0 select-none">
+          <div className="p-4 space-y-6">
+            <div className="px-3 pt-1">
+              <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-slate-500">
+                PUSAT KOMANDO
+              </p>
+              <p className="text-xs font-extrabold text-slate-200 mt-0.5">
+                DKI Jakarta &amp; Bodetabek
+              </p>
+            </div>
 
-            <nav className="space-y-1.5" aria-label="Menu Utama">
-              {navItems.map((item) => {
-                const isActive =
-                  item.href === "/"
-                    ? pathname === "/"
-                    : pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center px-3.5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                      isActive
-                        ? "bg-[#2563EB] text-white"
-                        : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+            <nav className="space-y-5" aria-label="Menu Pusat Komando">
+              {navSections.map((sec) => (
+                <div key={sec.group} className="space-y-1">
+                  <p className="px-3 text-[10px] font-mono font-bold tracking-wider uppercase text-slate-500">
+                    {sec.group}
+                  </p>
+                  <div className="space-y-0.5">
+                    {sec.items.map((item) => {
+                      const isActive =
+                        item.href === "/"
+                          ? pathname === "/"
+                          : pathname.startsWith(item.href);
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                            isActive
+                              ? "bg-sky-500/15 text-sky-300 border border-sky-500/30 shadow-xs"
+                              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                          }`}
+                        >
+                          <span className={isActive ? "text-sky-400" : "text-slate-500"}>
+                            {item.icon}
+                          </span>
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </nav>
           </div>
 
-          <div className="p-5 border-t border-slate-800/80 text-xs text-slate-400 space-y-1">
-            <div className="font-semibold text-slate-300">Wilayah Pilot</div>
-            <div>DKI Jakarta &amp; Bodetabek</div>
-            <div className="pt-2 text-[11px] text-slate-500">
+          <div className="p-4 border-t border-[#1E2A4A] bg-[#0A0F1F]/60 text-xs text-slate-400 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-400">Jalur Radar</span>
+              <span className="font-mono text-emerald-400 font-bold">ONLINE</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-400">Kemendagri</span>
+              <span className="font-mono text-slate-300">11 Wilayah</span>
+            </div>
+            <div className="pt-2 border-t border-[#1E2A4A]/60 text-[10px] text-slate-400 font-mono">
               PT Technosoft Indo Prima
             </div>
           </div>
@@ -174,10 +270,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile Navigation Bar (< md) */}
         <nav
-          className="flex md:hidden overflow-x-auto bg-[#0F172A] px-3 py-2 space-x-1.5 border-b border-slate-800"
+          className="flex md:hidden overflow-x-auto bg-[#0C1226] px-3 py-2 space-x-1.5 border-b border-[#1E2A4A]"
           aria-label="Menu Mobile"
         >
-          {navItems.map((item) => {
+          {allItems.map((item) => {
             const isActive =
               item.href === "/"
                 ? pathname === "/"
@@ -186,20 +282,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`whitespace-nowrap min-h-[44px] inline-flex items-center px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                className={`whitespace-nowrap min-h-[40px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   isActive
-                    ? "bg-[#2563EB] text-white"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    ? "bg-sky-500/15 text-sky-300 border border-sky-500/30"
+                    : "text-slate-400 hover:bg-slate-800/60 hover:text-white"
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

@@ -9,6 +9,7 @@ import {
   CaseCard,
   IssueItem,
 } from "@/lib/api";
+import { ThreatLevelPill } from "@/components/RadarUi";
 
 export default function PapanKasusPage() {
   const [cases, setCases] = useState<CaseCard[]>([]);
@@ -101,81 +102,84 @@ export default function PapanKasusPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
-          Notifikasi &amp; Kasus
-        </p>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-          Alert sampai ke pimpinan, kasus dipantau sampai selesai
-        </h1>
+      <div className="pb-2 border-b border-[#1E2A4A]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-sky-400">
+            INCIDENT WORKFLOW &bull; DISPATCH &amp; SLA
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+            Papan Kasus &amp; Tindak Lanjut Unit
+          </h1>
+        </div>
+        <div className="text-xs font-mono text-slate-400">
+          Total Aktif: {waitingCases.length + inProgressCases.length} Kasus
+        </div>
       </div>
 
       {approvalFeedback && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-sm text-emerald-900 font-semibold">
+        <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-semibold flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           {approvalFeedback}
         </div>
       )}
 
-      {/* Main Split matching Slide 12: Mobile Frame (Left) + Case Board (Right) */}
+      {/* Main Split: Mobile Alert (Left) + Case Kanban Board (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left 4 Cols: Simulated Mobile Alert matching Slide 12 */}
-        {/* Left 4 Cols: Executive Alert Card Preview matching Slide 10 */}
+        {/* Left 4 Cols: Executive Alert Card Preview */}
         <div className="lg:col-span-4 flex justify-center">
-          <div className="w-full max-w-[290px] bg-white border-[8px] border-[#0F172A] rounded-[28px] p-5 flex flex-col justify-between min-h-[430px] shadow-sm">
+          <div className="w-full max-w-[290px] bg-[#10172E] border-4 border-[#1E2A4A] rounded-[24px] p-5 flex flex-col justify-between min-h-[430px] shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-4 bg-[#0A0F1F] rounded-b-xl" />
+
             {topPriorityIssue ? (
               <>
-                <div>
-                  <div className="text-center text-xs text-slate-500 pb-3 mb-4 border-b border-slate-200">
+                <div className="pt-3">
+                  <div className="text-center text-[10px] font-mono text-slate-400 pb-3 mb-4 border-b border-[#1E2A4A]">
                     Notifikasi Pimpinan Siaga
                   </div>
 
-                  <div className="space-y-2.5">
-                    <div
-                      className={`text-xs font-extrabold uppercase tracking-wide ${
-                        topPriorityIssue.level === "CRITICAL"
-                          ? "text-[#B91C1C]"
-                          : topPriorityIssue.level === "HIGH"
-                          ? "text-[#C2410C]"
-                          : "text-blue-700"
-                      }`}
-                    >
-                      ALERT {topPriorityIssue.level} (Skor {topPriorityIssue.skor})
-                    </div>
+                  <div className="space-y-3">
+                    <ThreatLevelPill
+                      level={topPriorityIssue.level}
+                      score={topPriorityIssue.skor}
+                    />
 
-                    <h2 className="text-base font-extrabold text-slate-900 leading-snug line-clamp-3">
+                    <h2 className="text-sm font-bold text-white leading-snug line-clamp-3">
                       {topPriorityIssue.judul}
                     </h2>
 
-                    <p className="text-sm text-slate-600 leading-relaxed line-clamp-4">
-                      {topPriorityIssue.ringkasan || "Isu teridentifikasi dan membutuhkan penanganan unit terkait."}
+                    <p className="text-xs text-slate-300 leading-relaxed line-clamp-4">
+                      {topPriorityIssue.ringkasan ||
+                        "Isu membutuhkan penanganan unit terkait dan pemantauan berkala."}
                     </p>
 
-                    <div className="pt-2 text-sm text-slate-900 space-y-0.5">
+                    <div className="pt-2 text-xs text-slate-300 space-y-1 font-mono border-t border-[#1E2A4A]/60">
                       <div>
-                        <strong className="font-bold">Wilayah:</strong> {topPriorityIssue.wilayah}
+                        <span className="text-slate-400">Wilayah:</span>{" "}
+                        <strong className="text-slate-200">{topPriorityIssue.wilayah}</strong>
                       </div>
                       <div>
-                        <strong className="font-bold">Kategori:</strong> {topPriorityIssue.kategori}
+                        <span className="text-slate-400">Kategori:</span>{" "}
+                        <strong className="text-slate-200">{topPriorityIssue.kategori}</strong>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 pt-6">
+                <div className="grid grid-cols-2 gap-2.5 pt-5">
                   <button
                     type="button"
                     onClick={() =>
                       setApprovalFeedback(
-                        `Rekomendasi untuk isu "${topPriorityIssue.judul.slice(0, 40)}..." telah disetujui Pimpinan.`
+                        `Rekomendasi untuk isu "${topPriorityIssue.judul.slice(0, 36)}..." telah disetujui Pimpinan.`
                       )
                     }
-                    className="min-h-[42px] py-2 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors"
+                    className="min-h-[38px] py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
                   >
                     Setujui
                   </button>
                   <Link
                     href={`/isu/${topPriorityIssue.id}`}
-                    className="min-h-[42px] inline-flex items-center justify-center py-2 bg-white hover:bg-blue-50 text-[#2563EB] border-2 border-[#2563EB] text-xs font-bold rounded-lg transition-colors text-center"
+                    className="min-h-[38px] inline-flex items-center justify-center py-2 bg-[#16203C] hover:bg-[#1E2A4A] text-sky-400 border border-[#1E2A4A] text-xs font-bold rounded-lg transition-colors text-center"
                   >
                     Detail
                   </Link>
@@ -183,72 +187,103 @@ export default function PapanKasusPage() {
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center py-10">
-                <div className="text-xs font-extrabold uppercase tracking-wide text-emerald-600 mb-2">
+                <div className="text-xs font-mono font-bold tracking-wider uppercase text-emerald-400 mb-2">
                   STATUS AMAN
                 </div>
-                <h2 className="text-base font-extrabold text-slate-900 mb-2">
+                <h2 className="text-sm font-bold text-white mb-2">
                   Tidak Ada Alert Aktif
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Semua feed terpantau normal tanpa lonjakan isu kritis saat ini.
+                <p className="text-xs text-slate-400">
+                  Semua feed terpantau stabil tanpa lonjakan isu kritis.
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right 8 Cols: Papan Kasus Kanban matching Slide 12 */}
-        <section className="lg:col-span-8 bg-white rounded-xl border border-slate-200/90 p-6 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-extrabold text-slate-900">
-              Papan kasus
-            </h2>
-            <span className="text-xs text-slate-500">
-              Klik kartu kasus untuk memperbarui PIC, status, atau bukti
+        {/* Right 8 Cols: Papan Kasus Kanban */}
+        <section className="lg:col-span-8 panel p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#1E2A4A]">
+            <div>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                Papan Penanganan Kasus
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Klik kartu kasus untuk memperbarui PIC, status, atau lampiran bukti
+              </p>
+            </div>
+            <span className="text-xs font-mono text-slate-400">
+              SLA Tracker Aktif
             </span>
           </div>
 
           {loading ? (
-            <div className="py-12 text-center text-sm text-slate-500">
-              Memuat papan kasus...
+            <div className="py-12 text-center text-xs text-slate-400 font-mono">
+              Memuat data papan kasus...
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Menunggu */}
-              <div className="bg-slate-100/90 rounded-xl p-3.5 space-y-3">
-                <h3 className="text-sm font-extrabold text-slate-900 px-1">
-                  Menunggu ({waitingCases.length})
-                </h3>
+              <div className="bg-[#16203C]/80 border border-[#1E2A4A] rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-bold font-mono uppercase text-slate-300">
+                    Menunggu ({waitingCases.length})
+                  </h3>
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                </div>
                 <div className="space-y-2.5">
-                  {waitingCases.map((c) => renderCaseCard(c))}
+                  {waitingCases.length === 0 ? (
+                    <div className="text-[11px] text-slate-500 text-center py-6">
+                      Kosong
+                    </div>
+                  ) : (
+                    waitingCases.map((c) => renderCaseCard(c))
+                  )}
                 </div>
               </div>
 
               {/* Ditangani */}
-              <div className="bg-slate-100/90 rounded-xl p-3.5 space-y-3">
-                <h3 className="text-sm font-extrabold text-slate-900 px-1">
-                  Ditangani ({inProgressCases.length})
-                </h3>
+              <div className="bg-[#16203C]/80 border border-[#1E2A4A] rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-bold font-mono uppercase text-slate-300">
+                    Ditangani ({inProgressCases.length})
+                  </h3>
+                  <span className="w-2 h-2 rounded-full bg-sky-400" />
+                </div>
                 <div className="space-y-2.5">
-                  {inProgressCases.map((c) => renderCaseCard(c))}
+                  {inProgressCases.length === 0 ? (
+                    <div className="text-[11px] text-slate-500 text-center py-6">
+                      Kosong
+                    </div>
+                  ) : (
+                    inProgressCases.map((c) => renderCaseCard(c))
+                  )}
                 </div>
               </div>
 
               {/* Selesai */}
-              <div className="bg-slate-100/90 rounded-xl p-3.5 space-y-3">
-                <h3 className="text-sm font-extrabold text-slate-900 px-1">
-                  Selesai ({completedCases.length})
-                </h3>
+              <div className="bg-[#16203C]/80 border border-[#1E2A4A] rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-bold font-mono uppercase text-slate-300">
+                    Selesai ({completedCases.length})
+                  </h3>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                </div>
                 <div className="space-y-2.5">
-                  {completedCases.map((c) => renderCaseCard(c))}
+                  {completedCases.length === 0 ? (
+                    <div className="text-[11px] text-slate-500 text-center py-6">
+                      Kosong
+                    </div>
+                  ) : (
+                    completedCases.map((c) => renderCaseCard(c))
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          <p className="text-xs text-slate-500 pt-2">
-            Setiap kartu menyimpan PIC, tenggat, catatan verifikasi, bukti
-            respons, dan riwayat status (audit trail).
+          <p className="text-[11px] font-mono text-slate-400 pt-2 border-t border-[#1E2A4A]/60">
+            Audit Trail: Setiap pembaruan status, PIC, dan bukti respon tercatat permanen di log audit sistem.
           </p>
         </section>
       </div>
@@ -256,34 +291,34 @@ export default function PapanKasusPage() {
       {/* Case Update Dialog (Accessible with Escape) */}
       {selectedCase && (
         <div
-          className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50"
+          className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-case-title"
         >
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 space-y-4 border border-slate-200 shadow-lg">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-[#10172E] rounded-xl max-w-lg w-full p-6 space-y-4 border border-[#1E2A4A] shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E2A4A]">
               <h3
                 id="modal-case-title"
-                className="font-extrabold text-slate-900 text-base"
+                className="font-bold text-white text-sm uppercase tracking-wider font-mono"
               >
-                Perbarui Tindak Lanjut Kasus #{selectedCase.id}
+                Perbarui Kasus #{selectedCase.id}
               </h3>
               <button
                 type="button"
                 onClick={() => setSelectedCase(null)}
-                className="min-w-[36px] min-h-[36px] text-slate-500 hover:text-slate-900 font-bold"
+                className="min-w-[32px] min-h-[32px] text-slate-400 hover:text-white font-bold"
                 aria-label="Tutup dialog"
               >
                 &times;
               </button>
             </div>
 
-            <form onSubmit={handleUpdate} className="space-y-4">
+            <form onSubmit={handleUpdate} className="space-y-4 text-xs">
               <div>
                 <label
                   htmlFor="pic-input"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
+                  className="block font-bold uppercase tracking-wider text-slate-300 mb-1"
                 >
                   PIC / Unit Penanggung Jawab
                 </label>
@@ -292,15 +327,15 @@ export default function PapanKasusPage() {
                   type="text"
                   value={newPic}
                   onChange={(e) => setNewPic(e.target.value)}
-                  placeholder="Contoh: Dinas SDA / Dishub"
-                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
+                  placeholder="Contoh: Dinas SDA / Dishub DKI"
+                  className="w-full text-xs p-2.5 bg-[#16203C] border border-[#1E2A4A] rounded-lg text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="status-select"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
+                  className="block font-bold uppercase tracking-wider text-slate-300 mb-1"
                 >
                   Status Kasus
                 </label>
@@ -308,7 +343,7 @@ export default function PapanKasusPage() {
                   id="status-select"
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value as any)}
-                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none bg-white"
+                  className="w-full text-xs p-2.5 bg-[#16203C] border border-[#1E2A4A] rounded-lg text-slate-100 focus:border-sky-400 focus:outline-none cursor-pointer"
                 >
                   <option value="menunggu">Menunggu</option>
                   <option value="ditangani">Ditangani</option>
@@ -319,24 +354,24 @@ export default function PapanKasusPage() {
               <div>
                 <label
                   htmlFor="bukti-catatan"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
+                  className="block font-bold uppercase tracking-wider text-slate-300 mb-1"
                 >
-                  Catatan Penanganan / Bukti Lapangan
+                  Catatan Penanganan / Tindakan Lapangan
                 </label>
                 <textarea
                   id="bukti-catatan"
                   rows={3}
                   value={buktiCatatan}
                   onChange={(e) => setBuktiCatatan(e.target.value)}
-                  placeholder="Tuliskan tindakan yang telah dikerjakan di lapangan..."
-                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
+                  placeholder="Tuliskan tindakan yang telah dilakukan di lapangan..."
+                  className="w-full text-xs p-2.5 bg-[#16203C] border border-[#1E2A4A] rounded-lg text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="bukti-url"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
+                  className="block font-bold uppercase tracking-wider text-slate-300 mb-1"
                 >
                   Tautan Lampiran Bukti (Opsional)
                 </label>
@@ -346,22 +381,22 @@ export default function PapanKasusPage() {
                   value={buktiUrl}
                   onChange={(e) => setBuktiUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
+                  className="w-full text-xs p-2.5 bg-[#16203C] border border-[#1E2A4A] rounded-lg text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-[#1E2A4A]">
                 <button
                   type="button"
                   onClick={() => setSelectedCase(null)}
-                  className="min-h-[40px] px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="min-h-[38px] px-4 py-2 border border-[#1E2A4A] rounded-lg text-xs font-semibold text-slate-300 hover:bg-[#16203C]"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdating}
-                  className="min-h-[40px] px-4 py-2 bg-[#2563EB] hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                  className="min-h-[38px] px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold disabled:opacity-50 shadow-sm"
                 >
                   {isUpdating ? "Menyimpan..." : "Simpan Status"}
                 </button>
@@ -386,43 +421,43 @@ export default function PapanKasusPage() {
           setNewPic(c.pic_nama || "");
           setNewStatus(c.status);
         }}
-        className={`w-full text-left bg-white rounded-lg p-3.5 border transition-colors cursor-pointer ${
-          c.status === "ditangani" && issue?.kode_referensi === "2611-0042"
-            ? "border-[#EA580C]/70"
-            : "border-slate-200/90 hover:border-blue-500"
-        }`}
+        className="w-full text-left bg-[#10172E] rounded-lg p-3.5 border border-[#1E2A4A] hover:border-sky-400 transition-colors cursor-pointer group"
       >
-        <div className="font-bold text-sm text-slate-900 leading-snug">
+        <div className="font-bold text-xs text-slate-200 group-hover:text-sky-300 leading-snug">
           {issue ? issue.judul : `Kasus #${c.id}`}
         </div>
 
-        <div className="text-xs text-slate-500 mt-1.5">
+        <div className="text-[11px] text-slate-400 mt-2 font-mono">
           {c.status === "menunggu" && (
             <span>
               <strong
                 className={
-                  levelLabel === "HIGH"
-                    ? "text-[#C2410C] font-bold"
-                    : "text-slate-600 font-semibold"
+                  levelLabel === "CRITICAL"
+                    ? "text-red-400 font-bold"
+                    : levelLabel === "HIGH"
+                    ? "text-orange-400 font-bold"
+                    : "text-slate-300"
                 }
               >
                 {levelLabel}
               </strong>{" "}
-              &middot; {c.pic_nama ? "dipantau" : "belum ada PIC"}
+              &bull; {c.pic_nama ? "dipantau" : "belum ada PIC"}
             </span>
           )}
 
           {c.status === "ditangani" && (
             <span>
-              PIC {c.pic_nama || c.unit} &middot;{" "}
-              <strong className="text-[#9A3412] font-semibold">
+              PIC: {c.pic_nama || c.unit} &bull;{" "}
+              <strong className="text-amber-400">
                 {getSlaTimeRemaining(c.tenggat)}
               </strong>
             </span>
           )}
 
           {c.status === "selesai" && (
-            <span className="text-slate-600">Bukti perbaikan terlampir</span>
+            <span className="text-emerald-400 font-bold">
+              Bukti tuntas terlampir
+            </span>
           )}
         </div>
       </button>

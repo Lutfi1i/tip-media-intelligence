@@ -17,6 +17,7 @@ export interface DashboardKPI {
 
 export interface TrendPoint {
   day: string;
+  label?: string;
   volume: number;
   negative_pct: number;
 }
