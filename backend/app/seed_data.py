@@ -7,12 +7,106 @@ from backend.app.models import (
 )
 from backend.app.services.risk_scorer import compute_risk_score
 
+def sync_issue_scores(db) -> int:
+    """Samakan skor/level tersimpan dengan breakdown yang dihitung risk scorer.
+
+    Seed lama menulis skor manual (mis. 78/HIGH) sementara alasan_skor_json
+    berisi hasil hitung (mis. 90.8/CRITICAL) sehingga UI menampilkan dua
+    kebenaran sekaligus. Breakdown selalu jadi acuan.
+    """
+    fixed = 0
+    for issue in db.query(Issue).all():
+        if not issue.alasan_skor_json:
+            continue
+        try:
+            alasan = json.loads(issue.alasan_skor_json)
+        except (TypeError, ValueError):
+            continue
+        skor = alasan.get("skor_akhir")
+        level = alasan.get("level")
+        if skor is None or not level:
+            continue
+        if abs(float(issue.skor or 0) - float(skor)) > 0.05 or issue.level != level:
+            issue.skor = float(skor)
+            issue.level = level
+            fixed += 1
+    if fixed:
+        db.commit()
+    return fixed
+
+
+# Daftar sumber nyata (feed publik yang sudah diuji merespons). Dipakai saat seeding awal
+# maupun untuk memperbaiki instalasi lama yang masih menyimpan URL mati.
+SUMBER_NYATA = [
+    dict(nama="Portal Berita Nasional (Antara News)", jenis="rss",
+         url="https://www.antaranews.com/rss/terkini", frekuensi_menit=10,
+         rate_limit_per_min=30, kredibilitas=0.92, status_izin="aktif"),
+    dict(nama="RSS Berita Megapolitan (Antara Metro)", jenis="rss",
+         url="https://www.antaranews.com/rss/metro", frekuensi_menit=10,
+         rate_limit_per_min=30, kredibilitas=0.90, status_izin="aktif"),
+    dict(nama="RSS Berita Nasional (detikcom)", jenis="rss",
+         url="https://news.detik.com/berita/rss", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.85, status_izin="aktif"),
+    dict(nama="RSS Berita Nasional (CNN Indonesia)", jenis="rss",
+         url="https://www.cnnindonesia.com/nasional/rss", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.87, status_izin="aktif"),
+    dict(nama="Situs Resmi Dinas Perhubungan DKI Jakarta", jenis="situs_resmi",
+         url="https://dishub.jakarta.go.id/feed", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.95, status_izin="aktif"),
+    dict(nama="Data Resmi BMKG (Gempa Terkini)", jenis="situs_resmi",
+         url="https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json", frekuensi_menit=10,
+         rate_limit_per_min=30, kredibilitas=0.98, status_izin="aktif"),
+    dict(nama="Kanal Pengaduan Resmi Pemprov DKI", jenis="pengaduan",
+         url="https://crm.jakarta.go.id/api/feeds", frekuensi_menit=5,
+         rate_limit_per_min=60, kredibilitas=0.95, status_izin="belum_ada_akses"),
+]
+
+# Sumber lama yang URL-nya sudah mati (404/403) atau duplikat dari sumber baru.
+SUMBER_LEGACY = {
+    "Portal Berita Nasional & Megapolitan",
+    "RSS Berita Daerah Jabodetabek",
+    "Situs Resmi BPBD & BMKG",
+}
+
+
+def sinkronkan_sumber(db) -> int:
+    """Selaraskan registri sumber dengan feed nyata. Mengembalikan jumlah perubahan.
+
+    - Sumber legacy (URL mati / duplikat) ditandai 'digabung' agar tidak diambil lagi.
+    - Sumber pada SUMBER_NYATA dibuat bila belum ada, atau diselaraskan bila sudah ada.
+    """
+    perubahan = 0
+
+    for sumber in db.query(Source).all():
+        if sumber.nama in SUMBER_LEGACY and sumber.status_izin != "digabung":
+            sumber.status_izin = "digabung"
+            perubahan += 1
+
+    by_nama = {s.nama: s for s in db.query(Source).all()}
+    for definisi in SUMBER_NYATA:
+        current = by_nama.get(definisi["nama"])
+        if current is None:
+            db.add(Source(**definisi))
+            perubahan += 1
+            continue
+        for field, value in definisi.items():
+            if getattr(current, field) != value:
+                setattr(current, field, value)
+                perubahan += 1
+
+    if perubahan:
+        db.commit()
+    return perubahan
+
+
 def seed_database():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     # Check if already seeded
     if db.query(Region).first():
+        sync_issue_scores(db)
+        sinkronkan_sumber(db)
         db.close()
         return
 
@@ -64,27 +158,42 @@ def seed_database():
     db.add_all(regions_data)
     db.commit()
 
-    # 2. Seed Sources
+    # 2. Seed Sources — hanya feed publik yang benar-benar merespons (diuji 2026-11-11).
     sources_data = [
         Source(
-            nama="Portal Berita Nasional & Megapolitan", jenis="berita",
-            url="https://megapolitan.kompas.com/rss", frekuensi_menit=10,
+            nama="Portal Berita Nasional (Antara News)", jenis="rss",
+            url="https://www.antaranews.com/rss/terkini", frekuensi_menit=10,
             rate_limit_per_min=30, kredibilitas=0.92, status_izin="aktif"
+        ),
+        Source(
+            nama="RSS Berita Megapolitan (Antara Metro)", jenis="rss",
+            url="https://www.antaranews.com/rss/metro", frekuensi_menit=10,
+            rate_limit_per_min=30, kredibilitas=0.90, status_izin="aktif"
+        ),
+        Source(
+            nama="RSS Berita Nasional (detikcom)", jenis="rss",
+            url="https://news.detik.com/berita/rss", frekuensi_menit=15,
+            rate_limit_per_min=20, kredibilitas=0.85, status_izin="aktif"
+        ),
+        Source(
+            nama="RSS Berita Nasional (CNN Indonesia)", jenis="rss",
+            url="https://www.cnnindonesia.com/nasional/rss", frekuensi_menit=15,
+            rate_limit_per_min=20, kredibilitas=0.87, status_izin="aktif"
+        ),
+        Source(
+            nama="Situs Resmi Dinas Perhubungan DKI Jakarta", jenis="situs_resmi",
+            url="https://dishub.jakarta.go.id/feed", frekuensi_menit=15,
+            rate_limit_per_min=20, kredibilitas=0.95, status_izin="aktif"
+        ),
+        Source(
+            nama="Data Resmi BMKG (Gempa Terkini)", jenis="situs_resmi",
+            url="https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json", frekuensi_menit=10,
+            rate_limit_per_min=30, kredibilitas=0.98, status_izin="aktif"
         ),
         Source(
             nama="Kanal Pengaduan Resmi Pemprov DKI", jenis="pengaduan",
             url="https://crm.jakarta.go.id/api/feeds", frekuensi_menit=5,
-            rate_limit_per_min=60, kredibilitas=0.95, status_izin="aktif"
-        ),
-        Source(
-            nama="RSS Berita Daerah Jabodetabek", jenis="rss",
-            url="https://jakarta.tribunnews.com/rss", frekuensi_menit=15,
-            rate_limit_per_min=20, kredibilitas=0.85, status_izin="aktif"
-        ),
-        Source(
-            nama="Situs Resmi BPBD & BMKG", jenis="situs_resmi",
-            url="https://bpbd.jakarta.go.id/publikasi", frekuensi_menit=10,
-            rate_limit_per_min=40, kredibilitas=0.98, status_izin="aktif"
+            rate_limit_per_min=60, kredibilitas=0.95, status_izin="belum_ada_akses"
         ),
     ]
     db.add_all(sources_data)
@@ -123,8 +232,8 @@ def seed_database():
         judul="Genangan 30-50 cm di Kemang & Pejaten",
         wilayah="Jakarta Selatan",
         kategori="Bencana",
-        skor=78.0,
-        level="HIGH",
+        skor=risk1["skor_akhir"],
+        level=risk1["level"],
         alasan_skor_json=json.dumps(risk1),
         status="terverifikasi",
         ringkasan="Laporan genangan di dua titik (Kemang & Pejaten); sebagian konten menyebut pompa tidak berfungsi.",
@@ -145,8 +254,8 @@ def seed_database():
         judul="Antrean Layanan Kependudukan Membludak di Jaktim",
         wilayah="Jakarta Timur",
         kategori="Pelayanan Publik",
-        skor=72.0,
-        level="HIGH",
+        skor=risk2["skor_akhir"],
+        level=risk2["level"],
         alasan_skor_json=json.dumps(risk2),
         status="terverifikasi",
         ringkasan="Gangguan server pencetakan identitas menyebabkan antrean warga sejak pukul 07.00 WIB.",
@@ -167,8 +276,8 @@ def seed_database():
         judul="Kepadatan Arus Lalu Lintas Simpang Tomang Jakbar",
         wilayah="Jakarta Barat",
         kategori="Infrastruktur",
-        skor=54.0,
-        level="MEDIUM",
+        skor=risk3["skor_akhir"],
+        level=risk3["level"],
         alasan_skor_json=json.dumps(risk3),
         status="terverifikasi",
         ringkasan="Kepadatan akibat perbaikan median jalan tol dalam kota.",
@@ -189,8 +298,8 @@ def seed_database():
         judul="Penyumbatan Saluran Drainase Jalan Margonda Depok",
         wilayah="Depok",
         kategori="Infrastruktur",
-        skor=32.0,
-        level="LOW",
+        skor=risk4["skor_akhir"],
+        level=risk4["level"],
         alasan_skor_json=json.dumps(risk4),
         status="kandidat",
         ringkasan="Sampah menyumbat gorong-gorong pasca hujan rintik semalam.",
@@ -211,8 +320,8 @@ def seed_database():
         judul="PJU Padam di Akses Pelabuhan Tanjung Priok Jakut",
         wilayah="Jakarta Utara",
         kategori="Infrastruktur",
-        skor=38.0,
-        level="LOW",
+        skor=risk5["skor_akhir"],
+        level=risk5["level"],
         alasan_skor_json=json.dumps(risk5),
         status="selesai",
         ringkasan="Lampu penerangan jalan umum padam sepanjang 300 meter.",
@@ -279,7 +388,7 @@ def seed_database():
     alt1 = Alert(
         issue_id=issue1.id,
         level="HIGH",
-        penerima="+6281234567890 (Pimpinan Siaga)",
+        penerima="+628****7890 (Pimpinan Siaga)",
         kanal="whatsapp",
         konten_pesan=(
             "[ALERT HIGH] Banjir Jakarta Selatan\n"
@@ -451,6 +560,7 @@ def seed_database():
     db.add_all([audit1, audit2])
 
     db.commit()
+    sync_issue_scores(db)
     db.close()
 
 if __name__ == "__main__":

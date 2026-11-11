@@ -3,45 +3,54 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { 
-  LayoutDashboard, 
-  MapPin, 
-  Sliders, 
-  AlertTriangle, 
-  KanbanSquare, 
-  FileText, 
-  ShieldCheck, 
-  Play, 
-  CheckCircle2, 
-  UserCheck 
-} from "lucide-react";
 import { triggerFloodScenario } from "@/lib/api";
 
-export function Navigation() {
+const navItems = [
+  { label: "Dashboard", href: "/", pathDisplay: "app.tipmedia.id/dashboard" },
+  { label: "Peta Wilayah", href: "/peta", pathDisplay: "app.tipmedia.id/peta" },
+  {
+    label: "Monitoring",
+    href: "/monitoring",
+    pathDisplay: "app.tipmedia.id/monitoring/banjir-jaksel",
+  },
+  {
+    label: "Isu & Alert",
+    href: "/isu",
+    pathDisplay: "app.tipmedia.id/isu/2611-0042",
+  },
+  { label: "Kasus", href: "/kasus", pathDisplay: "app.tipmedia.id/kasus" },
+  {
+    label: "Laporan",
+    href: "/laporan",
+    pathDisplay: "app.tipmedia.id/laporan",
+  },
+  {
+    label: "Audit & Evaluasi",
+    href: "/audit",
+    pathDisplay: "app.tipmedia.id/audit",
+  },
+];
+
+export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [role, setRole] = useState("Pimpinan");
   const [isSimulating, setIsSimulating] = useState(false);
   const [simMessage, setSimMessage] = useState<string | null>(null);
 
-  const navItems = [
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Peta Wilayah", href: "/peta", icon: MapPin },
-    { label: "Monitoring", href: "/monitoring", icon: Sliders },
-    { label: "Isu & Alert", href: "/isu", icon: AlertTriangle },
-    { label: "Kasus", href: "/kasus", icon: KanbanSquare },
-    { label: "Laporan", href: "/laporan", icon: FileText },
-    { label: "Audit & Evaluasi", href: "/audit", icon: ShieldCheck },
-  ];
+  const activeNav =
+    navItems.find((item) =>
+      item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+    ) || navItems[0];
 
   const handleTriggerSimulation = async () => {
     setIsSimulating(true);
     setSimMessage(null);
     try {
       const res = await triggerFloodScenario();
-      setSimMessage(res.message || "Skenario Banjir Kemang terpasang.");
+      setSimMessage(res.message || "Skenario Banjir Kemang berhasil dimuat.");
       setTimeout(() => {
         window.location.reload();
-      }, 1200);
+      }, 900);
     } catch (err: any) {
       setSimMessage(err.message || "Gagal memicu simulasi");
     } finally {
@@ -50,117 +59,145 @@ export function Navigation() {
   };
 
   return (
-    <header className="bg-navy-900 border-b border-slate-800 text-white sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo & Brand */}
-          <div className="flex items-center space-x-6">
-            <Link href="/" className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white tracking-wider shadow-sm">
-                TIP
-              </div>
-              <div>
-                <div className="text-base font-bold tracking-tight text-white leading-none">
-                  TIP Media Intelligence
-                </div>
-                <div className="text-xs text-slate-400 mt-1 font-mono">
-                  Sistem Deteksi Dini & Respon Krisis
-                </div>
-              </div>
-            </Link>
-
-            {/* Pilot Tag */}
-            <div className="hidden lg:flex items-center text-xs bg-slate-800/80 text-blue-300 px-2.5 py-1 rounded-full border border-slate-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse" />
-              Pilot: DKI Jakarta & Bodetabek
-            </div>
+    <div className="min-h-screen flex flex-col bg-[#F1F5F9] text-slate-900">
+      {/* Top Context Bar matching PRD mockup header */}
+      <header className="bg-white border-b border-slate-200 px-4 sm:px-6 h-14 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="hidden sm:flex items-center space-x-1.5" aria-hidden="true">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
           </div>
-
-          {/* Navigation Links */}
-          <nav className="hidden md:flex space-x-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-300 hover:text-white hover:bg-slate-800"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 mr-1.5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Actions & Role Switcher */}
-          <div className="flex items-center space-x-3">
-            {/* Scenario Demo Trigger */}
-            <button
-              onClick={handleTriggerSimulation}
-              disabled={isSimulating}
-              className="hidden sm:inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 transition-colors shadow-sm disabled:opacity-50"
-              title="Jalankan skenario uji Banjir Jakarta Selatan 05:40 - 09:00"
-            >
-              <Play className="w-3.5 h-3.5 mr-1 fill-current" />
-              {isSimulating ? "Menyiapkan..." : "Skenario Demo"}
-            </button>
-
-            {/* Role Switcher */}
-            <div className="flex items-center text-xs bg-slate-800 px-2.5 py-1 rounded border border-slate-700">
-              <UserCheck className="w-3.5 h-3.5 text-slate-400 mr-1.5" />
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer"
-                aria-label="Pilih Peran Pengguna"
-              >
-                <option value="Pimpinan" className="bg-slate-800 text-white">Peran: Pimpinan</option>
-                <option value="Analis" className="bg-slate-800 text-white">Peran: Analis / Verifikator</option>
-                <option value="Supervisor" className="bg-slate-800 text-white">Peran: Supervisor</option>
-                <option value="PIC Unit" className="bg-slate-800 text-white">Peran: PIC Unit (Dinas SDA)</option>
-                <option value="Admin" className="bg-slate-800 text-white">Peran: Admin Sistem</option>
-                <option value="Auditor" className="bg-slate-800 text-white">Peran: Auditor</option>
-              </select>
-            </div>
-          </div>
+          <span className="text-xs sm:text-sm font-mono text-slate-500 truncate">
+            {activeNav.pathDisplay}
+          </span>
         </div>
 
-        {/* Mobile Navigation bar */}
-        <div className="flex md:hidden overflow-x-auto py-2 space-x-1 border-t border-slate-800">
+        <div className="flex items-center space-x-2.5">
+          <button
+            type="button"
+            onClick={handleTriggerSimulation}
+            disabled={isSimulating}
+            className="min-h-[36px] px-3 py-1.5 rounded-md text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors disabled:opacity-50"
+          >
+            {isSimulating ? "Memuat Skenario..." : "Muat Skenario Banjir"}
+          </button>
+
+          <div className="hidden md:flex items-center bg-slate-100 border border-slate-200 rounded-md px-2.5 py-1">
+            <label htmlFor="role-select" className="text-xs text-slate-500 mr-1.5">
+              Peran:
+            </label>
+            <select
+              id="role-select"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="Pimpinan">Pimpinan</option>
+              <option value="Analis">Analis / Verifikator</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="PIC Unit">PIC Unit (Dinas SDA)</option>
+              <option value="Admin">Admin</option>
+              <option value="Auditor">Auditor</option>
+            </select>
+          </div>
+
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FFEDD5] text-[#9A3412] border border-[#FDBA74]">
+            Data simulasi
+          </span>
+        </div>
+      </header>
+
+      {simMessage && (
+        <div className="bg-blue-950 text-blue-100 text-xs px-6 py-2 flex items-center justify-between border-b border-blue-800">
+          <span>{simMessage}</span>
+          <span className="font-mono text-[11px] text-blue-300">Memuat ulang...</span>
+        </div>
+      )}
+
+      {/* Main Workspace with Left Dark Navy Sidebar */}
+      <div className="flex-1 flex flex-col md:flex-row">
+        {/* Left Vertical Sidebar (Desktop) */}
+        <aside className="hidden md:flex md:w-56 lg:w-60 bg-[#0F172A] text-white flex-col justify-between shrink-0 select-none">
+          <div className="p-5">
+            {/* Brand Logo matching PRD Slide 8-11 */}
+            <Link
+              href="/"
+              className="flex items-baseline space-x-1.5 px-3 pb-6 mb-4 border-b border-slate-800"
+            >
+              <span className="text-xl font-extrabold tracking-tight text-white">
+                TIP
+              </span>
+              <span className="text-xl font-extrabold tracking-tight text-blue-400">
+                MI
+              </span>
+            </Link>
+
+            <nav className="space-y-1.5" aria-label="Menu Utama">
+              {navItems.map((item) => {
+                const isActive =
+                  item.href === "/"
+                    ? pathname === "/"
+                    : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center px-3.5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                      isActive
+                        ? "bg-[#2563EB] text-white"
+                        : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="p-5 border-t border-slate-800/80 text-xs text-slate-400 space-y-1">
+            <div className="font-semibold text-slate-300">Wilayah Pilot</div>
+            <div>DKI Jakarta &amp; Bodetabek</div>
+            <div className="pt-2 text-[11px] text-slate-500">
+              PT Technosoft Indo Prima
+            </div>
+          </div>
+        </aside>
+
+        {/* Mobile Navigation Bar (< md) */}
+        <nav
+          className="flex md:hidden overflow-x-auto bg-[#0F172A] px-3 py-2 space-x-1.5 border-b border-slate-800"
+          aria-label="Menu Mobile"
+        >
           {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center whitespace-nowrap px-2.5 py-1 rounded text-xs font-medium ${
-                  isActive ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-800"
+                className={`whitespace-nowrap min-h-[44px] inline-flex items-center px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  isActive
+                    ? "bg-[#2563EB] text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 mr-1" />
                 {item.label}
               </Link>
             );
           })}
-        </div>
+        </nav>
 
-        {simMessage && (
-          <div className="bg-blue-950 border border-blue-800 text-blue-200 text-xs px-3 py-1.5 rounded my-1 flex items-center justify-between">
-            <div className="flex items-center">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 mr-2" />
-              {simMessage}
-            </div>
-            <span className="text-slate-400 font-mono text-[11px]">Auto refresh...</span>
-          </div>
-        )}
+        {/* Main Content Area */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto">
+          {children}
+        </main>
       </div>
-    </header>
+    </div>
   );
 }
+
+export { AppShell as Navigation };

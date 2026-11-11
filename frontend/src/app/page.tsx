@@ -2,18 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { 
-  TrendingUp, 
-  AlertCircle, 
-  MapPin, 
-  Clock, 
-  ArrowUpRight, 
-  CheckCircle2, 
-  ShieldAlert,
-  ChevronRight,
-  RefreshCw
-} from "lucide-react";
-import { fetchDashboardSummary, DashboardKPI, TrendPoint, IssueItem } from "@/lib/api";
+import {
+  fetchDashboardSummary,
+  DashboardKPI,
+  TrendPoint,
+  IssueItem,
+} from "@/lib/api";
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -31,7 +25,10 @@ export default function DashboardPage() {
       setTrend(data.trend_7d);
       setPriorityIssues(data.priority_issues);
     } catch (err: any) {
-      setError(err.message || "Gagal memuat data dashboard");
+      setError(
+        err.message ||
+          "Gagal terhubung ke server API backend. Pastikan start_backend.bat sudah berjalan di port 8001."
+      );
     } finally {
       setLoading(false);
     }
@@ -43,293 +40,321 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-        <p className="text-sm text-slate-500 font-medium">Memuat data situasi terkini...</p>
+      <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
+        <p className="text-sm font-semibold text-slate-700">
+          Memuat metrik situasi terkini dan tren 7 hari...
+        </p>
+        <p className="text-xs text-slate-500 mt-1">
+          Mengambil ringkasan mention unik, isu prioritas, dan status SLA.
+        </p>
       </div>
     );
   }
 
   if (error || !kpi) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center max-w-lg mx-auto my-12">
-        <AlertCircle className="w-10 h-10 text-red-600 mx-auto mb-3" />
-        <h2 className="text-base font-bold text-red-900 mb-1">Terjadi Kendala Koneksi</h2>
-        <p className="text-sm text-red-700 mb-4">{error || "Data tidak dapat diakses."}</p>
+      <div className="bg-white border border-red-200 rounded-xl p-8 max-w-lg mx-auto my-8">
+        <h2 className="text-base font-bold text-red-900">
+          Koneksi ke Backend Terputus
+        </h2>
+        <p className="text-sm text-slate-600 mt-1 mb-4">
+          {error || "Tidak dapat mengambil data ringkasan."}
+        </p>
         <button
+          type="button"
           onClick={loadData}
-          className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors"
+          className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
         >
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Coba Lagi
+          Muat Ulang Data
         </button>
       </div>
     );
   }
 
-  // Calculate maximum volume for proportional bar heights
   const maxVol = Math.max(...trend.map((t) => t.volume), 400);
+
+  // Compute SVG coordinates for the 7-day combo chart (Slide 8)
+  const chartWidth = 560;
+  const chartHeight = 190;
+  const padTop = 24;
+  const padBottom = 32;
+  const plotHeight = chartHeight - padTop - padBottom;
+  const colWidth = chartWidth / Math.max(trend.length, 1);
+
+  const linePoints = trend
+    .map((t, i) => {
+      const cx = colWidth * i + colWidth / 2;
+      const cy = padTop + plotHeight * (1 - t.negative_pct / 90);
+      return `${cx},${cy}`;
+    })
+    .join(" ");
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200">
+      {/* Page Title */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Situasi Terkini Dalam Satu Layar
+          <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
+            Dashboard Pimpinan
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
+            Situasi terkini dalam satu layar
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            app.tipmedia.id/dashboard &bull; Pemantauan aktif 24 jam wilayah pilot
-          </p>
         </div>
-        <div className="mt-3 sm:mt-0 flex items-center space-x-2">
-          <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded bg-amber-100 text-amber-800 border border-amber-300">
-            Data Simulasi Terkalibrasi
-          </span>
-          <button
-            onClick={loadData}
-            className="p-1.5 text-slate-500 hover:text-slate-800 rounded hover:bg-slate-100 transition-colors"
-            title="Muat Ulang Data"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={loadData}
+          className="self-start sm:self-auto min-h-[38px] px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+        >
+          Segarkan Data
+        </button>
       </div>
 
-      {/* KPI 4 Cards Grid - Exactly matching PRD Slide 8 */}
+      {/* 4 KPI Cards matching Slide 8 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Mention Unik */}
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm hover:border-slate-300 transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-            <span>Mention Unik</span>
-            <TrendingUp className="w-4 h-4 text-blue-600" />
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5">
+          <div className="text-sm font-medium text-slate-500">Mention unik</div>
+          <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-1.5">
+            {kpi.mention_unik.toLocaleString("id-ID")}
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {kpi.mention_unik.toLocaleString("id-ID")}
-            </span>
-            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              +{kpi.mention_growth_pct}% vs minggu lalu
-            </span>
+          <div className="text-xs font-semibold text-[#C2410C] mt-2">
+            +{kpi.mention_growth_pct}% vs minggu lalu
           </div>
-          <p className="text-xs text-slate-500 mt-2">
-            Total mention tersaring dari media online, RSS, dan pengaduan.
-          </p>
         </div>
 
-        {/* Card 2: Isu Prioritas */}
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm hover:border-slate-300 transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-            <span>Isu Prioritas</span>
-            <ShieldAlert className="w-4 h-4 text-orange-600" />
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5">
+          <div className="text-sm font-medium text-slate-500">Isu prioritas</div>
+          <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-1.5">
+            {kpi.isu_prioritas}
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {kpi.isu_prioritas}
-            </span>
-            <span className="text-xs font-semibold text-orange-800 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
-              {kpi.critical_count} Critical, {kpi.high_count} High
-            </span>
+          <div className="text-xs font-medium text-slate-500 mt-2">
+            {kpi.critical_count} Critical, {kpi.high_count} High
           </div>
-          <p className="text-xs text-slate-500 mt-2">
-            Isu berbobot risiko tinggi yang memerlukan atensi eksekutif.
-          </p>
         </div>
 
-        {/* Card 3: Wilayah Terdampak */}
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm hover:border-slate-300 transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-            <span>Wilayah Terdampak</span>
-            <MapPin className="w-4 h-4 text-indigo-600" />
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5">
+          <div className="text-sm font-medium text-slate-500">
+            Wilayah terdampak
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {kpi.wilayah_terdampak}
-            </span>
-            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-              dari {kpi.total_wilayah_terpantau} terpantau
-            </span>
+          <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-1.5">
+            {kpi.wilayah_terdampak}
           </div>
-          <p className="text-xs text-slate-500 mt-2">
-            Titik persebaran percakapan publik di DKI & Bodetabek.
-          </p>
+          <div className="text-xs font-medium text-slate-500 mt-2">
+            dari {kpi.total_wilayah_terpantau} terpantau
+          </div>
         </div>
 
-        {/* Card 4: Menunggu Aksi */}
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm hover:border-slate-300 transition-shadow">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-            <span>Menunggu Aksi</span>
-            <Clock className="w-4 h-4 text-red-600" />
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5">
+          <div className="text-sm font-medium text-slate-500">Menunggu aksi</div>
+          <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-1.5">
+            {kpi.menunggu_aksi}
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {kpi.menunggu_aksi}
-            </span>
-            <span className="text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-              {kpi.lewat_tenggat} lewat tenggat
-            </span>
+          <div className="text-xs font-semibold text-[#C2410C] mt-2">
+            {kpi.lewat_tenggat} lewat tenggat
           </div>
-          <p className="text-xs text-slate-500 mt-2">
-            Tiket kasus yang membutuhkan konfirmasi PIC atau eskalasi pimpinan.
-          </p>
         </div>
       </div>
 
-      {/* Main Section: 7-Day Trend Chart & Priority Issues List */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: 7-Day Trend (Volume & % Negatif) */}
-        <div className="lg:col-span-2 bg-white rounded-lg border border-slate-200 p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Tren 7 hari: volume dan % negatif
+      {/* Main Content Split: 7-Day Trend (Left) & Priority Issues (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Left 7 Cols: 7-Day Trend Chart */}
+        <section className="lg:col-span-7 bg-white rounded-xl border border-slate-200/90 p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h2 className="text-base font-bold text-slate-900">
+                Tren 7 hari: volume dan{" "}
+                <span className="text-[#C2410C]">% negatif</span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Kombinasi volume total mention (batang) dan rasio sentimen negatif (garis indikator)
-              </p>
-            </div>
-            <div className="flex items-center space-x-4 mt-2 sm:mt-0 text-xs">
-              <div className="flex items-center">
-                <span className="w-3 h-3 bg-blue-500 rounded-sm mr-1.5" />
-                <span className="text-slate-600 font-medium">Volume Mention</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-3 h-1 bg-amber-500 rounded-full mr-1.5" />
-                <span className="text-slate-600 font-medium">% Negatif</span>
+              <div className="flex items-center space-x-4 text-xs text-slate-600">
+                <span className="inline-flex items-center">
+                  <span className="w-3 h-3 rounded-xs bg-[#2563EB] mr-1.5" />
+                  Volume puncak
+                </span>
+                <span className="inline-flex items-center">
+                  <span className="w-3 h-0.5 bg-[#D97706] mr-1.5" />% Sentimen
+                  negatif
+                </span>
               </div>
             </div>
-          </div>
 
-          {/* Accessible Custom SVG/HTML Chart */}
-          <div className="pt-6 pb-2">
-            <div className="h-64 flex items-end justify-between gap-3 px-2 border-b border-slate-200 pb-2 relative">
-              {/* Background Guideline */}
-              <div className="absolute inset-x-0 top-1/4 border-b border-dashed border-slate-100" />
-              <div className="absolute inset-x-0 top-2/4 border-b border-dashed border-slate-100" />
-              <div className="absolute inset-x-0 top-3/4 border-b border-dashed border-slate-100" />
+            <div className="w-full overflow-x-auto pt-2">
+              <svg
+                viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                className="w-full h-auto min-w-[360px]"
+                role="img"
+                aria-label="Grafik tren 7 hari volume mention dan persentase sentimen negatif"
+              >
+                {/* Baseline horizontal line */}
+                <line
+                  x1={12}
+                  y1={padTop + plotHeight}
+                  x2={chartWidth - 12}
+                  y2={padTop + plotHeight}
+                  stroke="#E2E8F0"
+                  strokeWidth={1.5}
+                />
 
-              {trend.map((t, idx) => {
-                const heightPct = Math.round((t.volume / maxVol) * 100);
-                const isSaturdayPeak = t.day === "Sab";
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end z-10 group">
-                    {/* Hover tooltip */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[11px] rounded px-2 py-1 mb-2 pointer-events-none whitespace-nowrap shadow-lg">
-                      <div className="font-bold">{t.day}: {t.volume} mention</div>
-                      <div className="text-amber-300 font-medium">{t.negative_pct}% sentimen negatif</div>
-                    </div>
+                {/* Bars */}
+                {trend.map((t, i) => {
+                  const barW = 38;
+                  const x = colWidth * i + (colWidth - barW) / 2;
+                  const barH = Math.max(
+                    12,
+                    (t.volume / maxVol) * (plotHeight - 10)
+                  );
+                  const y = padTop + plotHeight - barH;
+                  const isPeak = t.day === "Sab";
 
-                    {/* % Negative marker dot */}
-                    <div 
-                      className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm mb-1.5 ${
-                        t.negative_pct >= 60 ? "bg-red-600" : "bg-amber-500"
-                      }`}
-                      style={{ transform: `translateY(-${Math.min(t.negative_pct * 0.4, 40)}px)` }}
-                      title={`% Negatif: ${t.negative_pct}%`}
-                    />
+                  return (
+                    <g key={t.day}>
+                      <rect
+                        x={x}
+                        y={y}
+                        width={barW}
+                        height={barH}
+                        rx={4}
+                        fill={isPeak ? "#2563EB" : "#BFDBFE"}
+                      />
+                      <text
+                        x={colWidth * i + colWidth / 2}
+                        y={chartHeight - 10}
+                        textAnchor="middle"
+                        className="text-[12px] fill-slate-500 font-medium"
+                      >
+                        {t.day}
+                      </text>
+                    </g>
+                  );
+                })}
 
-                    {/* Bar */}
-                    <div
-                      style={{ height: `${heightPct}%` }}
-                      className={`w-full max-w-[42px] rounded-t transition-all ${
-                        isSaturdayPeak
-                          ? "bg-blue-600 hover:bg-blue-700 shadow-md ring-2 ring-blue-300 ring-offset-1"
-                          : "bg-blue-200 hover:bg-blue-400"
-                      }`}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                {/* % Negative Polyline */}
+                <polyline
+                  fill="none"
+                  stroke="#D97706"
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={linePoints}
+                />
 
-            {/* X-Axis Labels */}
-            <div className="flex justify-between px-2 pt-3 text-xs font-semibold text-slate-600">
-              {trend.map((t, idx) => (
-                <div key={idx} className="flex-1 text-center">
-                  <span className={t.day === "Sab" ? "text-blue-700 font-bold" : ""}>
-                    {t.day}
-                  </span>
-                  <div className="text-[10px] text-slate-400 font-normal">{t.volume}</div>
-                </div>
-              ))}
+                {/* % Negative Points & Labels */}
+                {trend.map((t, i) => {
+                  const cx = colWidth * i + colWidth / 2;
+                  const cy = padTop + plotHeight * (1 - t.negative_pct / 90);
+                  return (
+                    <g key={`pt-${t.day}`}>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={4.5}
+                        fill="#D97706"
+                        stroke="#FFFFFF"
+                        strokeWidth={1.5}
+                      />
+                      {t.day === "Sab" && (
+                        <text
+                          x={cx}
+                          y={cy - 10}
+                          textAnchor="middle"
+                          className="text-[11px] font-bold fill-[#9A3412]"
+                        >
+                          {t.negative_pct}%
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Puncak anomali terdeteksi pada hari Sabtu (Sab) dengan 360 mention dan 72% sentimen negatif.</span>
-            <Link href="/peta" className="text-blue-600 font-semibold hover:text-blue-800 flex items-center">
-              Lihat Sebaran Peta <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+            <span>
+              Lonjakan tertinggi hari Sabtu: 360 mention (72% sentimen negatif).
+            </span>
+            <Link
+              href="/peta"
+              className="font-semibold text-blue-700 hover:text-blue-900"
+            >
+              Buka Peta Wilayah
             </Link>
           </div>
-        </div>
+        </section>
 
-        {/* Right Col: Isu Prioritas List - Slide 8 Mockup */}
-        <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+        {/* Right 5 Cols: Priority Issues List matching Slide 8 */}
+        <section className="lg:col-span-5 bg-white rounded-xl border border-slate-200/90 p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
+              <h2 className="text-base font-bold text-slate-900">
                 Isu prioritas
               </h2>
-              <Link href="/isu" className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center">
-                Semua <ChevronRight className="w-3 h-3 ml-0.5" />
+              <Link
+                href="/isu"
+                className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+              >
+                Lihat antrean ({priorityIssues.length})
               </Link>
             </div>
 
-            <div className="space-y-3">
-              {priorityIssues.length === 0 ? (
-                <p className="text-sm text-slate-500 py-6 text-center">Tidak ada isu aktif.</p>
-              ) : (
-                priorityIssues.map((issue) => {
-                  const badgeClasses = {
-                    CRITICAL: "bg-red-100 text-red-900 border-red-200",
-                    HIGH: "bg-orange-100 text-orange-900 border-orange-200",
-                    MEDIUM: "bg-blue-100 text-blue-900 border-blue-200",
-                    LOW: "bg-slate-100 text-slate-800 border-slate-200",
-                  }[issue.level] || "bg-slate-100 text-slate-800";
+            {priorityIssues.length === 0 ? (
+              <div className="py-8 text-center text-sm text-slate-500">
+                Belum ada isu prioritas. Klik tombol &ldquo;Muat Skenario
+                Banjir&rdquo; di atas untuk memuat simulasi.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {priorityIssues.slice(0, 5).map((issue) => {
+                  const pillStyle =
+                    {
+                      CRITICAL: "bg-[#B91C1C] text-white",
+                      HIGH: "bg-[#EA580C] text-white",
+                      MEDIUM: "bg-[#2563EB] text-white",
+                      LOW: "bg-slate-200 text-slate-800",
+                    }[issue.level] || "bg-slate-200 text-slate-800";
 
                   return (
                     <Link
                       key={issue.id}
                       href={`/isu/${issue.id}`}
-                      className="block p-3 rounded-lg border border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                      className="flex items-center justify-between py-3.5 px-2 -mx-2 rounded-lg hover:bg-slate-50 transition-colors group"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="font-bold text-sm text-slate-900 leading-snug">
+                      <div className="pr-3 min-w-0">
+                        <div className="text-sm font-bold text-slate-900 group-hover:text-blue-700 truncate">
                           {issue.judul}
                         </div>
-                        <span className={`ml-2 text-[11px] font-bold px-2 py-0.5 rounded border ${badgeClasses}`}>
-                          {issue.level}
-                        </span>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {issue.wilayah} &middot; Skor {Math.round(issue.skor)}{" "}
+                          &middot;{" "}
+                          <span className="capitalize">{issue.status}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center text-xs text-slate-500 mt-1.5 space-x-2">
-                        <span>{issue.wilayah}</span>
-                        <span>&bull;</span>
-                        <span>Skor {Math.round(issue.skor)}</span>
-                        <span>&bull;</span>
-                        <span className="capitalize">{issue.status}</span>
-                      </div>
+                      <span
+                        className={`shrink-0 text-[11px] font-extrabold px-2.5 py-1 rounded-md tracking-wide ${pillStyle}`}
+                      >
+                        {issue.level}
+                      </span>
                     </Link>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col space-y-2">
+          <div className="mt-5 pt-4 border-t border-slate-100 grid grid-cols-2 gap-2.5">
             <Link
               href="/kasus"
-              className="w-full text-center py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded text-xs font-semibold shadow-sm transition-colors"
+              className="min-h-[40px] inline-flex items-center justify-center px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors text-center"
             >
-              Buka Papan Tindak Lanjut Kasus (SLA)
+              Papan Kasus (SLA)
             </Link>
             <Link
               href="/laporan"
-              className="w-full text-center py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-xs font-semibold transition-colors"
+              className="min-h-[40px] inline-flex items-center justify-center px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors text-center"
             >
-              Unduh Laporan Briefing Eksekutif (PDF)
+              Laporan Eksekutif
             </Link>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

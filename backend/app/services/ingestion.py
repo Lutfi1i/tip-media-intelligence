@@ -7,6 +7,9 @@ from backend.app.models import Source, RawItem, ItemAnalysis, MonitoringProfile,
 from backend.app.services.dedup import compute_content_hash, is_near_duplicate
 from backend.app.services.ai_analyzer import analyze_sentiment, analyze_topic, extract_locations
 
+# Versi nyata mesin analisis (leksikon + aturan gazetir), bukan model transformer.
+MODEL_VERSION = "leksikon-id-gazetir-v2"
+
 def can_fetch_source(source: Source) -> bool:
     """Check if source is legally permitted and active."""
     return source.status_izin == "aktif"
@@ -40,6 +43,16 @@ def ingest_content_item(
             "item_id": existing.id,
             "message": "Konten sama persis sudah tersimpan"
         }
+
+    # 1b. URL duplicate check — kolom url_kanonik unik, jadi cek sebelum insert.
+    if url:
+        existing_url = db.query(RawItem).filter(RawItem.url_kanonik == url).first()
+        if existing_url:
+            return {
+                "status": "duplicate_exact",
+                "item_id": existing_url.id,
+                "message": "URL ini sudah tersimpan",
+            }
 
     # 2. Near-duplicate check with recent items
     recent_items = db.query(RawItem).order_by(RawItem.id.desc()).limit(50).all()
@@ -81,7 +94,7 @@ def ingest_content_item(
         lokasi_disebut_json=json.dumps(lokasi_disebut),
         lokasi_confidence=lokasi_conf,
         ringkasan=f"{title}. Dilaporkan oleh {penerbit} terkait {topik.lower()} di wilayah {lokasi_prim or 'Jabodetabek'}.",
-        model_version="indobert-multilingual-e5-v1"
+        model_version=MODEL_VERSION
     )
     db.add(analysis)
     db.commit()

@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+export const API_BASE_URL =
+  typeof window !== "undefined"
+    ? "/api/v1"
+    : process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001/api/v1";
 
 export interface DashboardKPI {
   mention_unik: number;
@@ -52,7 +55,10 @@ export interface IssueDetail extends IssueItem {
     skor_akhir: number;
     level: string;
     respons: string;
-    faktor: Record<string, { bobot: string; nilai: number; kontribusi: number; catatan: string }>;
+    faktor: Record<
+      string,
+      { bobot: string; nilai: number; kontribusi: number; catatan: string }
+    >;
   };
   pihak_terlibat: string[];
   hal_belum_diketahui: string;
@@ -87,7 +93,12 @@ export interface IssueDetail extends IssueItem {
     status: string;
     tenggat: string;
     bukti: Array<{ waktu: string; catatan: string; url?: string; oleh: string }>;
-    riwayat: Array<{ waktu: string; status_sebelum?: string; status_baru: string; catatan: string }>;
+    riwayat: Array<{
+      waktu: string;
+      status_sebelum?: string;
+      status_baru: string;
+      catatan: string;
+    }>;
   };
 }
 
@@ -100,7 +111,12 @@ export interface CaseCard {
   tenggat: string;
   status: "menunggu" | "ditangani" | "selesai";
   bukti: Array<{ waktu: string; catatan: string; url?: string; oleh: string }>;
-  riwayat: Array<{ waktu: string; status_sebelum?: string; status_baru: string; catatan: string }>;
+  riwayat: Array<{
+    waktu: string;
+    status_sebelum?: string;
+    status_baru: string;
+    catatan: string;
+  }>;
 }
 
 export interface MonitoringProfile {
@@ -120,31 +136,49 @@ export interface MonitoringProfile {
 }
 
 export async function fetchDashboardSummary() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/summary`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE_URL}/dashboard/summary`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Gagal mengambil ringkasan dashboard");
   return res.json();
 }
 
-export async function fetchIssues(params?: { status?: string; level?: string; q?: string }) {
+export async function fetchIssues(params?: {
+  status?: string;
+  level?: string;
+  wilayah?: string;
+  q?: string;
+}) {
   const query = new URLSearchParams();
   if (params?.status) query.set("status", params.status);
   if (params?.level) query.set("level", params.level);
+  if (params?.wilayah) query.set("wilayah", params.wilayah);
   if (params?.q) query.set("q", params.q);
 
-  const res = await fetch(`${API_BASE_URL}/issues?${query.toString()}`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE_URL}/issues?${query.toString()}`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Gagal mengambil daftar isu");
   return res.json();
 }
 
 export async function fetchIssueDetail(id: number | string) {
-  const res = await fetch(`${API_BASE_URL}/issues/${id}`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE_URL}/issues/${id}`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Gagal mengambil detail isu");
   return res.json();
 }
 
 export async function submitIssueReview(
   issueId: number,
-  payload: { reviewer_id: string; reviewer_nama: string; keputusan: string; catatan?: string }
+  payload: {
+    reviewer_id: string;
+    reviewer_nama: string;
+    keputusan: string;
+    koreksi_label?: Record<string, any>;
+    catatan?: string;
+  }
 ) {
   const res = await fetch(`${API_BASE_URL}/issues/${issueId}/review`, {
     method: "POST",
@@ -156,7 +190,9 @@ export async function submitIssueReview(
 }
 
 export async function fetchCases(status?: string) {
-  const url = status ? `${API_BASE_URL}/cases?status=${status}` : `${API_BASE_URL}/cases`;
+  const url = status
+    ? `${API_BASE_URL}/cases?status=${status}`
+    : `${API_BASE_URL}/cases`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil papan kasus");
   return res.json();
@@ -178,8 +214,20 @@ export async function fetchProfiles() {
   return res.json();
 }
 
+export async function updateProfile(profileId: number, payload: any) {
+  const res = await fetch(`${API_BASE_URL}/profiles/${profileId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Gagal menyimpan perubahan profil");
+  return res.json();
+}
+
 export async function testProfile7d(profileId: number) {
-  const res = await fetch(`${API_BASE_URL}/profiles/${profileId}/test-7d`, { method: "POST" });
+  const res = await fetch(`${API_BASE_URL}/profiles/${profileId}/test-7d`, {
+    method: "POST",
+  });
   if (!res.ok) throw new Error("Gagal menjalankan uji 7 hari");
   return res.json();
 }
@@ -192,11 +240,17 @@ export async function fetchReports() {
 
 export async function generateNewReport(jenis: string, periode: string) {
   const res = await fetch(
-    `${API_BASE_URL}/reports/generate?jenis=${encodeURIComponent(jenis)}&periode=${encodeURIComponent(periode)}`,
+    `${API_BASE_URL}/reports/generate?jenis=${encodeURIComponent(
+      jenis
+    )}&periode=${encodeURIComponent(periode)}`,
     { method: "POST" }
   );
   if (!res.ok) throw new Error("Gagal menghasilkan laporan");
   return res.json();
+}
+
+export function getReportViewUrl(reportId: number) {
+  return `/api/v1/reports/${reportId}/view`;
 }
 
 export async function fetchAuditLogs() {
@@ -206,13 +260,17 @@ export async function fetchAuditLogs() {
 }
 
 export async function fetchAiEvaluation() {
-  const res = await fetch(`${API_BASE_URL}/audit/ai-evaluation`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE_URL}/audit/ai-evaluation`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Gagal mengambil evaluasi AI");
   return res.json();
 }
 
 export async function triggerFloodScenario() {
-  const res = await fetch(`${API_BASE_URL}/simulation/trigger-flood-scenario`, { method: "POST" });
+  const res = await fetch(`${API_BASE_URL}/simulation/trigger-flood-scenario`, {
+    method: "POST",
+  });
   if (!res.ok) throw new Error("Gagal memicu simulasi skenario");
   return res.json();
 }

@@ -2,19 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { 
-  KanbanSquare, 
-  Clock, 
-  User, 
-  CheckCircle2, 
-  FileCheck, 
-  AlertTriangle, 
-  ExternalLink, 
-  Plus, 
-  RefreshCw,
-  Send
-} from "lucide-react";
-import { fetchCases, updateCaseStatus, fetchIssues, CaseCard, IssueItem } from "@/lib/api";
+import {
+  fetchCases,
+  updateCaseStatus,
+  fetchIssues,
+  CaseCard,
+  IssueItem,
+} from "@/lib/api";
 
 export default function PapanKasusPage() {
   const [cases, setCases] = useState<CaseCard[]>([]);
@@ -22,10 +16,12 @@ export default function PapanKasusPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCase, setSelectedCase] = useState<CaseCard | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
 
-  // Modal / Update Form state
   const [newPic, setNewPic] = useState("");
-  const [newStatus, setNewStatus] = useState<"menunggu" | "ditangani" | "selesai">("ditangani");
+  const [newStatus, setNewStatus] = useState<
+    "menunggu" | "ditangani" | "selesai"
+  >("ditangani");
   const [buktiCatatan, setBuktiCatatan] = useState("");
   const [buktiUrl, setBuktiUrl] = useState("");
 
@@ -34,7 +30,7 @@ export default function PapanKasusPage() {
     try {
       const [casesData, issuesData] = await Promise.all([
         fetchCases(),
-        fetchIssues()
+        fetchIssues(),
       ]);
       setCases(casesData);
 
@@ -52,6 +48,17 @@ export default function PapanKasusPage() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Close modal on Escape key (R-32)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedCase(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -80,7 +87,7 @@ export default function PapanKasusPage() {
     const deadline = new Date(tenggatStr).getTime();
     const now = new Date().getTime();
     const diff = deadline - now;
-    if (diff <= 0) return "Lewat tenggat";
+    if (diff <= 0) return "lewat tenggat";
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     return `sisa ${hours}j ${mins}m`;
@@ -92,149 +99,155 @@ export default function PapanKasusPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Alert Sampai Ke Pimpinan, Kasus Dipantau Sampai Selesai
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            app.tipmedia.id/kasus &bull; Alur kerja penugasan PIC, SLA respon krisis, dan bukti penyelesaian
-          </p>
-        </div>
+      <div>
+        <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
+          Notifikasi &amp; Kasus
+        </p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
+          Alert sampai ke pimpinan, kasus dipantau sampai selesai
+        </h1>
       </div>
 
-      {/* Main Grid: Mobile Alert Preview + Kanban Board (Slide 12 Mockup) */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left Column: Simulated Mobile Alert to Leadership (Slide 12 Mockup) */}
-        <div className="lg:col-span-1">
-          <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-xl border border-slate-800 max-w-xs mx-auto">
-            {/* Phone notch */}
-            <div className="w-20 h-4 bg-slate-950 rounded-full mx-auto mb-3" />
+      {approvalFeedback && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-sm text-emerald-900 font-semibold">
+          {approvalFeedback}
+        </div>
+      )}
 
-            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2 font-mono">
-              <span>06.05 &bull; Notifikasi</span>
-              <span className="text-emerald-400 font-semibold">Terkirim</span>
-            </div>
+      {/* Main Split matching Slide 12: Mobile Frame (Left) + Case Board (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left 4 Cols: Simulated Mobile Alert matching Slide 12 */}
+        <div className="lg:col-span-4 flex justify-center">
+          <div className="w-full max-w-[290px] bg-white border-[8px] border-[#0F172A] rounded-[28px] p-5 flex flex-col justify-between min-h-[430px] shadow-sm">
+            <div>
+              <div className="text-center text-xs text-slate-500 pb-3 mb-4 border-b border-slate-200">
+                06.05 &middot; Notifikasi
+              </div>
 
-            {/* Alert card inside phone */}
-            <div className="bg-slate-800/90 border border-orange-500/40 rounded-xl p-3.5 space-y-2">
-              <div className="flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
-                <span className="text-xs font-extrabold text-orange-400 uppercase tracking-wider">
+              <div className="space-y-2.5">
+                <div className="text-xs font-extrabold uppercase tracking-wide text-[#C2410C]">
                   ALERT HIGH
-                </span>
-              </div>
+                </div>
 
-              <div className="font-bold text-sm text-white leading-snug">
-                Banjir Jakarta Selatan
-              </div>
+                <h2 className="text-base font-extrabold text-slate-900 leading-snug">
+                  Banjir Jakarta Selatan
+                </h2>
 
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Genangan 30&ndash;50 cm di Kemang &amp; Pejaten. Terverifikasi: pompa Kemang rusak.
-              </p>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Genangan 30&ndash;50 cm di Kemang &amp; Pejaten. Terverifikasi:
+                  pompa Kemang rusak.
+                </p>
 
-              <div className="text-xs text-slate-300 pt-1 border-t border-slate-700/60 flex justify-between">
-                <span>PIC: Dinas SDA</span>
-                <span className="font-semibold text-amber-400">Tenggat: 2 jam</span>
-              </div>
-
-              {/* Action buttons in mobile view */}
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => alert("Pimpinan telah menyetujui rekomendasi tindakan. Tiket diteruskan ke Dinas SDA.")}
-                  className="py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded shadow-sm text-center transition-colors"
-                >
-                  Setujui
-                </button>
-                <Link
-                  href="/isu/1"
-                  className="py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold rounded text-center transition-colors"
-                >
-                  Detail
-                </Link>
+                <div className="pt-2 text-sm text-slate-900 space-y-0.5">
+                  <div>
+                    <strong className="font-bold">PIC:</strong> Dinas SDA
+                  </div>
+                  <div>
+                    <strong className="font-bold">Tenggat:</strong> 2 jam
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="text-center text-[10px] text-slate-400 mt-4">
-              Kanal Distribusi: WhatsApp &amp; Telegram
+            <div className="grid grid-cols-2 gap-2.5 pt-6">
+              <button
+                type="button"
+                onClick={() =>
+                  setApprovalFeedback(
+                    "Rekomendasi tindakan disetujui Pimpinan. Instruksi penugasan dikirim ke PIC Dinas SDA (SLA 2 jam)."
+                  )
+                }
+                className="min-h-[42px] py-2 bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors"
+              >
+                Setujui
+              </button>
+              <Link
+                href="/isu/1"
+                className="min-h-[42px] inline-flex items-center justify-center py-2 bg-white hover:bg-blue-50 text-[#2563EB] border-2 border-[#2563EB] text-xs font-bold rounded-lg transition-colors"
+              >
+                Detail
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Right 3 Columns: Kanban Board (Slide 12 Mockup) */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              Papan Kasus
+        {/* Right 8 Cols: Papan Kasus Kanban matching Slide 12 */}
+        <section className="lg:col-span-8 bg-white rounded-xl border border-slate-200/90 p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-extrabold text-slate-900">
+              Papan kasus
             </h2>
             <span className="text-xs text-slate-500">
-              Total {cases.length} kasus terpantau
+              Klik kartu kasus untuk memperbarui PIC, status, atau bukti
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Column 1: Menunggu */}
-            <div className="bg-slate-100 rounded-lg p-3 border border-slate-200">
-              <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-200">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+          {loading ? (
+            <div className="py-12 text-center text-sm text-slate-500">
+              Memuat papan kasus...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Menunggu */}
+              <div className="bg-slate-100/90 rounded-xl p-3.5 space-y-3">
+                <h3 className="text-sm font-extrabold text-slate-900 px-1">
                   Menunggu ({waitingCases.length})
-                </span>
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                </h3>
+                <div className="space-y-2.5">
+                  {waitingCases.map((c) => renderCaseCard(c))}
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {waitingCases.map((c) => renderCaseCard(c))}
-              </div>
-            </div>
-
-            {/* Column 2: Ditangani */}
-            <div className="bg-blue-50/60 rounded-lg p-3 border border-blue-200">
-              <div className="flex items-center justify-between pb-2 mb-3 border-b border-blue-200">
-                <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">
+              {/* Ditangani */}
+              <div className="bg-slate-100/90 rounded-xl p-3.5 space-y-3">
+                <h3 className="text-sm font-extrabold text-slate-900 px-1">
                   Ditangani ({inProgressCases.length})
-                </span>
-                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                </h3>
+                <div className="space-y-2.5">
+                  {inProgressCases.map((c) => renderCaseCard(c))}
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {inProgressCases.map((c) => renderCaseCard(c))}
-              </div>
-            </div>
-
-            {/* Column 3: Selesai */}
-            <div className="bg-emerald-50/60 rounded-lg p-3 border border-emerald-200">
-              <div className="flex items-center justify-between pb-2 mb-3 border-b border-emerald-200">
-                <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">
+              {/* Selesai */}
+              <div className="bg-slate-100/90 rounded-xl p-3.5 space-y-3">
+                <h3 className="text-sm font-extrabold text-slate-900 px-1">
                   Selesai ({completedCases.length})
-                </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-600" />
-              </div>
-
-              <div className="space-y-3">
-                {completedCases.map((c) => renderCaseCard(c))}
+                </h3>
+                <div className="space-y-2.5">
+                  {completedCases.map((c) => renderCaseCard(c))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <p className="text-xs text-slate-500 pt-2 italic">
-            Setiap kartu menyimpan PIC, tenggat, catatan verifikasi, bukti respons, dan riwayat status (audit trail).
+          <p className="text-xs text-slate-500 pt-2">
+            Setiap kartu menyimpan PIC, tenggat, catatan verifikasi, bukti
+            respons, dan riwayat status (audit trail).
           </p>
-        </div>
+        </section>
       </div>
 
-      {/* Case Update Modal */}
+      {/* Case Update Dialog (Accessible with Escape) */}
       {selectedCase && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 space-y-4 border border-slate-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <h3 className="font-bold text-slate-900 text-base">
-                Tindak Lanjut Kasus #{selectedCase.id}
+        <div
+          className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-case-title"
+        >
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 space-y-4 border border-slate-200 shadow-lg">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3
+                id="modal-case-title"
+                className="font-extrabold text-slate-900 text-base"
+              >
+                Perbarui Tindak Lanjut Kasus #{selectedCase.id}
               </h3>
               <button
+                type="button"
                 onClick={() => setSelectedCase(null)}
-                className="text-slate-400 hover:text-slate-700"
+                className="min-w-[36px] min-h-[36px] text-slate-500 hover:text-slate-900 font-bold"
+                aria-label="Tutup dialog"
               >
                 &times;
               </button>
@@ -242,26 +255,34 @@ export default function PapanKasusPage() {
 
             <form onSubmit={handleUpdate} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nama PIC / Petugas Lapangan
+                <label
+                  htmlFor="pic-input"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  PIC / Unit Penanggung Jawab
                 </label>
                 <input
+                  id="pic-input"
                   type="text"
                   value={newPic}
                   onChange={(e) => setNewPic(e.target.value)}
-                  placeholder="Misal: Ir. Hendra (Dinas SDA)"
-                  className="w-full text-xs p-2 border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                  placeholder="Contoh: Dinas SDA / Dishub"
+                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Status Penanganan
+                <label
+                  htmlFor="status-select"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Status Kasus
                 </label>
                 <select
+                  id="status-select"
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value as any)}
-                  className="w-full text-xs p-2 border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none bg-white"
                 >
                   <option value="menunggu">Menunggu</option>
                   <option value="ditangani">Ditangani</option>
@@ -270,45 +291,53 @@ export default function PapanKasusPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Catatan Tindak Lanjut / Bukti Perbaikan
+                <label
+                  htmlFor="bukti-catatan"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Catatan Penanganan / Bukti Lapangan
                 </label>
                 <textarea
+                  id="bukti-catatan"
                   rows={3}
                   value={buktiCatatan}
                   onChange={(e) => setBuktiCatatan(e.target.value)}
-                  placeholder="Deskripsikan tindakan yang diambil atau bukti foto perbaikan..."
-                  className="w-full text-xs p-2 border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                  placeholder="Tuliskan tindakan yang telah dikerjakan di lapangan..."
+                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tautan Bukti Dokumentasi (Foto / Dokumen)
+                <label
+                  htmlFor="bukti-url"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Tautan Lampiran Bukti (Opsional)
                 </label>
                 <input
-                  type="text"
+                  id="bukti-url"
+                  type="url"
                   value={buktiUrl}
                   onChange={(e) => setBuktiUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full text-xs p-2 border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                  className="w-full text-sm p-2.5 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setSelectedCase(null)}
-                  className="px-4 py-2 border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="min-h-[40px] px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdating}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold shadow-sm disabled:opacity-50"
+                  className="min-h-[40px] px-4 py-2 bg-[#2563EB] hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
                 >
-                  {isUpdating ? "Menyimpan..." : "Simpan Perubahan"}
+                  {isUpdating ? "Menyimpan..." : "Simpan Status"}
                 </button>
               </div>
             </form>
@@ -320,50 +349,57 @@ export default function PapanKasusPage() {
 
   function renderCaseCard(c: CaseCard) {
     const issue = issuesMap[c.issue_id];
-    const isCompleted = c.status === "selesai";
+    const levelLabel = issue?.level || "HIGH";
 
     return (
-      <div
+      <button
         key={c.id}
+        type="button"
         onClick={() => {
           setSelectedCase(c);
           setNewPic(c.pic_nama || "");
           setNewStatus(c.status);
         }}
-        className="bg-white rounded-md p-3.5 border border-slate-200 shadow-2xs hover:border-blue-500 hover:shadow-sm cursor-pointer transition-all"
+        className={`w-full text-left bg-white rounded-lg p-3.5 border transition-colors cursor-pointer ${
+          c.status === "ditangani" && issue?.kode_referensi === "2611-0042"
+            ? "border-[#EA580C]/70"
+            : "border-slate-200/90 hover:border-blue-500"
+        }`}
       >
-        <div className="font-bold text-sm text-slate-900 leading-snug mb-1">
+        <div className="font-bold text-sm text-slate-900 leading-snug">
           {issue ? issue.judul : `Kasus #${c.id}`}
         </div>
 
-        <div className="text-xs text-slate-600 space-y-1">
+        <div className="text-xs text-slate-500 mt-1.5">
           {c.status === "menunggu" && (
-            <div className="text-slate-500">
-              <span className="font-semibold text-orange-700">HIGH</span> &bull; {c.pic_nama ? c.pic_nama : "belum ada PIC"}
-            </div>
+            <span>
+              <strong
+                className={
+                  levelLabel === "HIGH"
+                    ? "text-[#C2410C] font-bold"
+                    : "text-slate-600 font-semibold"
+                }
+              >
+                {levelLabel}
+              </strong>{" "}
+              &middot; {c.pic_nama ? "dipantau" : "belum ada PIC"}
+            </span>
           )}
 
           {c.status === "ditangani" && (
-            <div className="text-slate-700">
-              PIC <span className="font-bold text-slate-900">{c.pic_nama || c.unit}</span> &bull;{" "}
-              <span className="font-semibold text-blue-700">{getSlaTimeRemaining(c.tenggat)}</span>
-            </div>
+            <span>
+              PIC {c.pic_nama || c.unit} &middot;{" "}
+              <strong className="text-[#9A3412] font-semibold">
+                {getSlaTimeRemaining(c.tenggat)}
+              </strong>
+            </span>
           )}
 
           {c.status === "selesai" && (
-            <div className="text-emerald-700 font-semibold flex items-center">
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-              Bukti perbaikan terlampir
-            </div>
+            <span className="text-slate-600">Bukti perbaikan terlampir</span>
           )}
         </div>
-
-        {c.bukti && c.bukti.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500 italic line-clamp-1">
-            &ldquo;{c.bukti[c.bukti.length - 1].catatan}&rdquo;
-          </div>
-        )}
-      </div>
+      </button>
     );
   }
 }

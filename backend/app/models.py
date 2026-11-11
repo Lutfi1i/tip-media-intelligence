@@ -83,7 +83,7 @@ class ItemAnalysis(Base):
     lokasi_confidence = Column(Float, default=0.75)
     ringkasan = Column(Text, nullable=True)
     embedding_vector_json = Column(Text, nullable=True)
-    model_version = Column(String(50), default="indobert-multilingual-e5-v1")
+    model_version = Column(String(50), default="leksikon-id-gazetir-v2")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     raw_item = relationship("RawItem", back_populates="analysis")

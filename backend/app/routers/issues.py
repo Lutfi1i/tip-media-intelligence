@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from backend.app.database import get_db
 from backend.app.models import Issue, IssueItem, RawItem, Review, Case, Alert
 from backend.app.schemas import (
-    IssueOut, IssueDetailOut, RawItemOut, ReviewCreate, ReviewOut, AlertOut, CaseOut
+    IssueOut, IssueDetailOut, RawItemOut, ItemAnalysisOut, ReviewCreate, ReviewOut, AlertOut, CaseOut
 )
 from backend.app.services.audit import record_audit
 from backend.app.services.notification import dispatch_executive_alert
@@ -44,6 +44,24 @@ def get_issue_detail(issue_id: int, db: Session = Depends(get_db)):
     raw_items_out = []
     for link in issue.items:
         item = link.raw_item
+        source = item.source
+        analysis = item.analysis
+        analysis_out = None
+        if analysis is not None:
+            try:
+                lokasi_disebut = json.loads(analysis.lokasi_disebut_json or "[]")
+            except (TypeError, ValueError):
+                lokasi_disebut = []
+            analysis_out = ItemAnalysisOut(
+                sentimen=analysis.sentimen,
+                sentimen_confidence=analysis.sentimen_confidence,
+                topik=analysis.topik,
+                topik_confidence=analysis.topik_confidence,
+                lokasi_kejadian=analysis.lokasi_kejadian,
+                lokasi_disebut=lokasi_disebut,
+                lokasi_confidence=analysis.lokasi_confidence,
+                ringkasan=analysis.ringkasan,
+            )
         raw_items_out.append(RawItemOut(
             id=item.id,
             source_id=item.source_id,
@@ -53,7 +71,10 @@ def get_issue_detail(issue_id: int, db: Session = Depends(get_db)):
             penerbit=item.penerbit,
             published_at=item.published_at,
             fetched_at=item.fetched_at,
-            is_repost=link.is_repost
+            is_repost=link.is_repost,
+            sumber_kredibilitas=source.kredibilitas if source else None,
+            sumber_nama=source.nama if source else None,
+            analysis=analysis_out,
         ))
 
     reviews_out = []

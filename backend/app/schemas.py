@@ -44,6 +44,19 @@ class SourceOut(SourceCreate):
     class Config:
         from_attributes = True
 
+class ItemAnalysisOut(BaseModel):
+    sentimen: str
+    sentimen_confidence: float
+    topik: str
+    topik_confidence: float
+    lokasi_kejadian: Optional[str]
+    lokasi_disebut: List[str] = []
+    lokasi_confidence: float
+    ringkasan: Optional[str]
+
+    class Config:
+        from_attributes = True
+
 class RawItemOut(BaseModel):
     id: int
     source_id: Optional[int]
@@ -54,19 +67,14 @@ class RawItemOut(BaseModel):
     published_at: datetime
     fetched_at: datetime
     is_repost: bool = False
+    # Kredibilitas sumber pelapor (0-1), diambil dari tabel sources.
+    sumber_kredibilitas: Optional[float] = None
+    sumber_nama: Optional[str] = None
+    # Hasil klasifikasi AI untuk konten ini (None jika belum dianalisis).
+    analysis: Optional[ItemAnalysisOut] = None
 
     class Config:
         from_attributes = True
-
-class ItemAnalysisOut(BaseModel):
-    sentimen: str
-    sentimen_confidence: float
-    topik: str
-    topik_confidence: float
-    lokasi_kejadian: Optional[str]
-    lokasi_disebut: List[str] = []
-    lokasi_confidence: float
-    ringkasan: Optional[str]
 
 class ReviewCreate(BaseModel):
     reviewer_id: str
@@ -156,7 +164,8 @@ class IssueDetailOut(IssueOut):
 
 class DashboardKPI(BaseModel):
     mention_unik: int
-    mention_growth_pct: float
+    # None = belum ada pembanding periode sebelumnya (jangan tampilkan tren).
+    mention_growth_pct: Optional[float] = None
     isu_prioritas: int
     critical_count: int
     high_count: int
@@ -167,8 +176,10 @@ class DashboardKPI(BaseModel):
 
 class TrendPoint(BaseModel):
     day: str
+    label: Optional[str] = None
     volume: int
-    negative_pct: float
+    # None = belum ada item terklasifikasi pada hari tersebut.
+    negative_pct: Optional[float] = None
 
 class RegionSummary(BaseModel):
     kode_wilayah: str
@@ -181,12 +192,24 @@ class RegionSummary(BaseModel):
     top_issue: Optional[str]
     confidence: float
     tier: str  # "<15", "15-29", "30-59", ">=60"
+    # "live" = dihitung dari konten hasil koleksi; "agregat" = angka simpanan lama.
+    sumber: str = "live"
+    topik_dominan: Optional[str] = None
+    konten_terkait: int = 0
 
 class DashboardSummaryOut(BaseModel):
     kpi: DashboardKPI
     trend_7d: List[TrendPoint]
     priority_issues: List[IssueOut]
     regions: List[RegionSummary]
+    # "live" = ada konten hasil koleksi pipeline, "seed" = masih data contoh.
+    data_mode: str = "seed"
+    sumber_aktif: int = 0
+    konten_terkumpul: int = 0
+    konten_terklasifikasi: int = 0
+    konten_24jam: int = 0
+    terakhir_koleksi: Optional[datetime] = None
+    generated_at: datetime
 
 class AuditLogOut(BaseModel):
     id: int

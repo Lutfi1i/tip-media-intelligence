@@ -1,65 +1,173 @@
 import re
 from typing import Dict, Any, List, Optional, Tuple
 
+def _g(nama: str, parent: str, tingkat: str) -> Dict[str, Any]:
+    return {"nama": nama, "parent": parent, "tingkat": tingkat}
+
+
+# Gazetir wilayah prioritas: DKI Jakarta (provinsi → kota → kecamatan kunci) + Bodetabek.
+# Setiap entri: kata kunci (lowercase) → nama baku + induk + tingkat administratif.
 GAZETTEER_REGIONS = {
-    "kemang": {"nama": "Kemang", "parent": "Jakarta Selatan", "tingkat": "kelurahan"},
-    "pejaten": {"nama": "Pejaten", "parent": "Jakarta Selatan", "tingkat": "kelurahan"},
-    "kebayoran baru": {"nama": "Kebayoran Baru", "parent": "Jakarta Selatan", "tingkat": "kecamatan"},
-    "pasar minggu": {"nama": "Pasar Minggu", "parent": "Jakarta Selatan", "tingkat": "kecamatan"},
-    "cilandak": {"nama": "Cilandak", "parent": "Jakarta Selatan", "tingkat": "kecamatan"},
-    "mampang": {"nama": "Mampang Prapatan", "parent": "Jakarta Selatan", "tingkat": "kecamatan"},
-    "tebet": {"nama": "Tebet", "parent": "Jakarta Selatan", "tingkat": "kecamatan"},
-    "jakarta selatan": {"nama": "Jakarta Selatan", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jaksel": {"nama": "Jakarta Selatan", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jakarta timur": {"nama": "Jakarta Timur", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jaktim": {"nama": "Jakarta Timur", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jakarta barat": {"nama": "Jakarta Barat", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jakbar": {"nama": "Jakarta Barat", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jakarta pusat": {"nama": "Jakarta Pusat", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jakpus": {"nama": "Jakarta Pusat", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jakarta utara": {"nama": "Jakarta Utara", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "jakut": {"nama": "Jakarta Utara", "parent": "DKI Jakarta", "tingkat": "kota"},
-    "depok": {"nama": "Depok", "parent": "Jawa Barat", "tingkat": "kota"},
-    "bogor": {"nama": "Bogor", "parent": "Jawa Barat", "tingkat": "kota"},
-    "bekasi": {"nama": "Bekasi", "parent": "Jawa Barat", "tingkat": "kota"},
-    "tangerang": {"nama": "Tangerang", "parent": "Banten", "tingkat": "kota"},
+    # --- Provinsi / agregat ---
+    "dki jakarta": _g("DKI Jakarta", "Indonesia", "provinsi"),
+    "jakarta": _g("DKI Jakarta", "Indonesia", "provinsi"),
+    "jabodetabek": _g("Jabodetabek", "Indonesia", "kawasan"),
+    "bodetabek": _g("Bodetabek", "Indonesia", "kawasan"),
+    "jabodetabekpunjur": _g("Jabodetabek", "Indonesia", "kawasan"),
+
+    # --- Kota administrasi DKI ---
+    "jakarta selatan": _g("Jakarta Selatan", "DKI Jakarta", "kota"),
+    "jaksel": _g("Jakarta Selatan", "DKI Jakarta", "kota"),
+    "jakarta timur": _g("Jakarta Timur", "DKI Jakarta", "kota"),
+    "jaktim": _g("Jakarta Timur", "DKI Jakarta", "kota"),
+    "jakarta barat": _g("Jakarta Barat", "DKI Jakarta", "kota"),
+    "jakbar": _g("Jakarta Barat", "DKI Jakarta", "kota"),
+    "jakarta pusat": _g("Jakarta Pusat", "DKI Jakarta", "kota"),
+    "jakpus": _g("Jakarta Pusat", "DKI Jakarta", "kota"),
+    "jakarta utara": _g("Jakarta Utara", "DKI Jakarta", "kota"),
+    "jakut": _g("Jakarta Utara", "DKI Jakarta", "kota"),
+    "kepulauan seribu": _g("Kepulauan Seribu", "DKI Jakarta", "kabupaten"),
+
+    # --- Kecamatan Jakarta Selatan ---
+    "kebayoran baru": _g("Kebayoran Baru", "Jakarta Selatan", "kecamatan"),
+    "kebayoran lama": _g("Kebayoran Lama", "Jakarta Selatan", "kecamatan"),
+    "pesanggrahan": _g("Pesanggrahan", "Jakarta Selatan", "kecamatan"),
+    "cilandak": _g("Cilandak", "Jakarta Selatan", "kecamatan"),
+    "pasar minggu": _g("Pasar Minggu", "Jakarta Selatan", "kecamatan"),
+    "jagakarsa": _g("Jagakarsa", "Jakarta Selatan", "kecamatan"),
+    "mampang": _g("Mampang Prapatan", "Jakarta Selatan", "kecamatan"),
+    "mampang prapatan": _g("Mampang Prapatan", "Jakarta Selatan", "kecamatan"),
+    "pancoran": _g("Pancoran", "Jakarta Selatan", "kecamatan"),
+    "tebet": _g("Tebet", "Jakarta Selatan", "kecamatan"),
+    "setiabudi": _g("Setiabudi", "Jakarta Selatan", "kecamatan"),
+    "kemang": _g("Kemang", "Jakarta Selatan", "kelurahan"),
+    "pejaten": _g("Pejaten", "Jakarta Selatan", "kelurahan"),
+    "senayan": _g("Senayan", "Jakarta Selatan", "kelurahan"),
+    "blok m": _g("Blok M", "Jakarta Selatan", "kelurahan"),
+
+    # --- Kecamatan Jakarta Timur ---
+    "matraman": _g("Matraman", "Jakarta Timur", "kecamatan"),
+    "pulo gadung": _g("Pulo Gadung", "Jakarta Timur", "kecamatan"),
+    "jatinegara": _g("Jatinegara", "Jakarta Timur", "kecamatan"),
+    "duren sawit": _g("Duren Sawit", "Jakarta Timur", "kecamatan"),
+    "kramat jati": _g("Kramat Jati", "Jakarta Timur", "kecamatan"),
+    "makasar": _g("Makasar", "Jakarta Timur", "kecamatan"),
+    "ciracas": _g("Ciracas", "Jakarta Timur", "kecamatan"),
+    "cipayung": _g("Cipayung", "Jakarta Timur", "kecamatan"),
+    "cakung": _g("Cakung", "Jakarta Timur", "kecamatan"),
+    "pasar rebo": _g("Pasar Rebo", "Jakarta Timur", "kecamatan"),
+    "rawamangun": _g("Rawamangun", "Jakarta Timur", "kelurahan"),
+    "kalimalang": _g("Kalimalang", "Jakarta Timur", "kelurahan"),
+
+    # --- Kecamatan Jakarta Pusat ---
+    "gambir": _g("Gambir", "Jakarta Pusat", "kecamatan"),
+    "tanah abang": _g("Tanah Abang", "Jakarta Pusat", "kecamatan"),
+    "menteng": _g("Menteng", "Jakarta Pusat", "kecamatan"),
+    "senen": _g("Senen", "Jakarta Pusat", "kecamatan"),
+    "cempaka putih": _g("Cempaka Putih", "Jakarta Pusat", "kecamatan"),
+    "johar baru": _g("Johar Baru", "Jakarta Pusat", "kecamatan"),
+    "kemayoran": _g("Kemayoran", "Jakarta Pusat", "kecamatan"),
+    "sawah besar": _g("Sawah Besar", "Jakarta Pusat", "kecamatan"),
+    "sudirman": _g("Sudirman", "Jakarta Pusat", "kawasan"),
+    "thamrin": _g("Thamrin", "Jakarta Pusat", "kawasan"),
+    "monas": _g("Monas", "Jakarta Pusat", "kawasan"),
+
+    # --- Kecamatan Jakarta Barat ---
+    "cengkareng": _g("Cengkareng", "Jakarta Barat", "kecamatan"),
+    "grogol petamburan": _g("Grogol Petamburan", "Jakarta Barat", "kecamatan"),
+    "grogol": _g("Grogol Petamburan", "Jakarta Barat", "kecamatan"),
+    "taman sari": _g("Taman Sari", "Jakarta Barat", "kecamatan"),
+    "tambora": _g("Tambora", "Jakarta Barat", "kecamatan"),
+    "kebon jeruk": _g("Kebon Jeruk", "Jakarta Barat", "kecamatan"),
+    "kalideres": _g("Kalideres", "Jakarta Barat", "kecamatan"),
+    "palmerah": _g("Palmerah", "Jakarta Barat", "kecamatan"),
+    "kembangan": _g("Kembangan", "Jakarta Barat", "kecamatan"),
+
+    # --- Kecamatan Jakarta Utara ---
+    "penjaringan": _g("Penjaringan", "Jakarta Utara", "kecamatan"),
+    "pademangan": _g("Pademangan", "Jakarta Utara", "kecamatan"),
+    "tanjung priok": _g("Tanjung Priok", "Jakarta Utara", "kecamatan"),
+    "koja": _g("Koja", "Jakarta Utara", "kecamatan"),
+    "kelapa gading": _g("Kelapa Gading", "Jakarta Utara", "kecamatan"),
+    "cilincing": _g("Cilincing", "Jakarta Utara", "kecamatan"),
+    "ancol": _g("Ancol", "Jakarta Utara", "kawasan"),
+    "pluit": _g("Pluit", "Jakarta Utara", "kelurahan"),
+
+    # --- Bodetabek ---
+    "depok": _g("Depok", "Jawa Barat", "kota"),
+    "bogor": _g("Bogor", "Jawa Barat", "kota"),
+    "bekasi": _g("Bekasi", "Jawa Barat", "kota"),
+    "tangerang": _g("Tangerang", "Banten", "kota"),
+    "tangerang selatan": _g("Tangerang Selatan", "Banten", "kota"),
+    "tangsel": _g("Tangerang Selatan", "Banten", "kota"),
+    "cibinong": _g("Cibinong", "Bogor", "kecamatan"),
+    "cikarang": _g("Cikarang", "Bekasi", "kecamatan"),
+    "serpong": _g("Serpong", "Tangerang Selatan", "kecamatan"),
+    "bintaro": _g("Bintaro", "Tangerang Selatan", "kawasan"),
+    "pondok aren": _g("Pondok Aren", "Tangerang Selatan", "kecamatan"),
+    "ciledug": _g("Ciledug", "Tangerang", "kecamatan"),
+    "cinere": _g("Cinere", "Depok", "kecamatan"),
+    "sawangan": _g("Sawangan", "Depok", "kecamatan"),
+    "cibubur": _g("Cibubur", "Depok", "kawasan"),
+    "cimanggis": _g("Cimanggis", "Depok", "kecamatan"),
+    "sukmajaya": _g("Sukmajaya", "Depok", "kecamatan"),
+    "jatiasih": _g("Jatiasih", "Bekasi", "kecamatan"),
+    "tambun": _g("Tambun", "Bekasi", "kecamatan"),
+    "cikunir": _g("Cikunir", "Bekasi", "kawasan"),
 }
 
 TOPIC_KEYWORDS = {
     "Bencana": [
-        "banjir", "genangan", "air naik", "luapan", "longsor", "gempa",
-        "tanggul jebol", "curah hujan", "pohon tumbang", "cuaca ekstrem"
+        "banjir", "genangan", "air naik", "luapan", "longsor", "tanah longsor", "gempa",
+        "tanggul jebol", "curah hujan", "pohon tumbang", "cuaca ekstrem", "kebakaran",
+        "angin kencang", "rob", "kekeringan", "tsunami", "erupsi", "banjir rob",
+        "siaga banjir", "status siaga", "evakuasi"
     ],
     "Infrastruktur": [
-        "pompa", "drainase", "jalan rusak", "lampu jalan", "jembatan",
-        "saluran air", "proyek", "aspal", "trotoar", "pipa pdam"
+        "pompa", "drainase", "jalan rusak", "lampu jalan", "jembatan", "saluran air",
+        "proyek", "aspal", "trotoar", "pipa pdam", "perbaikan jalan", "pembangunan",
+        "flyover", "underpass", "halte", "mrt", "lrt", "tj", "transjakarta",
+        "gorong-gorong", "siring", "turap", "beton", "pengaspalan", "pelebaran jalan"
     ],
     "Pelayanan Publik": [
-        "antrean", "puskesmas", "ktp", "dukcapil", "pelayanan",
-        "samsat", "izin", "birokrasi", "pungli", "kelurahan"
+        "antrean", "antri", "puskesmas", "ktp", "dukcapil", "pelayanan", "samsat",
+        "izin", "birokrasi", "pungli", "kelurahan", "pengaduan", "loket", "bansos",
+        "bantuan sosial", "kjp", "kartu jakarta pintar", "pdam", "layanan publik",
+        "petugas", "lokasi layanan", "administrasi", "dokumen"
     ],
     "Keamanan": [
-        "tawuran", "pencurian", "begal", "polisi", "kejahatan",
-        "patroli", "kamtibmas", "razia", "narkoba"
+        "tawuran", "pencurian", "begal", "polisi", "kejahatan", "patroli", "kamtibmas",
+        "razia", "narkoba", "curanmor", "penipuan", "preman", "satpol pp", "kriminal",
+        "ditangkap", "tersangka", "satreskrim", "polsek", "polres", "pengeroyokan"
     ],
     "Ekonomi": [
-        "harga beras", "pasar", "inflasi", "sembako", "umkm", "pedagang", "subsidi"
+        "harga beras", "pasar", "inflasi", "sembako", "umkm", "pedagang", "subsidi",
+        "harga", "kenaikan tarif", "tarif", "upah minimum", "phk", "pajak", "retribusi",
+        "apbd", "anggaran", "investasi", "ekonomi", "daya beli", "bahan pokok"
     ],
     "Kesehatan": [
-        "demam berdarah", "dbd", "stunting", "vaksin", "wabah", "rumah sakit", "bpjs"
+        "demam berdarah", "dbd", "stunting", "vaksin", "wabah", "rumah sakit", "bpjs",
+        "polusi", "kualitas udara", "ispa", "kesehatan", "gizi", "posyandu",
+        "imunisasi", "covid", "pasien", "dokter", "apotek"
     ],
 }
 
 NEGATIVE_SENTIMENT_WORDS = [
     "rusak", "rusaknya", "lumpuh", "tergenang", "tenggelam", "macet", "keluhan",
     "korban", "bahaya", "mati", "mogok", "parah", "kecewa", "lambat",
-    "tertunda", "gagal", "ancaman", "waspada", "kritis", "terjebak"
+    "tertunda", "gagal", "ancaman", "waspada", "kritis", "terjebak",
+    "kecelakaan", "kebakaran", "ambruk", "roboh", "tewas", "luka", "terluka",
+    "ditangkap", "tersangka", "protes", "demo", "menolak", "keluhkan", "terlambat",
+    "penumpukan", "kemacetan", "padat merayap", "tawuran", "begal", "curanmor",
+    "meluber", "jebol", "terendam", "menggenang", "kerusakan", "kekurangan"
 ]
 
 POSITIVE_SENTIMENT_WORDS = [
     "surut", "cepat tanggap", "membaik", "apresiasi", "teratasi", "bantuan",
     "tertangani", "respons cepat", "berhasil", "berfungsi kembali", "lancar",
-    "aman", "kondusif", "terkendali"
+    "aman", "kondusif", "terkendali", "diresmikan", "beroperasi", "selesai",
+    "tuntas", "tertib", "perbaikan", "peningkatan", "dukungan", "sinergi",
+    "optimal", "terpenuhi", "ditangani"
 ]
 
 def analyze_sentiment(text: str) -> Tuple[str, float]:

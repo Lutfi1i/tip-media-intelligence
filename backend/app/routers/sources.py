@@ -6,12 +6,36 @@ from backend.app.database import get_db
 from backend.app.models import Source
 from backend.app.schemas import SourceCreate, SourceOut
 from backend.app.services.audit import record_audit
+from backend.app.services.collector import collect_all
 
 router = APIRouter(prefix="/sources", tags=["Sources Registry"])
 
 @router.get("", response_model=List[SourceOut])
 def list_sources(db: Session = Depends(get_db)):
     return db.query(Source).all()
+
+
+@router.post("/poll")
+def poll_sources(force: bool = True, db: Session = Depends(get_db)):
+    """Tarik data nyata dari semua sumber berizin aktif (RSS/Atom/API resmi).
+
+    `force=true` mengabaikan jeda frekuensi; default true agar tombol UI selalu memberi hasil.
+    """
+    hasil = collect_all(db, force=force)
+    record_audit(
+        db,
+        aktor="sistem",
+        peran="Sistem",
+        aksi="TARIK_DATA_SUMBER",
+        objek="sources:poll",
+        detail={
+            "dibaca": hasil["total_dibaca"],
+            "baru": hasil["total_baru"],
+            "duplikat": hasil["total_duplikat"],
+            "gagal": hasil["total_gagal"],
+        },
+    )
+    return hasil
 
 @router.post("", response_model=SourceOut)
 def register_source(payload: SourceCreate, db: Session = Depends(get_db)):

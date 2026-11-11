@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MapPin, AlertCircle, ArrowUpRight, ShieldCheck, RefreshCw, Layers } from "lucide-react";
 import { fetchDashboardSummary, RegionSummary } from "@/lib/api";
 
 export default function PetaWilayahPage() {
   const [regions, setRegions] = useState<RegionSummary[]>([]);
-  const [selectedRegion, setSelectedRegion] = useState<RegionSummary | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<RegionSummary | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,8 +18,9 @@ export default function PetaWilayahPage() {
     try {
       const data = await fetchDashboardSummary();
       setRegions(data.regions);
-      // Select Jakarta Selatan by default as per mockup
-      const jaksel = data.regions.find((r: RegionSummary) => r.nama === "Jakarta Selatan");
+      const jaksel = data.regions.find(
+        (r: RegionSummary) => r.nama === "Jakarta Selatan"
+      );
       setSelectedRegion(jaksel || data.regions[0] || null);
     } catch (err: any) {
       setError(err.message || "Gagal memuat data sebaran wilayah");
@@ -31,186 +33,178 @@ export default function PetaWilayahPage() {
     loadData();
   }, []);
 
-  const getTierColorClass = (tier: string) => {
+  const getTierStyle = (tier: string) => {
     switch (tier) {
       case ">=60":
-        return "bg-blue-800 text-white border-blue-900";
+        return "bg-[#1E3A8A] text-white border-[#1E3A8A]";
       case "30-59":
-        return "bg-blue-600 text-white border-blue-700";
+        return "bg-[#2563EB] text-white border-[#2563EB]";
       case "15-29":
-        return "bg-blue-300 text-blue-950 border-blue-400";
+        return "bg-[#BFDBFE] text-slate-900 border-[#93C5FD]";
       default:
-        return "bg-blue-100 text-blue-900 border-blue-200";
+        return "bg-[#EFF6FF] text-slate-900 border-slate-200";
     }
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-3">
-        <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-        <p className="text-sm text-slate-500 font-medium">Memuat peta sebaran...</p>
+      <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
+        <p className="text-sm font-semibold text-slate-700">
+          Memuat peta skematis sebaran mention DKI Jakarta &amp; Bodetabek...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white border border-red-200 rounded-xl p-8 max-w-lg mx-auto my-8">
+        <h2 className="text-base font-bold text-red-900">
+          Gagal Memuat Peta Wilayah
+        </h2>
+        <p className="text-sm text-slate-600 mt-1 mb-4">{error}</p>
+        <button
+          type="button"
+          onClick={loadData}
+          className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg"
+        >
+          Coba Lagi
+        </button>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Di Mana Isu Paling Ramai Dibicarakan
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            app.tipmedia.id/peta &bull; Visualisasi intensitas sebaran isu per wilayah (24 jam)
-          </p>
-        </div>
-        <div className="mt-3 sm:mt-0 flex items-center space-x-2">
-          <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded font-semibold border border-slate-200">
-            Data Simulasi
-          </span>
-        </div>
+      <div>
+        <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
+          Peta Wilayah
+        </p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
+          Di mana isu paling ramai dibicarakan
+        </h1>
       </div>
 
-      {/* Main Grid: Schematic Map + Detail Sidebar (Slide 9 Mockup) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Schematic Choropleth Map */}
-        <div className="lg:col-span-2 bg-white rounded-lg border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Left 7 Cols: Schematic Choropleth Map matching Slide 9 */}
+        <section className="lg:col-span-7 bg-white rounded-xl border border-slate-200/90 p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Sebaran mention per wilayah &bull; 24 jam (peta skematis)
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-base font-bold text-slate-900">
+                Sebaran mention per wilayah &middot; 24 jam (peta skematis)
               </h2>
-              <div className="text-xs text-slate-500 flex items-center">
-                <Layers className="w-3.5 h-3.5 mr-1 text-slate-400" />
+              <span className="text-xs text-slate-500">
                 Klik wilayah untuk detail
-              </div>
+              </span>
             </div>
 
-            {/* Schematic Grid Map representation of DKI Jakarta & Bodetabek */}
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 my-4">
-              <div className="grid grid-cols-5 gap-3 max-w-xl mx-auto py-4">
-                {/* Row 1: Jakut */}
-                <div className="col-start-2 col-span-2">
-                  {renderRegionTile("Jakarta Utara", "Jakut")}
-                </div>
+            {/* 4-Column Schematic Layout matching Slide 9 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto my-2">
+              {/* Row 1 */}
+              <div className="hidden sm:block" />
+              <div>{renderRegionTile("Jakarta Utara", "Jakut")}</div>
+              <div className="hidden sm:block" />
+              <div className="hidden sm:block" />
 
-                {/* Row 2: Jakbar, Jakpus, Jaktim, Bekasi */}
-                <div className="col-span-1">
-                  {renderRegionTile("Jakarta Barat", "Jakbar")}
-                </div>
-                <div className="col-span-1">
-                  {renderRegionTile("Jakarta Pusat", "Jakpus")}
-                </div>
-                <div className="col-span-1">
-                  {renderRegionTile("Jakarta Timur", "Jaktim")}
-                </div>
-                <div className="col-span-2">
-                  {renderRegionTile("Bekasi", "Bekasi")}
-                </div>
+              {/* Row 2 */}
+              <div>{renderRegionTile("Jakarta Barat", "Jakbar")}</div>
+              <div>{renderRegionTile("Jakarta Pusat", "Jakpus")}</div>
+              <div>{renderRegionTile("Jakarta Timur", "Jaktim")}</div>
+              <div>{renderRegionTile("Bekasi", "Bekasi")}</div>
 
-                {/* Row 3: Jaksel */}
-                <div className="col-start-2 col-span-2">
-                  {renderRegionTile("Jakarta Selatan", "Jaksel")}
-                </div>
+              {/* Row 3 */}
+              <div className="hidden sm:block" />
+              <div>{renderRegionTile("Jakarta Selatan", "Jaksel")}</div>
+              <div className="hidden sm:block" />
+              <div className="hidden sm:block" />
 
-                {/* Row 4: Depok, Bogor */}
-                <div className="col-start-2 col-span-1">
-                  {renderRegionTile("Depok", "Depok")}
-                </div>
-                <div className="col-start-3 col-span-1">
-                  {renderRegionTile("Bogor", "Bogor")}
-                </div>
-              </div>
-            </div>
-
-            {/* Legend Tiers: <15, 15-29, 30-59, >=60 */}
-            <div className="flex items-center justify-center space-x-6 pt-3 text-xs font-semibold text-slate-700">
-              <div className="flex items-center">
-                <span className="w-4 h-4 bg-blue-100 border border-blue-200 rounded mr-1.5" />
-                <span>&lt; 15</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-4 h-4 bg-blue-300 border border-blue-400 rounded mr-1.5" />
-                <span>15&ndash;29</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-4 h-4 bg-blue-600 border border-blue-700 rounded mr-1.5" />
-                <span>30&ndash;59</span>
-              </div>
-              <div className="flex items-center">
-                <span className="w-4 h-4 bg-blue-800 border border-blue-900 rounded mr-1.5" />
-                <span>&ge; 60</span>
-              </div>
+              {/* Row 4 */}
+              <div className="hidden sm:block" />
+              <div>{renderRegionTile("Depok", "Depok")}</div>
+              <div>{renderRegionTile("Bogor", "Bogor")}</div>
+              <div className="hidden sm:block" />
             </div>
           </div>
 
-          <div className="mt-6 pt-3 border-t border-slate-100 text-xs text-slate-500">
-            Sumber agregasi: Pengaduan warga, laporan radio lalu lintas, dan portal berita megapolitan.
+          {/* Legend matching Slide 9 */}
+          <div className="mt-8 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-5 text-xs font-medium text-slate-600">
+            <span className="inline-flex items-center">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#EFF6FF] border border-slate-300 mr-1.5" />
+              &lt;15
+            </span>
+            <span className="inline-flex items-center">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#BFDBFE] mr-1.5" />
+              15&ndash;29
+            </span>
+            <span className="inline-flex items-center">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#2563EB] mr-1.5" />
+              30&ndash;59
+            </span>
+            <span className="inline-flex items-center">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#1E3A8A] mr-1.5" />
+              &ge;60
+            </span>
           </div>
-        </div>
+        </section>
 
-        {/* Right Col: Detail Drawer (Slide 9 Mockup) */}
-        <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+        {/* Right 5 Cols: Region Detail Card matching Slide 9 */}
+        <section className="lg:col-span-5 bg-white rounded-xl border border-slate-200/90 p-6 flex flex-col justify-between">
           <div>
-            <div className="pb-3 border-b border-slate-100 mb-4">
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Detail: {selectedRegion ? selectedRegion.nama : "Pilih Wilayah"}
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Kode Wilayah Kemendagri: {selectedRegion?.kode_wilayah}
-              </p>
-            </div>
+            <h2 className="text-base font-bold text-slate-900 pb-4 border-b border-slate-100">
+              Detail: {selectedRegion ? selectedRegion.nama : "Pilih Wilayah"}
+            </h2>
 
             {selectedRegion ? (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-slate-50 text-sm">
-                  <span className="text-slate-500 font-medium">Mention</span>
-                  <span className="font-extrabold text-slate-900 text-base">
+              <dl className="divide-y divide-slate-100 text-sm mt-2">
+                <div className="py-3.5 flex items-center justify-between">
+                  <dt className="text-slate-500">Mention</dt>
+                  <dd className="font-extrabold text-slate-900 text-base">
                     {selectedRegion.mention_count}
-                  </span>
+                  </dd>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-50 text-sm">
-                  <span className="text-slate-500 font-medium">Konten Unik</span>
-                  <span className="font-bold text-slate-900">
+                <div className="py-3.5 flex items-center justify-between">
+                  <dt className="text-slate-500">Konten unik</dt>
+                  <dd className="font-extrabold text-slate-900 text-base">
                     {selectedRegion.unique_content_count}
-                  </span>
+                  </dd>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-50 text-sm">
-                  <span className="text-slate-500 font-medium">Sentimen Negatif</span>
-                  <span className="font-bold text-red-600">
+                <div className="py-3.5 flex items-center justify-between">
+                  <dt className="text-slate-500">Sentimen negatif</dt>
+                  <dd className="font-extrabold text-slate-900 text-base">
                     {selectedRegion.sentiment_negative_pct}%
-                  </span>
+                  </dd>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-50 text-sm">
-                  <span className="text-slate-500 font-medium">Isu Utama</span>
-                  <span className="font-bold text-slate-900 text-right">
+                <div className="py-3.5 flex items-center justify-between">
+                  <dt className="text-slate-500">Isu utama</dt>
+                  <dd className="font-extrabold text-slate-900 text-right">
                     {selectedRegion.top_issue || "Kondusif"}
-                  </span>
+                  </dd>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-50 text-sm">
-                  <span className="text-slate-500 font-medium">Keyakinan Lokasi</span>
-                  <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    {selectedRegion.confidence.toFixed(2)}
-                  </span>
+                <div className="py-3.5 flex items-center justify-between">
+                  <dt className="text-slate-500">Keyakinan lokasi</dt>
+                  <dd className="font-extrabold text-slate-900 font-mono">
+                    {selectedRegion.confidence.toFixed(2).replace(".", ",")}
+                  </dd>
                 </div>
-              </div>
+              </dl>
             ) : (
-              <p className="text-sm text-slate-500 py-8 text-center">Silakan pilih wilayah pada peta.</p>
+              <p className="text-sm text-slate-500 py-8">
+                Pilih salah satu kotak wilayah di samping untuk melihat rincian.
+              </p>
             )}
           </div>
 
-          <div className="mt-8">
-            {selectedRegion && (
+          {selectedRegion && (
+            <div className="mt-6 pt-2">
               <Link
                 href={`/isu?wilayah=${encodeURIComponent(selectedRegion.nama)}`}
-                className="w-full inline-flex items-center justify-center py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-semibold shadow-sm transition-colors"
+                className="w-full min-h-[44px] inline-flex items-center justify-center py-2.5 px-4 bg-[#2563EB] hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors"
               >
-                Buka Isu Terkait <ArrowUpRight className="w-4 h-4 ml-1.5" />
+                Buka isu terkait
               </Link>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -223,17 +217,18 @@ export default function PetaWilayahPage() {
 
     return (
       <button
+        type="button"
         onClick={() => reg && setSelectedRegion(reg)}
-        className={`w-full py-4 px-2 rounded-lg border text-center transition-all cursor-pointer ${getTierColorClass(
+        className={`w-full min-h-[78px] p-3.5 rounded-xl border text-left transition-all cursor-pointer ${getTierStyle(
           tier
         )} ${
           isSelected
-            ? "ring-4 ring-blue-400 ring-offset-2 scale-105 shadow-md z-20"
-            : "hover:scale-102 hover:shadow-sm"
+            ? "ring-2 ring-offset-2 ring-blue-600"
+            : "hover:opacity-95"
         }`}
       >
-        <div className="text-xs font-semibold tracking-wide uppercase">{shortLabel}</div>
-        <div className="text-2xl font-extrabold mt-0.5">{count}</div>
+        <div className="text-xs font-semibold opacity-90">{shortLabel}</div>
+        <div className="text-2xl font-extrabold leading-tight mt-1">{count}</div>
       </button>
     );
   }

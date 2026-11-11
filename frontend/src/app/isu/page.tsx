@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Filter, Search, ChevronRight, RefreshCw } from "lucide-react";
 import { fetchIssues, IssueItem } from "@/lib/api";
 
 export default function IsuListPage() {
@@ -37,74 +36,66 @@ export default function IsuListPage() {
     loadIssues();
   };
 
-  const getBadgeClass = (level: string) => {
+  const getPillClass = (level: string) => {
     switch (level) {
       case "CRITICAL":
-        return "bg-red-100 text-red-900 border-red-200";
+        return "bg-[#B91C1C] text-white";
       case "HIGH":
-        return "bg-orange-100 text-orange-900 border-orange-200";
+        return "bg-[#EA580C] text-white";
       case "MEDIUM":
-        return "bg-blue-100 text-blue-900 border-blue-200";
+        return "bg-[#2563EB] text-white";
       default:
-        return "bg-slate-100 text-slate-800 border-slate-200";
+        return "bg-slate-200 text-slate-800";
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Antrean Isu & Alert
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Daftar kandidat isu, hasil skor risiko AI, dan status verifikasi analis
-          </p>
-        </div>
+      <div>
+        <p className="text-xs font-bold tracking-wider uppercase text-blue-700">
+          Isu &amp; Alert
+        </p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
+          Antrean kandidat isu dan verifikasi analis
+        </h1>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <form onSubmit={handleSearch} className="flex-1 w-full flex items-center">
-          <div className="relative w-full">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Cari berdasarkan kata kunci, judul, atau wilayah..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs sm:text-sm pl-9 pr-4 py-2 border border-slate-300 rounded-md focus:border-blue-600 focus:outline-none"
-            />
-          </div>
+      {/* Filter & Search Bar */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+          <input
+            type="text"
+            placeholder="Cari judul isu, kata kunci, atau wilayah..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 text-sm px-3.5 py-2 border border-slate-300 rounded-lg focus:border-blue-600 focus:outline-none"
+          />
           <button
             type="submit"
-            className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-md shadow-sm transition-colors"
+            className="min-h-[40px] px-4 py-2 bg-[#2563EB] hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-lg transition-colors"
           >
             Cari
           </button>
         </form>
 
-        <div className="flex items-center space-x-3 w-full md:w-auto">
-          {/* Level Filter */}
+        <div className="flex items-center gap-2.5">
           <select
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
-            className="text-xs sm:text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none"
-            aria-label="Filter Tingkat Risiko"
+            className="min-h-[40px] text-xs sm:text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 font-medium"
+            aria-label="Filter Level Risiko"
           >
             <option value="">Semua Level</option>
-            <option value="CRITICAL">Critical (85-100)</option>
-            <option value="HIGH">High (70-84)</option>
-            <option value="MEDIUM">Medium (40-69)</option>
-            <option value="LOW">Low (0-39)</option>
+            <option value="CRITICAL">CRITICAL (85-100)</option>
+            <option value="HIGH">HIGH (70-84)</option>
+            <option value="MEDIUM">MEDIUM (40-69)</option>
+            <option value="LOW">LOW (0-39)</option>
           </select>
 
-          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs sm:text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none"
+            className="min-h-[40px] text-xs sm:text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 font-medium"
             aria-label="Filter Status Verifikasi"
           >
             <option value="">Semua Status</option>
@@ -116,16 +107,21 @@ export default function IsuListPage() {
         </div>
       </div>
 
-      {/* Issues Table / Cards */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+      {/* Issues List */}
+      <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden">
         {loading ? (
-          <div className="py-16 text-center text-slate-500 flex flex-col items-center">
-            <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mb-2" />
-            <p className="text-xs">Memuat antrean isu...</p>
+          <div className="p-12 text-center text-sm font-medium text-slate-600">
+            Memuat antrean isu dan skor risiko...
           </div>
         ) : issues.length === 0 ? (
-          <div className="py-16 text-center text-slate-500">
-            <p className="text-sm">Tidak ada isu yang cocok dengan kriteria filter.</p>
+          <div className="p-12 text-center">
+            <p className="text-sm font-semibold text-slate-800">
+              Tidak ada isu yang cocok dengan filter saat ini.
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Ubah pilihan filter di atas atau klik &ldquo;Muat Skenario
+              Banjir&rdquo; pada bilah atas.
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -133,47 +129,53 @@ export default function IsuListPage() {
               <Link
                 key={issue.id}
                 href={`/isu/${issue.id}`}
-                className="block p-4 sm:p-5 hover:bg-slate-50 transition-colors group"
+                className="block p-5 hover:bg-slate-50 transition-colors group"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center space-x-3">
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded border ${getBadgeClass(issue.level)}`}>
-                      {issue.level} &bull; {Math.round(issue.skor)}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`text-xs font-extrabold px-2.5 py-1 rounded-md ${getPillClass(
+                        issue.level
+                      )}`}
+                    >
+                      {issue.level} &middot; skor {Math.round(issue.skor)}
                     </span>
-                    <span className="text-xs text-slate-400 font-mono">
-                      {issue.kode_referensi}
-                    </span>
-                    <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">
-                      {issue.wilayah}
-                    </span>
-                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium">
-                      {issue.kategori}
+                    <span className="text-xs text-slate-600 font-medium">
+                      {issue.wilayah} &middot; {issue.kategori} &middot;{" "}
+                      <span className="font-mono">
+                        {new Date(issue.first_seen).toLocaleTimeString(
+                          "id-ID",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )}{" "}
+                        WIB
+                      </span>
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400">
-                    Volume: {issue.current_volume} mention ({issue.repost_count} repost)
-                  </div>
+                  <span className="text-xs font-semibold capitalize px-2.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                    {issue.status}
+                  </span>
                 </div>
 
-                <div className="mt-2.5 flex items-baseline justify-between">
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                    {issue.judul}
-                  </h3>
-                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all ml-2" />
-                </div>
+                <h2 className="text-lg font-extrabold text-slate-900 group-hover:text-blue-700 mt-2">
+                  {issue.judul}
+                </h2>
 
-                <p className="text-xs sm:text-sm text-slate-600 mt-1 line-clamp-2">
-                  {issue.ringkasan || "Belum ada ringkasan yang diekstraksi."}
+                <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+                  {issue.ringkasan}
                 </p>
 
                 <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                  <div className="flex items-center space-x-2">
-                    <span>Status:</span>
-                    <span className="font-semibold text-slate-800 capitalize bg-slate-100 px-2 py-0.5 rounded">
-                      {issue.status}
-                    </span>
-                  </div>
-                  <span>Terdeteksi: {new Date(issue.first_seen).toLocaleTimeString("id-ID")} WIB</span>
+                  <span>
+                    Kode: <strong className="font-mono">{issue.kode_referensi}</strong>{" "}
+                    &middot; Volume: {issue.current_volume} konten ({issue.repost_count}{" "}
+                    repost)
+                  </span>
+                  <span className="font-semibold text-blue-700">
+                    Periksa &amp; Verifikasi
+                  </span>
                 </div>
               </Link>
             ))}
