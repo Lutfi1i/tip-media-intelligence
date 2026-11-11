@@ -159,7 +159,8 @@ NEGATIVE_SENTIMENT_WORDS = [
     "kecelakaan", "kebakaran", "ambruk", "roboh", "tewas", "luka", "terluka",
     "ditangkap", "tersangka", "protes", "demo", "menolak", "keluhkan", "terlambat",
     "penumpukan", "kemacetan", "padat merayap", "tawuran", "begal", "curanmor",
-    "meluber", "jebol", "terendam", "menggenang", "kerusakan", "kekurangan"
+    "meluber", "jebol", "terendam", "merendam", "menggenang", "kerusakan", "kekurangan",
+    "banjir", "luapan", "longsor"
 ]
 
 POSITIVE_SENTIMENT_WORDS = [

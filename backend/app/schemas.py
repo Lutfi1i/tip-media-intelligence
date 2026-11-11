@@ -209,6 +209,11 @@ class DashboardSummaryOut(BaseModel):
     konten_terklasifikasi: int = 0
     konten_24jam: int = 0
     terakhir_koleksi: Optional[datetime] = None
+    health_index: float = 78.0
+    galaxy_nodes: List[Dict[str, Any]] = []
+    flow_data: List[Dict[str, Any]] = []
+    triage_stats: Optional[Dict[str, Any]] = None
+    live_articles: List[Dict[str, Any]] = []
     generated_at: datetime
 
 class AuditLogOut(BaseModel):

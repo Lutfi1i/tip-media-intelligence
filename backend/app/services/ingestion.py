@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 from backend.app.models import Source, RawItem, ItemAnalysis, MonitoringProfile, Issue, IssueItem
 from backend.app.services.dedup import compute_content_hash, is_near_duplicate
 from backend.app.services.ai_analyzer import analyze_sentiment, analyze_topic, extract_locations
+from backend.app.services.jev_triage import evaluate_binary_triage
 
-# Versi nyata mesin analisis (leksikon + aturan gazetir), bukan model transformer.
-MODEL_VERSION = "leksikon-id-gazetir-v2"
+# Versi nyata mesin analisis (leksikon + aturan gazetir + jev triage), bukan model transformer.
+MODEL_VERSION = "leksikon-id-gazetir-v2-jev"
 
 def can_fetch_source(source: Source) -> bool:
     """Check if source is legally permitted and active."""
@@ -79,10 +80,18 @@ def ingest_content_item(
     db.commit()
     db.refresh(raw_item)
 
+    # 3.5. JEV Fast-Binary Triage Gatekeeper
+    triage = evaluate_binary_triage(title, body, publisher=penerbit)
+
     # 4. AI Analysis
     sentimen, sentimen_conf = analyze_sentiment(f"{title} {body}")
     topik, topik_conf = analyze_topic(f"{title} {body}")
     lokasi_prim, lokasi_disebut, lokasi_conf = extract_locations(f"{title} {body}")
+
+    # If flagged as commercial promo noise by Jev with high confidence, classify appropriately
+    if triage.is_noise_or_promo and triage.confidence >= 0.85:
+        topik = "Komersial"
+        sentimen = "netral"
 
     analysis = ItemAnalysis(
         item_id=raw_item.id,
@@ -106,5 +115,7 @@ def ingest_content_item(
         "is_repost": is_repost,
         "sentimen": sentimen,
         "topik": topik,
-        "lokasi": lokasi_prim
+        "lokasi": lokasi_prim,
+        "triage_incident": triage.is_incident_jabodetabek,
+        "triage_dispatch": triage.requires_analyst_dispatch,
     }

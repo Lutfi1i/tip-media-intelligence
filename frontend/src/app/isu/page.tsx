@@ -39,33 +39,33 @@ export default function IsuListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="pb-2 border-b border-[#1E2A4A]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="pb-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-sky-400">
+          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
             INCIDENT RADAR &bull; ANALYST VERIFICATION
           </p>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
             Antrean Isu &amp; Peringatan Dini
           </h1>
         </div>
-        <div className="text-xs font-mono text-slate-400">
+        <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
           Total Terdeteksi: {issues.length} Kluster
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="panel p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="panel p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
         <form onSubmit={handleSearch} className="flex-1 flex gap-2">
           <input
             type="text"
             placeholder="Cari judul isu, kata kunci insiden, atau wilayah..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 text-xs sm:text-sm px-3.5 py-2 bg-[#16203C] border border-[#1E2A4A] rounded-lg text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
+            className="flex-1 text-xs sm:text-sm px-3.5 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-md text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none font-mono"
           />
           <button
             type="submit"
-            className="min-h-[40px] px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs sm:text-sm font-bold rounded-lg transition-colors shadow-sm"
+            className="min-h-[40px] px-4 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs sm:text-sm font-mono font-bold rounded-md transition-colors shadow-xs"
           >
             Cari
           </button>
@@ -75,7 +75,7 @@ export default function IsuListPage() {
           <select
             value={levelFilter}
             onChange={(e) => setLevelFilter(e.target.value)}
-            className="min-h-[40px] text-xs sm:text-sm border border-[#1E2A4A] rounded-lg px-3 py-2 bg-[#16203C] text-slate-200 font-medium focus:outline-none cursor-pointer"
+            className="min-h-[40px] text-xs sm:text-sm border border-zinc-300 dark:border-zinc-800 rounded-md px-3 py-2 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none cursor-pointer"
             aria-label="Filter Level Risiko"
           >
             <option value="">Semua Level Risiko</option>
@@ -88,7 +88,7 @@ export default function IsuListPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="min-h-[40px] text-xs sm:text-sm border border-[#1E2A4A] rounded-lg px-3 py-2 bg-[#16203C] text-slate-200 font-medium focus:outline-none cursor-pointer"
+            className="min-h-[40px] text-xs sm:text-sm border border-zinc-300 dark:border-zinc-800 rounded-md px-3 py-2 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none cursor-pointer"
             aria-label="Filter Status Verifikasi"
           >
             <option value="">Semua Status</option>
@@ -101,33 +101,33 @@ export default function IsuListPage() {
       </div>
 
       {/* Issues Radar Feed */}
-      <div className="panel overflow-hidden">
+      <div className="panel overflow-hidden bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
         {loading ? (
-          <div className="p-12 text-center text-xs text-slate-400 font-mono">
-            <div className="inline-block w-6 h-6 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-2" />
+          <div className="p-12 text-center text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+            <div className="inline-block w-6 h-6 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin mb-2" />
             <p>Memuat antrean kluster isu dan skor anomali...</p>
           </div>
         ) : issues.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-sm font-bold text-slate-200">
+            <p className="text-sm font-bold font-mono text-zinc-800 dark:text-zinc-200">
               Tidak ada isu yang cocok dengan filter saat ini.
             </p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
               Ubah pilihan filter di atas atau klik &ldquo;Tarik Berita Nyata&rdquo; untuk menyinkronkan feed terkini.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[#1E2A4A]">
+          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {issues.map((issue) => (
               <Link
                 key={issue.id}
                 href={`/isu/${issue.id}`}
-                className="block p-5 hover:bg-[#16203C] transition-colors group"
+                className="block p-5 hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors group"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <ThreatLevelPill level={issue.level} score={issue.skor} />
-                    <span className="text-xs text-slate-400 font-medium font-mono">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium font-mono">
                       {issue.wilayah} &bull; {issue.kategori} &bull;{" "}
                       <span>
                         {new Date(issue.first_seen).toLocaleTimeString("id-ID", {
@@ -139,25 +139,25 @@ export default function IsuListPage() {
                     </span>
                   </div>
 
-                  <span className="text-[11px] font-mono font-bold capitalize px-2 py-0.5 rounded bg-[#16203C] text-slate-300 border border-[#1E2A4A]">
+                  <span className="text-[11px] font-mono font-bold capitalize px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                     {issue.status}
                   </span>
                 </div>
 
-                <h2 className="text-base font-bold text-slate-100 group-hover:text-sky-300 transition-colors mt-2 leading-snug">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 group-hover:underline transition-colors mt-2 leading-snug">
                   {issue.judul}
                 </h2>
 
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
                   {issue.ringkasan}
                 </p>
 
-                <div className="mt-3.5 pt-2.5 border-t border-[#1E2A4A]/60 flex items-center justify-between text-xs text-slate-400 font-mono">
+                <div className="mt-3.5 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                   <span>
-                    Ref: <strong className="text-slate-300">{issue.kode_referensi}</strong>{" "}
+                    Ref: <strong className="text-zinc-800 dark:text-zinc-200">{issue.kode_referensi}</strong>{" "}
                     &bull; Volume: {issue.current_volume} laporan
                   </span>
-                  <span className="font-bold text-sky-400 group-hover:text-sky-300 transition-colors">
+                  <span className="font-bold text-zinc-900 dark:text-white group-hover:underline transition-colors">
                     Verifikasi Analis &rarr;
                   </span>
                 </div>

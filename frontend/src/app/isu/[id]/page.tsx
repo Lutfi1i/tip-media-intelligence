@@ -67,9 +67,9 @@ export default function IssueDetailPage() {
 
   if (loading) {
     return (
-      <div className="panel p-12 text-center">
-        <div className="inline-block w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-sm font-bold text-slate-200">
+      <div className="panel p-16 text-center bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
+        <div className="inline-block w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100">
           Memindai Berkas Isu &amp; Kredibilitas Sumber...
         </p>
       </div>
@@ -78,14 +78,14 @@ export default function IssueDetailPage() {
 
   if (error || !issue) {
     return (
-      <div className="panel border-red-500/40 p-8 max-w-lg mx-auto my-8 bg-red-950/20">
-        <h2 className="text-base font-bold text-red-400">Isu Tidak Ditemukan</h2>
-        <p className="text-xs text-slate-300 mt-1 mb-4">
+      <div className="panel border-red-500/40 p-8 max-w-lg mx-auto my-8 bg-red-500/5">
+        <h2 className="text-base font-bold text-red-600 dark:text-red-400 font-mono">Isu Tidak Ditemukan</h2>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400 font-mono mt-1 mb-4">
           {error || "Data isu tidak tersedia dalam basis data radar."}
         </p>
         <Link
           href="/isu"
-          className="text-sky-400 text-xs font-bold hover:underline"
+          className="text-zinc-900 dark:text-white text-xs font-mono font-bold hover:underline"
         >
           &larr; Kembali ke daftar antrean isu
         </Link>
@@ -95,26 +95,26 @@ export default function IssueDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="pb-2 border-b border-[#1E2A4A]/60 flex flex-wrap items-center justify-between gap-3">
+      <div className="pb-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-sky-400">
+          <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
             RADAR INCIDENT &bull; #{issue.kode_referensi}
           </p>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
             Verifikasi Analis &amp; Bukti Sumber
           </h1>
         </div>
         <Link
           href="/isu"
-          className="text-xs font-mono font-bold text-slate-300 hover:text-white bg-[#10172E] px-3.5 py-2 rounded-lg border border-[#1E2A4A] transition-colors"
+          className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 bg-zinc-100 dark:bg-zinc-900 px-3.5 py-2 rounded-md border border-zinc-300 dark:border-zinc-800 transition-colors"
         >
           &larr; Kembali ke Antrean
         </Link>
       </div>
 
       {actionSuccess && (
-        <div className="p-4 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-semibold flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-xs text-emerald-700 dark:text-emerald-300 font-mono font-semibold flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           {actionSuccess}
         </div>
       )}
@@ -122,15 +122,15 @@ export default function IssueDetailPage() {
       {/* Main Split: Incident Evidence & Analyst Decisions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left 8 Cols: Issue Dossier & Real News Items */}
-        <section className="lg:col-span-8 panel p-6 sm:p-7 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#1E2A4A]">
+        <section className="lg:col-span-8 panel p-6 sm:p-7 space-y-6 bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
             <div className="flex flex-wrap items-center gap-2.5">
               <ThreatLevelPill level={issue.level} score={issue.skor} />
-              <span className="text-xs font-mono text-slate-300">
+              <span className="text-xs font-mono text-zinc-700 dark:text-zinc-300">
                 {issue.wilayah} &bull; {issue.kategori}
               </span>
             </div>
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
               Pertama dilihat:{" "}
               {new Date(issue.first_seen).toLocaleTimeString("id-ID", {
                 hour: "2-digit",
@@ -141,39 +141,39 @@ export default function IssueDetailPage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-bold text-white tracking-tight leading-snug">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight leading-snug">
               {issue.judul}
             </h2>
           </div>
 
           {/* AI Intelligence Brief */}
-          <div className="bg-[#16203C] border border-[#1E2A4A] rounded-xl p-4 space-y-1.5">
-            <div className="text-[11px] font-mono font-bold tracking-wider uppercase text-sky-400">
-              RINGKASAN INTELIJEN AI
+          <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 space-y-1.5">
+            <div className="text-[11px] font-mono font-bold tracking-wider uppercase text-zinc-500 dark:text-zinc-400">
+              RINGKASAN INTELIJEN AI &amp; PEDOMAN LAPANGAN
             </div>
-            <p className="text-xs text-slate-200 leading-relaxed">
+            <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-mono">
               {issue.ringkasan}
             </p>
           </div>
 
           {/* Evidence Articles from Real Sources */}
           <div>
-            <div className="flex items-center justify-between pb-3 mb-2 border-b border-[#1E2A4A]">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+            <div className="flex items-center justify-between pb-3 mb-2 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 font-mono">
                 Artikel Bukti &bull; {issue.items.length} Laporan Terverifikasi
               </h3>
-              <span className="text-xs font-mono text-slate-400">
+              <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
                 Volume: {issue.current_volume} konten
               </span>
             </div>
 
-            <div className="divide-y divide-[#1E2A4A]">
+            <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {issue.items.length > 0 ? (
                 issue.items.map((item) => (
                   <div key={item.id} className="py-4 space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <SourceBadge source={item.penerbit} />
-                      <span className="text-[11px] font-mono text-slate-400">
+                      <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
                         {new Date(item.published_at).toLocaleTimeString("id-ID", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -186,20 +186,20 @@ export default function IssueDetailPage() {
                       href={item.url_kanonik}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-bold text-slate-100 hover:text-sky-300 transition-colors block"
+                      className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:underline transition-colors block"
                     >
                       {item.judul} &nearr;
                     </a>
 
                     {item.isi && (
-                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                         {item.isi}
                       </p>
                     )}
                   </div>
                 ))
               ) : (
-                <div className="py-6 text-center text-xs text-slate-400">
+                <div className="py-6 text-center text-xs text-zinc-400 font-mono">
                   Belum ada artikel terhubung ke isu ini.
                 </div>
               )}
@@ -208,23 +208,23 @@ export default function IssueDetailPage() {
 
           {/* 6-Factor Risk Score Breakdown */}
           {issue.alasan_skor && issue.alasan_skor.faktor && (
-            <div className="pt-4 border-t border-[#1E2A4A]">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 font-mono">
+            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3 font-mono">
                 Rincian 6 Faktor Skor Risiko ({Math.round(issue.skor)}/100)
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
                 {Object.entries(issue.alasan_skor.faktor).map(([key, f]: any) => (
                   <div
                     key={key}
-                    className="p-3 rounded-lg bg-[#16203C] border border-[#1E2A4A] flex flex-col justify-between"
+                    className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between"
                   >
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 capitalize">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400 capitalize">
                       <span>{key.replace(/_/g, " ")}</span>
-                      <span className="font-mono text-sky-400">
+                      <span className="font-mono text-zinc-700 dark:text-zinc-300">
                         Bobot {f.bobot}
                       </span>
                     </div>
-                    <div className="text-lg font-black font-mono text-white mt-1">
+                    <div className="text-lg font-black font-mono text-zinc-900 dark:text-white mt-1">
                       {f.nilai}
                     </div>
                   </div>
@@ -235,12 +235,12 @@ export default function IssueDetailPage() {
         </section>
 
         {/* Right 4 Cols: Verification Action Panel */}
-        <section className="lg:col-span-4 panel p-6 space-y-6">
-          <div className="pb-3 border-b border-[#1E2A4A]">
-            <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-sky-400">
+        <section className="lg:col-span-4 panel p-6 space-y-6 bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
+          <div className="pb-3 border-b border-zinc-200 dark:border-zinc-800">
+            <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
               KEPUTUSAN ANALIS
             </p>
-            <h2 className="text-base font-bold text-white mt-0.5">
+            <h2 className="text-base font-bold text-zinc-900 dark:text-white mt-0.5 font-mono">
               Status: <span className="capitalize">{issue.status}</span>
             </h2>
           </div>
@@ -249,7 +249,7 @@ export default function IssueDetailPage() {
             <div>
               <label
                 htmlFor="catatan-analis"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5"
+                className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-1.5 font-mono"
               >
                 Catatan Verifikasi Lapangan
               </label>
@@ -259,16 +259,16 @@ export default function IssueDetailPage() {
                 value={reviewerCatatan}
                 onChange={(e) => setReviewerCatatan(e.target.value)}
                 placeholder="Tuliskan hasil konfirmasi dengan unit dinas terkait atau catatan khusus..."
-                className="w-full text-xs p-3 rounded-lg bg-[#16203C] border border-[#1E2A4A] text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none"
+                className="w-full text-xs p-3 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none font-mono"
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 font-mono">
               <button
                 type="button"
                 onClick={() => handleDecision("verifikasi")}
                 disabled={submitting}
-                className="w-full min-h-[42px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+                className="w-full min-h-[42px] px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold rounded-md transition-colors disabled:opacity-50 shadow-xs"
               >
                 {submitting ? "Memproses..." : "Verifikasi Isu Valid"}
               </button>
@@ -277,7 +277,7 @@ export default function IssueDetailPage() {
                 type="button"
                 onClick={() => handleDecision("koreksi")}
                 disabled={submitting}
-                className="w-full min-h-[42px] px-4 py-2.5 bg-[#16203C] hover:bg-[#1E2A4A] text-slate-200 text-xs font-bold border border-[#1E2A4A] rounded-lg transition-colors disabled:opacity-50"
+                className="w-full min-h-[42px] px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs font-bold border border-zinc-300 dark:border-zinc-800 rounded-md transition-colors disabled:opacity-50"
               >
                 Koreksi Data / Label
               </button>
@@ -286,7 +286,7 @@ export default function IssueDetailPage() {
                 type="button"
                 onClick={() => handleDecision("tolak")}
                 disabled={submitting}
-                className="w-full min-h-[42px] px-4 py-2.5 bg-red-900/30 hover:bg-red-900/50 text-red-300 text-xs font-bold border border-red-500/30 rounded-lg transition-colors disabled:opacity-50"
+                className="w-full min-h-[42px] px-4 py-2.5 bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-400 text-xs font-bold border border-red-500/30 rounded-md transition-colors disabled:opacity-50"
               >
                 Tolak Isu (False Alarm)
               </button>
@@ -295,24 +295,24 @@ export default function IssueDetailPage() {
 
           {/* Audit Trail Preview */}
           {issue.reviews && issue.reviews.length > 0 && (
-            <div className="pt-4 border-t border-[#1E2A4A] space-y-2">
-              <div className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">
+            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+              <div className="text-[10px] font-mono font-bold tracking-wider uppercase text-zinc-500 dark:text-zinc-400">
                 RIWAYAT VERIFIKASI TERAKHIR
               </div>
               {issue.reviews.map((rev) => (
                 <div
                   key={rev.id}
-                  className="p-3 bg-[#16203C] rounded-lg border border-[#1E2A4A] text-xs space-y-1"
+                  className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-md border border-zinc-200 dark:border-zinc-800 text-xs font-mono space-y-1"
                 >
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span className="font-bold text-slate-200">
+                  <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
                       {rev.reviewer_nama}
                     </span>
-                    <span className="font-mono text-[10px] uppercase text-sky-400">
+                    <span className="font-mono text-[10px] uppercase text-zinc-700 dark:text-zinc-300">
                       {rev.keputusan}
                     </span>
                   </div>
-                  <p className="text-slate-300 text-[11px]">{rev.catatan}</p>
+                  <p className="text-zinc-600 dark:text-zinc-400 text-[11px]">{rev.catatan}</p>
                 </div>
               ))}
             </div>

@@ -8,12 +8,31 @@ import {
   TrendPoint,
   IssueItem,
   RegionSummary,
+  GalaxyNode,
+  FlowItem,
+  LiveArticle,
+  TriageStats,
 } from "@/lib/api";
 import {
   RadarKpiCard,
   ThreatLevelPill,
   SourceBadge,
 } from "@/components/RadarUi";
+import { HealthIndexDial } from "@/components/HealthIndexDial";
+import { ConversationGalaxy } from "@/components/ConversationGalaxy";
+import { ConversationFlow } from "@/components/ConversationFlow";
+import { LiveNewsStream } from "@/components/LiveNewsStream";
+import { SourceDeepDive } from "@/components/SourceDeepDive";
+import {
+  RotateCw,
+  TrendingUp,
+  AlertTriangle,
+  MapPin,
+  Clock,
+  Radio,
+  Shield,
+  Layers,
+} from "lucide-react";
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -22,6 +41,11 @@ export default function DashboardPage() {
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [priorityIssues, setPriorityIssues] = useState<IssueItem[]>([]);
   const [regions, setRegions] = useState<RegionSummary[]>([]);
+  const [healthIndex, setHealthIndex] = useState<number>(78.5);
+  const [galaxyNodes, setGalaxyNodes] = useState<GalaxyNode[]>([]);
+  const [flowData, setFlowData] = useState<FlowItem[]>([]);
+  const [triageStats, setTriageStats] = useState<TriageStats | undefined>(undefined);
+  const [liveArticles, setLiveArticles] = useState<LiveArticle[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   const loadData = async () => {
@@ -33,6 +57,11 @@ export default function DashboardPage() {
       setTrend(data.trend_7d || []);
       setPriorityIssues(data.priority_issues || []);
       setRegions(data.regions || []);
+      if (data.health_index !== undefined) setHealthIndex(data.health_index);
+      if (data.galaxy_nodes) setGalaxyNodes(data.galaxy_nodes);
+      if (data.flow_data) setFlowData(data.flow_data);
+      if (data.triage_stats) setTriageStats(data.triage_stats);
+      if (data.live_articles) setLiveArticles(data.live_articles);
       setLastRefreshed(new Date());
     } catch (err: any) {
       setError(
@@ -50,13 +79,13 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="panel p-12 text-center">
-        <div className="inline-block w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-sm font-bold text-slate-200">
-          Memindai Sinyal Media &amp; Radar Intelijen...
+      <div className="panel p-16 text-center bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
+        <div className="inline-block w-8 h-8 border-2 border-zinc-900 dark:border-white border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100">
+          Memindai Sinyal Radar Intelijen &amp; Berita Nyata...
         </p>
-        <p className="text-xs text-slate-400 mt-1 font-mono">
-          Sinkronisasi feed berita nasional, BMKG, Dishub DKI, dan kalkulasi risiko
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
+          Sinkronisasi feed Antara, Detik, CNN, BMKG, Dishub, dan evaluasi Jev Triage
         </p>
       </div>
     );
@@ -64,18 +93,20 @@ export default function DashboardPage() {
 
   if (error || !kpi) {
     return (
-      <div className="panel border-red-500/40 p-8 max-w-lg mx-auto my-8 bg-red-950/20">
-        <div className="flex items-center gap-2 text-red-400 mb-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping" />
-          <h2 className="text-base font-bold">Koneksi Radar Terputus</h2>
+      <div className="panel border-red-500/40 p-8 max-w-lg mx-auto my-12 bg-red-500/5">
+        <div className="flex items-center gap-2 mb-2 text-red-600 dark:text-red-400 font-mono font-bold text-sm">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <span>Gagal Memuat Dashboard</span>
         </div>
-        <p className="text-xs text-slate-300 mb-5 leading-relaxed">{error}</p>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400 font-mono leading-relaxed mb-4">
+          {error}
+        </p>
         <button
           type="button"
           onClick={loadData}
-          className="min-h-[40px] px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg transition-colors"
+          className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-mono font-bold rounded-md transition-colors"
         >
-          Coba Hubungkan Ulang
+          Coba Hubungkan Kembali
         </button>
       </div>
     );
@@ -112,195 +143,190 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Page Title & Tactical Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#1E2A4A]/60">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono font-bold tracking-widest uppercase text-sky-400">
-              WAR ROOM &bull; EXECUTIVE RADAR
+            <span className="text-[11px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
+              PUSAT KOMANDO &bull; EXECUTIVE RADAR
             </span>
-            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              LIVE INGESTION
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-800">
+              100% DATA BERITA NYATA
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
             Situasi Terkini Media &amp; Bencana
           </h1>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400 font-mono hidden md:inline">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono hidden md:inline">
             Pembaruan: {lastRefreshed.toLocaleTimeString("id-ID")} WIB
           </span>
           <button
             type="button"
             onClick={loadData}
-            className="min-h-[36px] px-3.5 py-1.5 text-xs font-bold text-slate-200 bg-[#10172E] hover:bg-[#16203C] border border-[#1E2A4A] rounded-lg transition-colors flex items-center gap-1.5"
+            className="min-h-[36px] px-3.5 py-1.5 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-800 rounded-md transition-colors flex items-center gap-1.5"
           >
-            <svg
-              className="w-3.5 h-3.5 text-sky-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <RotateCw className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
             Segarkan
           </button>
         </div>
       </div>
 
-      {/* 4 Core Signals KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <RadarKpiCard
-          label="Total Mention Terkumpul"
-          value={kpi.mention_unik.toLocaleString("id-ID")}
-          hint="Dari 6 feed resmi publik teruji"
-          trend={
-            kpi.mention_growth_pct !== null
-              ? `${kpi.mention_growth_pct > 0 ? "+" : ""}${kpi.mention_growth_pct}% 24j`
-              : "Volume stabil"
-          }
-          trendPositive={(kpi.mention_growth_pct ?? 0) <= 0}
-          icon={
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-            </svg>
-          }
-        />
+      {/* Top Section: Health Index Dial + Core KPI Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Executive Health Index Dial (5 cols) */}
+        <div className="lg:col-span-5">
+          <HealthIndexDial
+            score={healthIndex}
+            criticalCount={kpi.critical_count}
+            highCount={kpi.high_count}
+            negativePct={peakDay ? peakDay.negative_pct : 25}
+            triageStats={triageStats}
+          />
+        </div>
 
-        <RadarKpiCard
-          label="Isu Prioritas Aktif"
-          value={kpi.isu_prioritas}
-          hint={`${kpi.critical_count} Kritis, ${kpi.high_count} Tinggi`}
-          trend={kpi.isu_prioritas > 0 ? "Perlu Respon" : "Kondusif"}
-          trendPositive={kpi.isu_prioritas === 0}
-          icon={
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          }
-        />
+        {/* 4 Core Signals KPI Cards (7 cols) */}
+        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <RadarKpiCard
+            label="Total Laporan Nyata"
+            value={kpi.mention_unik.toLocaleString("id-ID")}
+            hint="Feed berita & telemetri sensor terverifikasi"
+            trend={
+              kpi.mention_growth_pct !== null
+                ? `${kpi.mention_growth_pct > 0 ? "+" : ""}${kpi.mention_growth_pct}% 24j`
+                : "Volume stabil"
+            }
+            trendPositive={(kpi.mention_growth_pct ?? 0) <= 0}
+            icon={<Radio className="w-5 h-5" />}
+          />
 
-        <RadarKpiCard
-          label="Wilayah Terdampak"
-          value={kpi.wilayah_terdampak}
-          hint={`Dari ${kpi.total_wilayah_terpantau} wilayah terpantau`}
-          trend={`${Math.round((kpi.wilayah_terdampak / Math.max(kpi.total_wilayah_terpantau, 1)) * 100)}% sebaran`}
-          trendPositive={kpi.wilayah_terdampak <= 2}
-          icon={
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          }
-        />
+          <RadarKpiCard
+            label="Isu Prioritas Aktif"
+            value={kpi.isu_prioritas}
+            hint={`${kpi.critical_count} Kritis, ${kpi.high_count} Tinggi`}
+            trend={kpi.isu_prioritas > 0 ? "Perlu Respon" : "Kondusif"}
+            trendPositive={kpi.isu_prioritas === 0}
+            icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
+          />
 
-        <RadarKpiCard
-          label="Kasus Menunggu Aksi"
-          value={kpi.menunggu_aksi}
-          hint={`${kpi.lewat_tenggat} kasus lewat SLA`}
-          trend={kpi.lewat_tenggat > 0 ? "Eskalasi" : "Terkendali"}
-          trendPositive={kpi.lewat_tenggat === 0}
-          icon={
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-        />
+          <RadarKpiCard
+            label="Wilayah Terdampak"
+            value={`${kpi.wilayah_terdampak}/${kpi.total_wilayah_terpantau}`}
+            hint="Wilayah administrasi berstatus waspada"
+            trend="Kemendagri Jabodetabek"
+            trendPositive={true}
+            icon={<MapPin className="w-5 h-5 text-emerald-500" />}
+          />
+
+          <RadarKpiCard
+            label="Antrean Tindak Lanjut"
+            value={kpi.menunggu_aksi}
+            hint={`${kpi.lewat_tenggat} melewati SLA respons`}
+            trend={kpi.lewat_tenggat > 0 ? "Eskalasi Lewat Tenggat" : "Dalam Batas SLA"}
+            trendPositive={kpi.lewat_tenggat === 0}
+            icon={<Clock className="w-5 h-5" />}
+          />
+        </div>
       </div>
 
-      {/* Main Split: 7-Day Trend Chart & Priority Issues */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      {/* Middle Section: Authentic Radar Sweep Screen (Galaxy) + Conversation Flow */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Left 7 Cols: Circular Radar Screen Orbit */}
+        <div className="lg:col-span-7">
+          <ConversationGalaxy nodes={galaxyNodes} />
+        </div>
+
+        {/* Right 5 Cols: Flow Distribution Diagram */}
+        <div className="lg:col-span-5">
+          <ConversationFlow flows={flowData} />
+        </div>
+      </div>
+
+      {/* Real Live News Streaming Feed */}
+      <LiveNewsStream articles={liveArticles} />
+
+      {/* Trend & Threat Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left 7 Cols: 7-Day Trend Chart */}
-        <section className="lg:col-span-7 panel p-6 flex flex-col justify-between">
+        <section className="lg:col-span-7 panel p-6 flex flex-col justify-between bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-[#1E2A4A]">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Dinamika Tren 7 Hari
+                <h2 className="text-sm font-bold font-mono text-zinc-900 dark:text-white uppercase tracking-wider">
+                  TREN VOLUME &amp; TEKANAN SENTIMEN (7 HARI)
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Volume berita terkumpul dan rasio sentimen negatif harian
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono">
+                  Batang = volume berita; Garis oranye = % sentimen negatif
                 </p>
               </div>
-
-              <div className="flex items-center space-x-4 text-xs font-mono">
-                <span className="inline-flex items-center text-slate-300">
-                  <span className="w-2.5 h-2.5 rounded-xs bg-sky-500 mr-1.5" />
+              <div className="flex items-center space-x-3 text-xs font-mono">
+                <span className="flex items-center text-zinc-700 dark:text-zinc-300">
+                  <span className="w-2.5 h-2.5 bg-zinc-800 dark:bg-zinc-200 rounded-sm mr-1.5" />
                   Volume
                 </span>
-                <span className="inline-flex items-center text-amber-400">
-                  <span className="w-3 h-0.5 bg-amber-400 mr-1.5" />% Negatif
+                <span className="flex items-center text-amber-600 dark:text-amber-400 font-semibold">
+                  <span className="w-2.5 h-0.5 bg-amber-500 mr-1.5" />
+                  % Negatif
                 </span>
               </div>
             </div>
 
-            <div className="w-full overflow-x-auto pt-2">
+            {/* SVG Combo Chart */}
+            <div className="relative w-full overflow-x-auto">
               <svg
                 viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                className="w-full h-auto min-w-[340px]"
-                role="img"
-                aria-label="Grafik tren 7 hari volume mention dan persentase sentimen negatif"
+                className="w-full h-48 select-none"
               >
-                {/* Horizontal grid lines */}
-                {[0.25, 0.5, 0.75, 1].map((ratio) => {
-                  const y = padTop + plotHeight * (1 - ratio);
-                  return (
-                    <line
-                      key={ratio}
-                      x1={12}
-                      y1={y}
-                      x2={chartWidth - 12}
-                      y2={y}
-                      stroke="#1E2A4A"
-                      strokeWidth={1}
-                      strokeDasharray="3 3"
-                    />
-                  );
-                })}
-
-                {/* Baseline */}
+                {/* Baseline Guide Grid Lines */}
                 <line
-                  x1={12}
+                  x1="0"
+                  y1={padTop}
+                  x2={chartWidth}
+                  y2={padTop}
+                  className="stroke-zinc-200 dark:stroke-zinc-800"
+                  strokeWidth="1"
+                  strokeDasharray="3 3"
+                />
+                <line
+                  x1="0"
+                  y1={padTop + plotHeight / 2}
+                  x2={chartWidth}
+                  y2={padTop + plotHeight / 2}
+                  className="stroke-zinc-200 dark:stroke-zinc-800"
+                  strokeWidth="1"
+                  strokeDasharray="3 3"
+                />
+                <line
+                  x1="0"
                   y1={padTop + plotHeight}
-                  x2={chartWidth - 12}
+                  x2={chartWidth}
                   y2={padTop + plotHeight}
-                  stroke="#1E2A4A"
-                  strokeWidth={1.5}
+                  className="stroke-zinc-300 dark:stroke-zinc-700"
+                  strokeWidth="1"
                 />
 
-                {/* Bars */}
+                {/* Bars for volume */}
                 {trend.map((t, i) => {
-                  const barW = 34;
-                  const x = colWidth * i + (colWidth - barW) / 2;
-                  const barH =
-                    maxVol > 0
-                      ? Math.max(6, (t.volume / maxVol) * (plotHeight - 8))
-                      : 6;
-                  const y = padTop + plotHeight - barH;
-                  const isTop = peakDay && t.day === peakDay.day;
-
+                  const barHeight = (t.volume / maxVol) * plotHeight;
+                  const x = colWidth * i + colWidth * 0.22;
+                  const y = padTop + (plotHeight - barHeight);
+                  const w = colWidth * 0.56;
                   return (
-                    <g key={t.day}>
+                    <g key={t.day} className="cursor-pointer group">
                       <rect
                         x={x}
                         y={y}
-                        width={barW}
-                        height={barH}
-                        rx={4}
-                        fill={isTop ? "#0284C7" : "#1E2A4A"}
-                        className="hover:fill-sky-400 transition-colors"
+                        width={w}
+                        height={Math.max(barHeight, 2)}
+                        rx="3"
+                        className="fill-zinc-800 hover:fill-zinc-950 dark:fill-zinc-300 dark:hover:fill-white transition-colors"
                       />
                       <text
                         x={colWidth * i + colWidth / 2}
                         y={chartHeight - 8}
                         textAnchor="middle"
-                        className="text-[11px] fill-slate-400 font-mono font-medium"
+                        className="text-[11px] fill-zinc-500 font-mono font-medium"
                       >
                         {t.day}
                       </text>
@@ -309,7 +335,7 @@ export default function DashboardPage() {
                           x={colWidth * i + colWidth / 2}
                           y={y - 5}
                           textAnchor="middle"
-                          className="text-[10px] fill-slate-300 font-mono font-bold"
+                          className="text-[10px] fill-zinc-700 dark:fill-zinc-300 font-mono font-bold"
                         >
                           {t.volume}
                         </text>
@@ -342,7 +368,8 @@ export default function DashboardPage() {
                         cy={cy}
                         r={3.5}
                         fill="#F59E0B"
-                        stroke="#10172E"
+                        stroke="currentColor"
+                        className="text-white dark:text-black"
                         strokeWidth={1.5}
                       />
                     </g>
@@ -352,15 +379,15 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#1E2A4A] flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="text-slate-400 font-mono">
+          <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <span className="text-zinc-500 dark:text-zinc-400">
               {peakDay && peakDay.volume > 0
                 ? `Puncak volume: ${peakDay.label || peakDay.day} (${peakDay.volume} berita, ${peakDay.negative_pct ?? 0}% sentimen negatif)`
                 : "Semua kanal terpantau stabil dalam 7 hari terakhir."}
             </span>
             <Link
               href="/peta"
-              className="font-bold text-sky-400 hover:text-sky-300 transition-colors"
+              className="font-bold text-zinc-900 dark:text-white hover:underline"
             >
               Lihat Peta Wilayah &rarr;
             </Link>
@@ -368,28 +395,28 @@ export default function DashboardPage() {
         </section>
 
         {/* Right 5 Cols: Priority Issues Radar */}
-        <section className="lg:col-span-5 panel p-6 flex flex-col justify-between">
+        <section className="lg:col-span-5 panel p-6 flex flex-col justify-between bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
           <div>
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1E2A4A]">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Radar Isu &amp; Ancaman
+                <h2 className="text-sm font-bold font-mono text-zinc-900 dark:text-white uppercase tracking-wider">
+                  RADAR ISU &amp; ANCAMAN
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono">
                   Isu terkluster dengan skor risiko tertinggi
                 </p>
               </div>
               <Link
                 href="/isu"
-                className="text-xs font-bold text-sky-400 hover:text-sky-300 font-mono"
+                className="text-xs font-bold font-mono text-zinc-900 dark:text-white hover:underline"
               >
                 Semua ({priorityIssues.length})
               </Link>
             </div>
 
             {priorityIssues.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
-                <p className="font-semibold text-slate-300">
+              <div className="py-12 text-center text-xs font-mono text-zinc-400">
+                <p className="font-semibold text-zinc-700 dark:text-zinc-300">
                   Tidak ada isu kritis atau risiko tinggi saat ini.
                 </p>
                 <p className="mt-1">
@@ -398,20 +425,20 @@ export default function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-[#1E2A4A]/60">
+              <div className="divide-y divide-zinc-200 dark:divide-zinc-800/80">
                 {priorityIssues.slice(0, 5).map((issue) => (
                   <Link
                     key={issue.id}
                     href={`/isu/${issue.id}`}
-                    className="block py-3 px-2 -mx-2 rounded-lg hover:bg-[#16203C] transition-colors group"
+                    className="block py-3 px-2 -mx-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors group"
                   >
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="min-w-0 pr-2">
-                        <div className="text-xs font-bold text-slate-200 group-hover:text-sky-300 line-clamp-2 leading-snug">
+                        <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:underline line-clamp-2 leading-snug">
                           {issue.judul}
                         </div>
-                        <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400 font-mono">
-                          <span className="text-slate-300 font-semibold">
+                        <div className="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+                          <span className="text-zinc-700 dark:text-zinc-300 font-semibold">
                             {issue.wilayah}
                           </span>
                           <span>&bull;</span>
@@ -426,16 +453,16 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="mt-5 pt-4 border-t border-[#1E2A4A] grid grid-cols-2 gap-2.5">
+          <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-2 gap-2.5">
             <Link
               href="/kasus"
-              className="min-h-[38px] inline-flex items-center justify-center px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors text-center"
+              className="min-h-[38px] inline-flex items-center justify-center px-3 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-mono font-bold transition-colors text-center"
             >
               Papan Kasus
             </Link>
             <Link
               href="/laporan"
-              className="min-h-[38px] inline-flex items-center justify-center px-3 py-2 rounded-lg bg-[#16203C] hover:bg-[#1E2A4A] text-slate-200 text-xs font-bold border border-[#1E2A4A] transition-colors text-center"
+              className="min-h-[38px] inline-flex items-center justify-center px-3 py-2 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs font-mono font-bold border border-zinc-300 dark:border-zinc-800 transition-colors text-center"
             >
               Laporan Eksekutif
             </Link>
@@ -443,58 +470,8 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* Regional Exposure Overview (Radar Table) */}
-      <section className="panel p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-4 border-b border-[#1E2A4A]">
-          <div>
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-              Status Sebaran Wilayah Kemendagri
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Tingkat penyebaran isu di DKI Jakarta dan wilayah penyangga Bodetabek
-            </p>
-          </div>
-          <Link
-            href="/peta"
-            className="text-xs font-bold text-sky-400 hover:text-sky-300 font-mono"
-          >
-            Buka Peta Skematis &rarr;
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {regions.slice(0, 6).map((reg) => (
-            <div
-              key={reg.kode_wilayah}
-              className="bg-[#16203C]/80 border border-[#1E2A4A] rounded-lg p-3.5 hover:border-slate-600 transition-colors"
-            >
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="font-bold text-slate-200 truncate">
-                  {reg.nama}
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">
-                  {reg.kode_wilayah}
-                </span>
-              </div>
-              <div className="text-2xl font-black font-mono text-sky-400 mt-1">
-                {reg.mention_count}
-              </div>
-              <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-                <span>Negatif:</span>
-                <span
-                  className={`font-mono font-bold ${
-                    reg.sentiment_negative_pct > 50
-                      ? "text-red-400"
-                      : "text-slate-300"
-                  }`}
-                >
-                  {reg.sentiment_negative_pct}%
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Monitored Media & Sources Deep Dive */}
+      <SourceDeepDive />
     </div>
   );
 }

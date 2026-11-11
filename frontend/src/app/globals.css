@@ -3,13 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --background: #0A0F1F;
-  --foreground: #F1F5F9;
-  --panel: #10172E;
-  --panel-2: #16203C;
-  --border: #1E2A4A;
-  --muted: #7C8CAB;
-  --accent: #38BDF8;
+  --background: #FFFFFF;
+  --foreground: #09090B;
+  --panel: #FAFAFA;
+  --panel-2: #F4F4F5;
+  --border: #E4E4E7;
+  --muted: #71717A;
+  --accent: #18181B;
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #FAFAFA;
+  --panel: #09090B;
+  --panel-2: #121214;
+  --border: #27272A;
+  --muted: #A1A1AA;
+  --accent: #FFFFFF;
 }
 
 body {
@@ -17,9 +27,10 @@ body {
   background-color: var(--background);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Radar Intelligence Panel primitives */
+/* Authentic Radar Intelligence Panels */
 .panel {
   background-color: var(--panel);
   border: 1px solid var(--border);
@@ -45,31 +56,31 @@ body {
 }
 
 .animate-radarsweep {
-  animation: radarsweep 4s linear infinite;
+  animation: radarsweep 5s linear infinite;
 }
 
 .animate-radarblip {
   animation: radarblip 2.5s ease-in-out infinite;
 }
 
-/* Antislop Accessible Focus Ring on Dark Background */
+/* Antislop Accessible Focus Ring */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* Smooth dark custom scrollbars */
+/* Custom scrollbar for tactical feeds */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A0F1F;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1E2A4A;
+  background: var(--border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #38BDF8;
+  background: var(--muted);
 }

@@ -275,3 +275,90 @@ export async function pollSources(force: boolean = true) {
   if (!res.ok) throw new Error("Gagal menyinkronkan data berita nyata");
   return res.json();
 }
+
+
+export interface GalaxyNode {
+  id: string;
+  name: string;
+  volume: number;
+  sentiment_score: number;
+  threat_level: "kritis" | "waspada" | "aman";
+  orbit_radius: number;
+  angle: number;
+  top_topic: string;
+}
+
+export interface FlowItem {
+  source: string;
+  topic: string;
+  value: number;
+}
+
+export interface TriageStats {
+  total_evaluated: number;
+  incident_accepted: number;
+  noise_filtered: number;
+  noise_filtered_pct: number;
+  fast_dispatch_count: number;
+}
+
+export interface LiveArticle {
+  id: number;
+  judul: string;
+  penerbit: string;
+  url: string;
+  published_at: string | null;
+  sentimen: string;
+  topik: string;
+  lokasi_kejadian: string | null;
+  ringkasan: string;
+  kredibilitas: number;
+}
+
+export interface ProvinceGeo {
+  kode: string;
+  nama: string;
+  pulau: string;
+  lat: number;
+  lng: number;
+  is_focus: boolean;
+  status: string;
+  keterangan: string;
+}
+
+export interface JabodetabekRegionGeo {
+  kode: string;
+  nama: string;
+  jenis: string;
+  provinsi: string;
+  lat: number;
+  lng: number;
+  mention_count: number;
+  negative_count: number;
+  threat_level: "kritis" | "tinggi" | "waspada" | "rendah";
+  heat_intensity: number;
+  top_issue_title: string | null;
+  dominant_topic: string;
+}
+
+export interface IndonesiaGeoOverview {
+  status: string;
+  focus_area: string;
+  provinces: ProvinceGeo[];
+  jabodetabek_regions: JabodetabekRegionGeo[];
+  total_provinces: number;
+  total_active_regions: number;
+  generated_at: string;
+}
+
+export async function fetchIndonesiaGeo(): Promise<IndonesiaGeoOverview> {
+  const res = await fetch(`${API_BASE_URL}/geo/indonesia`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil data peta Indonesia & Jabodetabek");
+  return res.json();
+}
+
+export async function fetchRegionalDetail(kodeWilayah: string) {
+  const res = await fetch(`${API_BASE_URL}/geo/region/${kodeWilayah}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Gagal mengambil data wilayah ${kodeWilayah}`);
+  return res.json();
+}
