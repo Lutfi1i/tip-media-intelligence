@@ -116,8 +116,39 @@ def _entries_from_bmkg(payload: Any, limit: int) -> List[Dict[str, Any]]:
     return entries
 
 
+def _entries_from_bluesky(payload: Any, limit: int) -> List[Dict[str, Any]]:
+    """Adapter untuk postingan publik Bluesky (AT Protocol via XRPC public API)."""
+    posts = payload.get("posts", []) if isinstance(payload, dict) else []
+    entries: List[Dict[str, Any]] = []
+    for p in posts[:limit]:
+        if not isinstance(p, dict):
+            continue
+        record = p.get("record", {})
+        author = p.get("author", {})
+        text = record.get("text", "").strip()
+        if not text:
+            continue
+        handle = author.get("handle") or "bluesky"
+        uri = p.get("uri", "")
+        rkey = uri.split("/")[-1] if uri else ""
+        link = f"https://bsky.app/profile/{handle}/post/{rkey}" if rkey else uri
+        title = text[:140] + ("..." if len(text) > 140 else "")
+        created_at = record.get("createdAt")
+        entries.append(
+            {
+                "title": title,
+                "link": link,
+                "summary": text,
+                "author": f"@{handle}",
+                "_published_iso": created_at,
+                "_feed_title": "Bluesky (AT Protocol)",
+            }
+        )
+    return entries
+
+
 def fetch_source_entries(url: str, limit: int = MAX_ENTRIES_PER_SOURCE) -> Tuple[List[Any], Optional[str]]:
-    """Ambil dan parse feed (RSS/Atom) atau API JSON resmi. Mengembalikan (entries, error_message)."""
+    """Ambil dan parse feed (RSS/Atom) atau API JSON resmi/Bluesky. Mengembalikan (entries, error_message)."""
     try:
         with httpx.Client(
             timeout=HTTP_TIMEOUT,
@@ -130,6 +161,17 @@ def fetch_source_entries(url: str, limit: int = MAX_ENTRIES_PER_SOURCE) -> Tuple
 
     if response.status_code >= 400:
         return [], f"HTTP {response.status_code}"
+
+    # Jalur Media Sosial Bluesky (AT Protocol).
+    if "api.bsky.app" in url.lower() or "bsky.app" in url.lower():
+        try:
+            payload = response.json()
+        except ValueError:
+            return [], "respons Bluesky bukan JSON valid"
+        entries = _entries_from_bluesky(payload, limit)
+        if not entries:
+            return [], "tidak ada postingan Bluesky relevan"
+        return entries, None
 
     # Jalur JSON resmi (mis. data.bmkg.go.id).
     if ".json" in url.lower() or "application/json" in response.headers.get("content-type", ""):

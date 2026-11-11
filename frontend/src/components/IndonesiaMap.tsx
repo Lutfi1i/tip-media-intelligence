@@ -65,6 +65,11 @@ export function IndonesiaMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const touchDistanceRef = useRef<number | null>(null);
 
+  // Adaptive scale factor: elements stay visually compact and proportionate regardless of zoom
+  const invScale = useMemo(() => {
+    return Number((1 / Math.pow(zoom, 0.72)).toFixed(3));
+  }, [zoom]);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -134,6 +139,40 @@ export function IndonesiaMap() {
     setFilterIsland("ALL");
   };
 
+  // NATIVE NON-PASSIVE WHEEL LISTENER (Prevents page from scrolling completely)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onWheelNative = (e: WheelEvent) => {
+      // Guaranteed stop of outer window / page scrolling
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = el.getBoundingClientRect();
+      const factor = e.deltaY < 0 ? 1.15 : 0.87;
+
+      setZoom((currZoom) => {
+        const newZoom = Math.min(8.0, Math.max(0.6, Number((currZoom * factor).toFixed(2))));
+        const mouseX = e.clientX - rect.left - rect.width / 2;
+        const mouseY = e.clientY - rect.top - rect.height / 2;
+        const scaleRatio = newZoom / currZoom;
+
+        setPan((currPan) => ({
+          x: Math.round(currPan.x - (mouseX - currPan.x) * (scaleRatio - 1)),
+          y: Math.round(currPan.y - (mouseY - currPan.y) * (scaleRatio - 1)),
+        }));
+
+        return newZoom;
+      });
+    };
+
+    el.addEventListener("wheel", onWheelNative, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheelNative);
+    };
+  }, []);
+
   // Mouse Drag Handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return; // Only primary left-click
@@ -162,28 +201,6 @@ export function IndonesiaMap() {
 
   const handleMouseUp = () => {
     setIsDragging(false);
-  };
-
-  // Wheel Zoom (Mouse scroll)
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    // Zoom direction
-    const factor = e.deltaY < 0 ? 1.15 : 0.87;
-    const newZoom = Math.min(8.0, Math.max(0.6, Number((zoom * factor).toFixed(2))));
-
-    // Smooth focal zoom towards cursor
-    const mouseX = e.clientX - rect.left - rect.width / 2;
-    const mouseY = e.clientY - rect.top - rect.height / 2;
-    const scaleRatio = newZoom / zoom;
-
-    const newPanX = pan.x - (mouseX - pan.x) * (scaleRatio - 1);
-    const newPanY = pan.y - (mouseY - pan.y) * (scaleRatio - 1);
-
-    setZoom(newZoom);
-    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
   };
 
   // Touch handlers for mobile/tablet pinch & pan
@@ -264,11 +281,11 @@ export function IndonesiaMap() {
                 RADAR INTELIJEN GEOSPASIAL INDONESIA
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30">
-                FREE PAN &amp; ZOOM
+                SCROLL-LOCK &bull; ADAPTIVE SCALE
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Garis kontur kepulauan 33 provinsi. Drag bebas di area peta, scroll mouse untuk zoom in/out, atau gunakan tombol navigasi cepat.
+              Scroll mouse fokus pada peta tanpa menggulir halaman. Titik radar dan teks berukuran adaptif (tetap proporsional saat diperbesar).
             </p>
           </div>
         </div>
@@ -308,7 +325,7 @@ export function IndonesiaMap() {
           <div className="flex items-center gap-2">
             <Crosshair className="w-4 h-4 text-sky-500 animate-spin" style={{ animationDuration: "12s" }} />
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
-              PETA VEKTOR RESMI NUSANTARA &bull; DRAG &amp; SCROLL BEBAS
+              PETA VEKTOR RESMI NUSANTARA &bull; SCROLL MOUSE TERFOKUS
             </span>
           </div>
 
@@ -339,7 +356,6 @@ export function IndonesiaMap() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -441,10 +457,22 @@ export function IndonesiaMap() {
               }}
             >
               {/* Latitude & Equator Reference Lines */}
-              <line x1="10" y1="147" x2="990" y2="147" stroke="currentColor" strokeDasharray="3 4" strokeWidth="0.8" className="text-zinc-300 dark:text-zinc-800" />
-              <text x="20" y="142" className="text-[9px] fill-zinc-400 dark:fill-zinc-600 font-mono">0° KHATULISTIWA (EQUATOR)</text>
+              <line
+                x1="10"
+                y1="147"
+                x2="990"
+                y2="147"
+                stroke="currentColor"
+                strokeDasharray="3 4"
+                strokeWidth="0.8"
+                vectorEffect="non-scaling-stroke"
+                className="text-zinc-300 dark:text-zinc-800"
+              />
+              <text x="20" y="142" className="text-[9px] fill-zinc-400 dark:fill-zinc-600 font-mono">
+                0° KHATULISTIWA (EQUATOR)
+              </text>
 
-              {/* Indonesian Archipelago Provinces (Accurate Boundaries) */}
+              {/* Indonesian Archipelago Provinces (Accurate Boundaries, Non-Scaling Stroke) */}
               <g>
                 {INDONESIA_PROVINCES.map((prov) => {
                   const isHovered = hoveredProvince === prov.name;
@@ -459,12 +487,14 @@ export function IndonesiaMap() {
                       {/* Base Solid Fill & Accurate Boundary Stroke */}
                       <path
                         d={prov.d}
+                        vectorEffect="non-scaling-stroke"
+                        strokeWidth="1.1"
                         className={`transition-all duration-200 cursor-pointer ${
                           isHovered
-                            ? "fill-sky-100 dark:fill-sky-950/60 stroke-sky-500 stroke-[1.8]"
+                            ? "fill-sky-100 dark:fill-sky-950/60 stroke-sky-500"
                             : isJawa
-                            ? "fill-zinc-200/90 dark:fill-zinc-900/90 stroke-zinc-500 dark:stroke-zinc-600 stroke-[1.3]"
-                            : "fill-zinc-100/90 dark:fill-zinc-950/70 stroke-zinc-300 dark:stroke-zinc-800 stroke-[1]"
+                            ? "fill-zinc-200/90 dark:fill-zinc-900/90 stroke-zinc-500 dark:stroke-zinc-600"
+                            : "fill-zinc-100/90 dark:fill-zinc-950/70 stroke-zinc-300 dark:stroke-zinc-800"
                         }`}
                         onMouseEnter={() => setHoveredProvince(prov.name)}
                         onMouseLeave={() => setHoveredProvince(null)}
@@ -480,13 +510,15 @@ export function IndonesiaMap() {
                 })}
               </g>
 
-              {/* Island Watermark Labels */}
+              {/* Island Watermark Labels (Adaptively scaled) */}
               {ISLAND_LABELS.map((isl) => (
                 <text
                   key={isl.name}
                   x={isl.x}
                   y={isl.y}
-                  className="text-[10px] font-black tracking-widest fill-zinc-400/60 dark:fill-zinc-700/60 pointer-events-none select-none font-sans"
+                  fontSize={`${Math.max(6, Math.round(10 * invScale))}px`}
+                  opacity={zoom > 2.8 ? 0.25 : 0.6}
+                  className="font-black tracking-widest fill-zinc-400 dark:fill-zinc-600 pointer-events-none select-none font-sans transition-opacity"
                 >
                   {isl.name}
                 </text>
@@ -518,6 +550,14 @@ export function IndonesiaMap() {
                   nodeColor = "#71717A"; // Neutral grey for non-pilot nodes
                 }
 
+                // Adaptive visual radii:
+                const baseDotRadius = (isSelected ? 4.5 : node.isFocus ? 3.2 : 2.0) * invScale;
+                const ringRadius = (isSelected ? 8.5 : node.isFocus ? 6.0 : 3.8) * invScale;
+                const pulseRadius = (isCritical ? 13 : 9) * invScale;
+
+                // Show badge if selected, critical, or if zoomed into region
+                const showBadge = isSelected || isCritical || (zoom >= 2.4 && node.isFocus);
+
                 return (
                   <g
                     key={node.code}
@@ -536,7 +576,7 @@ export function IndonesiaMap() {
                       <circle
                         cx={node.x}
                         cy={node.y}
-                        r={isCritical ? "14" : "10"}
+                        r={pulseRadius}
                         fill={nodeColor}
                         opacity="0.25"
                         className="animate-ping"
@@ -551,10 +591,10 @@ export function IndonesiaMap() {
                     <circle
                       cx={node.x}
                       cy={node.y}
-                      r={isSelected ? "9" : node.isFocus ? "6.5" : "4"}
+                      r={ringRadius}
                       fill="none"
                       stroke={isSelected ? "#38BDF8" : nodeColor}
-                      strokeWidth={isSelected ? "2.5" : "1.5"}
+                      strokeWidth={Math.max(1, (isSelected ? 2.2 : 1.3) * invScale)}
                       opacity={isSelected ? 1 : 0.8}
                     />
 
@@ -562,29 +602,31 @@ export function IndonesiaMap() {
                     <circle
                       cx={node.x}
                       cy={node.y}
-                      r={isSelected ? "4.5" : node.isFocus ? "3.2" : "2"}
+                      r={baseDotRadius}
                       fill={isSelected ? "#38BDF8" : nodeColor}
                       filter={filter}
-                      className="transition-all duration-200 group-hover:scale-150"
+                      className="transition-all duration-200 group-hover:scale-125"
                       style={{ transformOrigin: `${node.x}px ${node.y}px` }}
                     />
 
-                    {/* Always-on Tag for Critical Nodes or Selected Node */}
-                    {(isSelected || (node.isFocus && isCritical)) && (
-                      <g transform={`translate(${node.x + 8}, ${node.y - 8})`}>
+                    {/* Adaptive Label Badge: scaled with invScale so it remains crisp and neat */}
+                    {showBadge && (
+                      <g
+                        transform={`translate(${node.x + 5 * invScale}, ${node.y - 7 * invScale}) scale(${invScale})`}
+                      >
                         <rect
                           x="0"
                           y="0"
-                          width={node.name.length * 6.5 + 16}
-                          height="18"
-                          rx="4"
-                          className="fill-zinc-900 dark:fill-black stroke-zinc-700 dark:stroke-zinc-800"
+                          width={node.name.length * 6.2 + 16}
+                          height="16"
+                          rx="3"
+                          className="fill-zinc-900/90 dark:fill-black/95 stroke-zinc-700 dark:stroke-zinc-800"
                           strokeWidth="1"
                         />
-                        <circle cx="8" cy="9" r="3" fill={nodeColor} />
+                        <circle cx="7" cy="8" r="2.5" fill={nodeColor} />
                         <text
-                          x="15"
-                          y="12"
+                          x="13"
+                          y="11"
                           className="text-[9px] font-bold fill-white font-sans"
                         >
                           {node.name}
