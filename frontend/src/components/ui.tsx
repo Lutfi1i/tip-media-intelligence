@@ -25,7 +25,7 @@ export function LevelBadge({
         LEVEL_STYLE[level] || LEVEL_STYLE.LOW
       }`}
     >
-      {level || "—"}
+      {level || "-"}
       {score !== null && score !== undefined && (
         <span className="ml-1 font-mono font-semibold opacity-80">{score.toFixed(0)}</span>
       )}
@@ -137,7 +137,7 @@ export function EmptyState({
   );
 }
 
-/** Notifikasi ringkas di dalam halaman — pengganti window.alert(). */
+/** Notifikasi ringkas di dalam halaman: pengganti window.alert(). */
 export function Notice({
   tone,
   message,

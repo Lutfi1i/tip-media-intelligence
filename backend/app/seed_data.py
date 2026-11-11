@@ -158,7 +158,7 @@ def seed_database():
     db.add_all(regions_data)
     db.commit()
 
-    # 2. Seed Sources — hanya feed publik yang benar-benar merespons (diuji 2026-11-11).
+    # 2. Seed Sources: hanya feed publik yang benar-benar merespons (diuji 2026-11-11).
     sources_data = [
         Source(
             nama="Portal Berita Nasional (Antara News)", jenis="rss",

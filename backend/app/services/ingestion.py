@@ -44,7 +44,7 @@ def ingest_content_item(
             "message": "Konten sama persis sudah tersimpan"
         }
 
-    # 1b. URL duplicate check — kolom url_kanonik unik, jadi cek sebelum insert.
+    # 1b. URL duplicate check: kolom url_kanonik unik, jadi cek sebelum insert.
     if url:
         existing_url = db.query(RawItem).filter(RawItem.url_kanonik == url).first()
         if existing_url:

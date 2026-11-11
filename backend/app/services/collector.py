@@ -99,7 +99,7 @@ def _entries_from_bmkg(payload: Any, limit: int) -> List[Dict[str, Any]]:
         wilayah = g.get("Wilayah", "tidak diketahui")
         entries.append(
             {
-                "title": f"Gempa M{magnitudo} — {wilayah}",
+                "title": f"Gempa M{magnitudo}: {wilayah}",
                 "link": g.get("Shakemap")
                 or f"https://www.bmkg.go.id/gempabumi/gempabumi-terkini.bmkg#{g.get('DateTime', '')}",
                 "summary": (
@@ -110,7 +110,7 @@ def _entries_from_bmkg(payload: Any, limit: int) -> List[Dict[str, Any]]:
                 ).strip(),
                 "author": "BMKG",
                 "_published_iso": g.get("DateTime"),
-                "_feed_title": "BMKG — Gempa Bumi Terkini (data resmi)",
+                "_feed_title": "BMKG: Gempa Bumi Terkini (data resmi)",
             }
         )
     return entries
@@ -172,7 +172,7 @@ def collect_source(db: Session, source: Source, force: bool = False) -> Dict[str
     }
 
     if not can_fetch_source(source):
-        result["error"] = f"status izin '{source.status_izin}' — tidak boleh diambil"
+        result["error"] = f"status izin '{source.status_izin}': tidak boleh diambil"
         return result
 
     if not source.url:

@@ -1,8 +1,8 @@
 const TZ = "Asia/Jakarta";
 
-/** Angka dengan pemisah ribuan lokal (id-ID). Null/undefined -> "—". */
+/** Angka dengan pemisah ribuan lokal (id-ID). Null/undefined -> "-". */
 export function fmtNum(value: number | null | undefined, digits = 0): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
   return value.toLocaleString("id-ID", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
@@ -11,14 +11,14 @@ export function fmtNum(value: number | null | undefined, digits = 0): string {
 
 /** Persentase tanpa tanda: 72.4 -> "72,4%". */
 export function fmtPct(value: number | null | undefined, digits = 0): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
   return `${fmtNum(value, digits)}%`;
 }
 
-/** Persentase bertanda: 32 -> "+32%", -4.2 -> "−4,2%". */
+/** Persentase bertanda: 32 -> "+32%", -4.2 -> "-4,2%". */
 export function fmtSignedPct(value: number | null | undefined, digits = 0): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  if (value === null || value === undefined || Number.isNaN(value)) return "-";
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
   return `${sign}${fmtNum(Math.abs(value), digits)}%`;
 }
 
@@ -33,7 +33,7 @@ function parse(iso?: string | null): Date | null {
 
 export function fmtDateTime(iso?: string | null): string {
   const d = parse(iso);
-  if (!d) return "—";
+  if (!d) return "-";
   return `${d.toLocaleString("id-ID", {
     day: "2-digit",
     month: "short",
@@ -49,7 +49,7 @@ export function fmtDateTime(iso?: string | null): string {
 
 export function fmtDate(iso?: string | null): string {
   const d = parse(iso);
-  if (!d) return "—";
+  if (!d) return "-";
   return d.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "short",
@@ -60,7 +60,7 @@ export function fmtDate(iso?: string | null): string {
 
 export function fmtTime(iso?: string | null): string {
   const d = parse(iso);
-  if (!d) return "—";
+  if (!d) return "-";
   return `${d.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
@@ -72,7 +72,7 @@ export function fmtTime(iso?: string | null): string {
 /** "baru saja", "12 menit lalu", "3 jam lalu", "2 hari lalu". */
 export function fmtRelative(iso?: string | null): string {
   const d = parse(iso);
-  if (!d) return "—";
+  if (!d) return "-";
   const diff = Date.now() - d.getTime();
   if (diff < 0) return fmtTime(d.toISOString());
   const mins = Math.floor(diff / 60000);
