@@ -1,0 +1,282 @@
+[
+  {
+    "code": "31.71",
+    "name": "Jakarta Pusat",
+    "x": 274.4,
+    "y": 282.5,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "31.72",
+    "name": "Jakarta Utara",
+    "x": 275.4,
+    "y": 281.3,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "31.73",
+    "name": "Jakarta Barat",
+    "x": 272.6,
+    "y": 282.1,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "31.74",
+    "name": "Jakarta Selatan",
+    "x": 273.8,
+    "y": 284.4,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "31.75",
+    "name": "Jakarta Timur",
+    "x": 275.6,
+    "y": 283.6,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "32.76",
+    "name": "Kota Depok",
+    "x": 274.0,
+    "y": 287.2,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "32.71",
+    "name": "Kota Bogor",
+    "x": 273.4,
+    "y": 291.2,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "32.01",
+    "name": "Kabupaten Bogor",
+    "x": 274.6,
+    "y": 292.5,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "32.75",
+    "name": "Kota Bekasi",
+    "x": 277.5,
+    "y": 283.8,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "32.16",
+    "name": "Kabupaten Bekasi",
+    "x": 280.7,
+    "y": 283.4,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "36.71",
+    "name": "Kota Tangerang",
+    "x": 270.2,
+    "y": 282.3,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "36.74",
+    "name": "Tangerang Selatan",
+    "x": 271.6,
+    "y": 285.1,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "36.03",
+    "name": "Kabupaten Tangerang",
+    "x": 267.4,
+    "y": 283.6,
+    "isFocus": true,
+    "island": "Jawa"
+  },
+  {
+    "code": "11",
+    "name": "Banda Aceh",
+    "x": 41.6,
+    "y": 34.5,
+    "isFocus": false,
+    "island": "Sumatera"
+  },
+  {
+    "code": "12",
+    "name": "Medan",
+    "x": 109.3,
+    "y": 76.0,
+    "isFocus": false,
+    "island": "Sumatera"
+  },
+  {
+    "code": "13",
+    "name": "Padang",
+    "x": 143.2,
+    "y": 171.9,
+    "isFocus": false,
+    "island": "Sumatera"
+  },
+  {
+    "code": "14",
+    "name": "Pekanbaru",
+    "x": 165.3,
+    "y": 140.7,
+    "isFocus": false,
+    "island": "Sumatera"
+  },
+  {
+    "code": "16",
+    "name": "Palembang",
+    "x": 232.2,
+    "y": 215.1,
+    "isFocus": false,
+    "island": "Sumatera"
+  },
+  {
+    "code": "18",
+    "name": "Bandar Lampung",
+    "x": 242.5,
+    "y": 267.1,
+    "isFocus": false,
+    "island": "Sumatera"
+  },
+  {
+    "code": "32",
+    "name": "Bandung",
+    "x": 290.0,
+    "y": 298.0,
+    "isFocus": false,
+    "island": "Jawa"
+  },
+  {
+    "code": "33",
+    "name": "Semarang",
+    "x": 346.8,
+    "y": 299.6,
+    "isFocus": false,
+    "island": "Jawa"
+  },
+  {
+    "code": "34",
+    "name": "DI Yogyakarta",
+    "x": 345.8,
+    "y": 316.8,
+    "isFocus": false,
+    "island": "Jawa"
+  },
+  {
+    "code": "35",
+    "name": "Surabaya",
+    "x": 393.9,
+    "y": 305.1,
+    "isFocus": false,
+    "island": "Jawa"
+  },
+  {
+    "code": "51",
+    "name": "Denpasar / Bali",
+    "x": 443.6,
+    "y": 334.7,
+    "isFocus": false,
+    "island": "Nusa Tenggara"
+  },
+  {
+    "code": "52",
+    "name": "Mataram / Lombok",
+    "x": 461.8,
+    "y": 333.3,
+    "isFocus": false,
+    "island": "Nusa Tenggara"
+  },
+  {
+    "code": "53",
+    "name": "Kupang / Timor",
+    "x": 613.2,
+    "y": 366.9,
+    "isFocus": false,
+    "island": "Nusa Tenggara"
+  },
+  {
+    "code": "61",
+    "name": "Pontianak",
+    "x": 325.0,
+    "y": 152.3,
+    "isFocus": false,
+    "island": "Kalimantan"
+  },
+  {
+    "code": "62",
+    "name": "Palangkaraya",
+    "x": 417.5,
+    "y": 198.6,
+    "isFocus": false,
+    "island": "Kalimantan"
+  },
+  {
+    "code": "63",
+    "name": "Banjarmasin",
+    "x": 431.1,
+    "y": 222.1,
+    "isFocus": false,
+    "island": "Kalimantan"
+  },
+  {
+    "code": "64",
+    "name": "Samarinda (IKN)",
+    "x": 482.8,
+    "y": 162.4,
+    "isFocus": false,
+    "island": "Kalimantan"
+  },
+  {
+    "code": "71",
+    "name": "Manado",
+    "x": 638.3,
+    "y": 120.4,
+    "isFocus": false,
+    "island": "Sulawesi"
+  },
+  {
+    "code": "73",
+    "name": "Makassar",
+    "x": 528.7,
+    "y": 260.5,
+    "isFocus": false,
+    "island": "Sulawesi"
+  },
+  {
+    "code": "81",
+    "name": "Ambon",
+    "x": 705.8,
+    "y": 229.9,
+    "isFocus": false,
+    "island": "Maluku"
+  },
+  {
+    "code": "91",
+    "name": "Jayapura",
+    "x": 959.0,
+    "y": 205.3,
+    "isFocus": false,
+    "island": "Papua"
+  },
+  {
+    "code": "93",
+    "name": "Merauke",
+    "x": 952.8,
+    "y": 331.4,
+    "isFocus": false,
+    "island": "Papua"
+  }
+]
