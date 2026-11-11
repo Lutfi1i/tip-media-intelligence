@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   fetchIndonesiaGeo,
   fetchRegionalDetail,
@@ -12,12 +12,13 @@ import {
   ExternalLink,
   Flame,
   Radio,
-  Zap,
   Crosshair,
-  Layers,
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Move,
+  Maximize2,
+  Navigation,
 } from "lucide-react";
 import { SentimentBadge } from "./RadarUi";
 import {
@@ -26,6 +27,18 @@ import {
   ISLAND_LABELS,
   HeatNode,
 } from "@/data/indonesiaGeoData";
+
+// Presets for Island Focus Navigation
+const ISLAND_PRESETS: Record<string, { x: number; y: number; zoom: number }> = {
+  ALL: { x: 0, y: 0, zoom: 1 },
+  Jawa: { x: 260, y: -160, zoom: 2.2 },
+  Jabodetabek: { x: 580, y: -240, zoom: 3.4 },
+  Sumatera: { x: 500, y: 40, zoom: 1.8 },
+  Kalimantan: { x: 80, y: 0, zoom: 1.9 },
+  Sulawesi: { x: -220, y: -40, zoom: 2.2 },
+  Papua: { x: -550, y: -100, zoom: 1.8 },
+  "Nusa Tenggara": { x: -140, y: -260, zoom: 2.4 },
+};
 
 export function IndonesiaMap() {
   const [geoData, setGeoData] = useState<IndonesiaGeoOverview | null>(null);
@@ -37,6 +50,20 @@ export function IndonesiaMap() {
   const [filterIsland, setFilterIsland] = useState<string>("ALL");
   const [hoveredNode, setHoveredNode] = useState<HeatNode | null>(null);
   const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
+
+  // Pan & Zoom State
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragStartRef = useRef<{ x: number; y: number; startPanX: number; startPanY: number }>({
+    x: 0,
+    y: 0,
+    startPanX: 0,
+    startPanY: 0,
+  });
+  const hasMovedRef = useRef<boolean>(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const touchDistanceRef = useRef<number | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -84,6 +111,130 @@ export function IndonesiaMap() {
     return map;
   }, [geoData]);
 
+  // Pan to preset island
+  const applyPreset = useCallback((key: string) => {
+    setFilterIsland(key);
+    const preset = ISLAND_PRESETS[key] || ISLAND_PRESETS.ALL;
+    setZoom(preset.zoom);
+    setPan({ x: preset.x, y: preset.y });
+  }, []);
+
+  // Zoom helpers
+  const handleZoomIn = () => {
+    setZoom((z) => Math.min(8.0, Number((z * 1.3).toFixed(2))));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((z) => Math.max(0.6, Number((z / 1.3).toFixed(2))));
+  };
+
+  const handleReset = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setFilterIsland("ALL");
+  };
+
+  // Mouse Drag Handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return; // Only primary left-click
+    setIsDragging(true);
+    hasMovedRef.current = false;
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
+    };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMovedRef.current = true;
+    }
+    setPan({
+      x: dragStartRef.current.startPanX + dx,
+      y: dragStartRef.current.startPanY + dy,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Wheel Zoom (Mouse scroll)
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Zoom direction
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    const newZoom = Math.min(8.0, Math.max(0.6, Number((zoom * factor).toFixed(2))));
+
+    // Smooth focal zoom towards cursor
+    const mouseX = e.clientX - rect.left - rect.width / 2;
+    const mouseY = e.clientY - rect.top - rect.height / 2;
+    const scaleRatio = newZoom / zoom;
+
+    const newPanX = pan.x - (mouseX - pan.x) * (scaleRatio - 1);
+    const newPanY = pan.y - (mouseY - pan.y) * (scaleRatio - 1);
+
+    setZoom(newZoom);
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+  };
+
+  // Touch handlers for mobile/tablet pinch & pan
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      hasMovedRef.current = false;
+      dragStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        startPanX: pan.x,
+        startPanY: pan.y,
+      };
+      touchDistanceRef.current = null;
+    } else if (e.touches.length === 2) {
+      setIsDragging(false);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchDistanceRef.current = dist;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1 && isDragging) {
+      const dx = e.touches[0].clientX - dragStartRef.current.x;
+      const dy = e.touches[0].clientY - dragStartRef.current.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        hasMovedRef.current = true;
+      }
+      setPan({
+        x: dragStartRef.current.startPanX + dx,
+        y: dragStartRef.current.startPanY + dy,
+      });
+    } else if (e.touches.length === 2 && touchDistanceRef.current !== null) {
+      const newDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = newDist / touchDistanceRef.current;
+      setZoom((z) => Math.min(8.0, Math.max(0.6, Number((z * factor).toFixed(2)))));
+      touchDistanceRef.current = newDist;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    touchDistanceRef.current = null;
+  };
+
   // Filtered Jabodetabek cards
   const filteredJabodetabek = (geoData?.jabodetabek_regions || []).filter((r) => {
     const q = searchQuery.toLowerCase().trim();
@@ -113,11 +264,11 @@ export function IndonesiaMap() {
                 RADAR INTELIJEN GEOSPASIAL INDONESIA
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30">
-                VEKTOR + PIXEL GRID
+                FREE PAN &amp; ZOOM
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Garis kontur kepulauan Indonesia lengkap 33 provinsi. Titik merah berdenyut menandakan eskalasi anomali/isu kritis.
+              Garis kontur kepulauan 33 provinsi. Drag bebas di area peta, scroll mouse untuk zoom in/out, atau gunakan tombol navigasi cepat.
             </p>
           </div>
         </div>
@@ -150,24 +301,25 @@ export function IndonesiaMap() {
         </div>
       </div>
 
-      {/* Main Authentic Map Canvas Section */}
+      {/* Main Interactive Map Canvas Section */}
       <div className="panel p-5 bg-white dark:bg-[#06080F] border border-zinc-200 dark:border-zinc-800 relative overflow-hidden">
         {/* Header Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-3 border-b border-zinc-200 dark:border-zinc-800 relative z-10">
           <div className="flex items-center gap-2">
             <Crosshair className="w-4 h-4 text-sky-500 animate-spin" style={{ animationDuration: "12s" }} />
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
-              PETA VEKTOR RESMI KEPULAUAN NUSANTARA &bull; KLIK WILAYAH UNTUK DRILL-DOWN
+              PETA VEKTOR RESMI NUSANTARA &bull; DRAG &amp; SCROLL BEBAS
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-zinc-400 text-[11px] mr-1">Fokus Gugus:</span>
-            {["ALL", "Jawa", "Sumatera", "Kalimantan", "Sulawesi", "Papua", "Nusa Tenggara"].map((isl) => (
+          {/* Island Preset Jump Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-zinc-400 text-[11px] mr-1">Lompat Wilayah:</span>
+            {["ALL", "Jabodetabek", "Jawa", "Sumatera", "Kalimantan", "Sulawesi", "Papua", "Nusa Tenggara"].map((isl) => (
               <button
                 key={isl}
                 type="button"
-                onClick={() => setFilterIsland(isl)}
+                onClick={() => applyPreset(isl)}
                 className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
                   filterIsland === isl
                     ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black shadow-sm"
@@ -180,22 +332,76 @@ export function IndonesiaMap() {
           </div>
         </div>
 
-        {/* SVG Interactive Canvas */}
-        <div className="relative w-full aspect-[21/9] min-h-[360px] max-h-[560px] bg-zinc-50 dark:bg-[#03050A] rounded-xl border border-zinc-200 dark:border-zinc-800/80 p-2 select-none overflow-hidden flex items-center justify-center">
+        {/* Free Pan & Zoom Interactive Canvas */}
+        <div
+          ref={containerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={`relative w-full aspect-[21/9] min-h-[380px] max-h-[580px] bg-zinc-50 dark:bg-[#03050A] rounded-xl border border-zinc-200 dark:border-zinc-800/80 select-none overflow-hidden flex items-center justify-center transition-colors ${
+            isDragging ? "cursor-grabbing" : "cursor-grab"
+          }`}
+        >
           {/* Tactical Background Grid Lines */}
           <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:24px_24px] opacity-15 pointer-events-none" />
 
           {/* Coordinate Crosshairs & Graticules */}
-          <div className="absolute top-3 left-4 text-[10px] text-zinc-400 dark:text-zinc-600 font-mono tracking-widest pointer-events-none">
+          <div className="absolute top-3 left-4 text-[10px] text-zinc-400 dark:text-zinc-600 font-mono tracking-widest pointer-events-none z-10">
             LAT: 06°00&apos;N - 11°00&apos;S &bull; LON: 95°00&apos;E - 141°00&apos;E
           </div>
-          <div className="absolute bottom-3 right-4 text-[10px] text-zinc-400 dark:text-zinc-600 font-mono tracking-widest pointer-events-none">
-            WGS84 &bull; KEMENDAGRI REPUBLIK INDONESIA
+          <div className="absolute bottom-3 right-4 text-[10px] text-zinc-400 dark:text-zinc-600 font-mono tracking-widest pointer-events-none z-10">
+            WGS84 &bull; ZOOM: {Math.round(zoom * 100)}% &bull; PAN: ({pan.x}, {pan.y})
           </div>
 
+          {/* Floating Pan & Zoom HUD Control Bar */}
+          <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 p-1 rounded-lg bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-700 shadow-lg backdrop-blur-xs">
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              title="Perbesar Peta (Scroll Up)"
+              className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 transition-colors"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              title="Perkecil Peta (Scroll Down)"
+              className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 transition-colors"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <div className="w-[1px] h-4 bg-zinc-300 dark:bg-zinc-700 mx-0.5" />
+            <button
+              type="button"
+              onClick={handleReset}
+              title="Reset Peta (Tampilan Penuh)"
+              className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => applyPreset("Jabodetabek")}
+              title="Fokus ke Jabodetabek (Area Pilot)"
+              className="px-2 py-1 rounded text-[11px] font-bold bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-400 transition-colors"
+            >
+              Fokus Pilot
+            </button>
+            <span className="text-[10px] font-bold text-zinc-500 px-1.5">
+              {Math.round(zoom * 100)}%
+            </span>
+          </div>
+
+          {/* SVG Map Container with Smooth Pan & Zoom Group */}
           <svg
             viewBox="0 0 1000 420"
-            className="w-full h-full drop-shadow-sm transition-all duration-300"
+            className="w-full h-full drop-shadow-sm select-none"
             preserveAspectRatio="xMidYMid meet"
           >
             <defs>
@@ -226,148 +432,169 @@ export function IndonesiaMap() {
               </filter>
             </defs>
 
-            {/* Latitude & Equator Reference Lines */}
-            <line x1="20" y1="147" x2="980" y2="147" stroke="currentColor" strokeDasharray="3 4" strokeWidth="0.8" className="text-zinc-300 dark:text-zinc-800" />
-            <text x="30" y="142" className="text-[9px] fill-zinc-400 dark:fill-zinc-600 font-mono">0° KHATULISTIWA (EQUATOR)</text>
+            {/* Transform Group: Handles Free Pan & Zoom Smoothly */}
+            <g
+              transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}
+              style={{
+                transformOrigin: "500px 210px",
+                transition: isDragging ? "none" : "transform 0.15s ease-out",
+              }}
+            >
+              {/* Latitude & Equator Reference Lines */}
+              <line x1="10" y1="147" x2="990" y2="147" stroke="currentColor" strokeDasharray="3 4" strokeWidth="0.8" className="text-zinc-300 dark:text-zinc-800" />
+              <text x="20" y="142" className="text-[9px] fill-zinc-400 dark:fill-zinc-600 font-mono">0° KHATULISTIWA (EQUATOR)</text>
 
-            {/* Indonesian Archipelago Provinces (True Shorelines & Shapes) */}
-            <g className="transition-opacity duration-300">
-              {INDONESIA_PROVINCES.map((prov) => {
-                const isHovered = hoveredProvince === prov.name;
-                const isJawa = prov.name.includes("Jawa") || prov.name.includes("Jakarta") || prov.name.includes("Banten") || prov.name.includes("Yogyakarta");
-                
+              {/* Indonesian Archipelago Provinces (Accurate Boundaries) */}
+              <g>
+                {INDONESIA_PROVINCES.map((prov) => {
+                  const isHovered = hoveredProvince === prov.name;
+                  const isJawa =
+                    prov.name.includes("Jawa") ||
+                    prov.name.includes("Jakarta") ||
+                    prov.name.includes("Banten") ||
+                    prov.name.includes("Yogyakarta");
+
+                  return (
+                    <g key={prov.key || prov.name}>
+                      {/* Base Solid Fill & Accurate Boundary Stroke */}
+                      <path
+                        d={prov.d}
+                        className={`transition-all duration-200 cursor-pointer ${
+                          isHovered
+                            ? "fill-sky-100 dark:fill-sky-950/60 stroke-sky-500 stroke-[1.8]"
+                            : isJawa
+                            ? "fill-zinc-200/90 dark:fill-zinc-900/90 stroke-zinc-500 dark:stroke-zinc-600 stroke-[1.3]"
+                            : "fill-zinc-100/90 dark:fill-zinc-950/70 stroke-zinc-300 dark:stroke-zinc-800 stroke-[1]"
+                        }`}
+                        onMouseEnter={() => setHoveredProvince(prov.name)}
+                        onMouseLeave={() => setHoveredProvince(null)}
+                      />
+                      {/* Tactical Pixel Overlay Pattern inside Landmass */}
+                      <path
+                        d={prov.d}
+                        fill="url(#tactical-pixel-dots)"
+                        className="pointer-events-none opacity-80"
+                      />
+                    </g>
+                  );
+                })}
+              </g>
+
+              {/* Island Watermark Labels */}
+              {ISLAND_LABELS.map((isl) => (
+                <text
+                  key={isl.name}
+                  x={isl.x}
+                  y={isl.y}
+                  className="text-[10px] font-black tracking-widest fill-zinc-400/60 dark:fill-zinc-700/60 pointer-events-none select-none font-sans"
+                >
+                  {isl.name}
+                </text>
+              ))}
+
+              {/* Tactical Heat Blips / Nodes (Jabodetabek Pilot & Major Hubs) */}
+              {INDONESIA_HEAT_NODES.map((node) => {
+                const isSelected = selectedRegionCode === node.code;
+                const heatInfo = regionHeatMap.get(node.code);
+                const threat = heatInfo?.threat || (node.isFocus ? "waspada" : "none");
+                const mentions = heatInfo?.mentions || 0;
+                const isCritical = threat === "kritis" || mentions >= 10;
+                const isHigh = threat === "tinggi" || mentions >= 5;
+
+                let nodeColor = "#10B981"; // Emerald / Kondusif
+                let filter = undefined;
+
+                if (node.isFocus) {
+                  if (isCritical) {
+                    nodeColor = "#EF4444"; // Red Critical
+                    filter = "url(#glow-red)";
+                  } else if (isHigh) {
+                    nodeColor = "#F97316"; // Orange High
+                    filter = "url(#glow-orange)";
+                  } else if (threat === "waspada" || mentions >= 1) {
+                    nodeColor = "#F59E0B"; // Amber Warning
+                  }
+                } else {
+                  nodeColor = "#71717A"; // Neutral grey for non-pilot nodes
+                }
+
                 return (
-                  <g key={prov.key || prov.name}>
-                    {/* Base Solid Fill & Accurate Boundary Stroke */}
-                    <path
-                      d={prov.d}
-                      className={`transition-all duration-200 cursor-pointer ${
-                        isHovered
-                          ? "fill-sky-100 dark:fill-sky-950/60 stroke-sky-500 stroke-[1.8]"
-                          : isJawa
-                          ? "fill-zinc-200/90 dark:fill-zinc-900/90 stroke-zinc-500 dark:stroke-zinc-600 stroke-[1.3]"
-                          : "fill-zinc-100/90 dark:fill-zinc-950/70 stroke-zinc-300 dark:stroke-zinc-800 stroke-[1]"
-                      }`}
-                      onMouseEnter={() => setHoveredProvince(prov.name)}
-                      onMouseLeave={() => setHoveredProvince(null)}
+                  <g
+                    key={node.code}
+                    className="cursor-pointer group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!hasMovedRef.current) {
+                        setSelectedRegionCode(node.code);
+                      }
+                    }}
+                    onMouseEnter={() => setHoveredNode(node)}
+                    onMouseLeave={() => setHoveredNode(null)}
+                  >
+                    {/* Outer Pulsing Wave for Critical / High Nodes */}
+                    {(isCritical || isHigh) && (
+                      <circle
+                        cx={node.x}
+                        cy={node.y}
+                        r={isCritical ? "14" : "10"}
+                        fill={nodeColor}
+                        opacity="0.25"
+                        className="animate-ping"
+                        style={{
+                          transformOrigin: `${node.x}px ${node.y}px`,
+                          animationDuration: isCritical ? "1.6s" : "2.4s",
+                        }}
+                      />
+                    )}
+
+                    {/* Halo Ring */}
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r={isSelected ? "9" : node.isFocus ? "6.5" : "4"}
+                      fill="none"
+                      stroke={isSelected ? "#38BDF8" : nodeColor}
+                      strokeWidth={isSelected ? "2.5" : "1.5"}
+                      opacity={isSelected ? 1 : 0.8}
                     />
-                    {/* Tactical Pixel Overlay Pattern inside Landmass */}
-                    <path
-                      d={prov.d}
-                      fill="url(#tactical-pixel-dots)"
-                      className="pointer-events-none opacity-80"
+
+                    {/* Solid Center Pixel / Radar Dot */}
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r={isSelected ? "4.5" : node.isFocus ? "3.2" : "2"}
+                      fill={isSelected ? "#38BDF8" : nodeColor}
+                      filter={filter}
+                      className="transition-all duration-200 group-hover:scale-150"
+                      style={{ transformOrigin: `${node.x}px ${node.y}px` }}
                     />
+
+                    {/* Always-on Tag for Critical Nodes or Selected Node */}
+                    {(isSelected || (node.isFocus && isCritical)) && (
+                      <g transform={`translate(${node.x + 8}, ${node.y - 8})`}>
+                        <rect
+                          x="0"
+                          y="0"
+                          width={node.name.length * 6.5 + 16}
+                          height="18"
+                          rx="4"
+                          className="fill-zinc-900 dark:fill-black stroke-zinc-700 dark:stroke-zinc-800"
+                          strokeWidth="1"
+                        />
+                        <circle cx="8" cy="9" r="3" fill={nodeColor} />
+                        <text
+                          x="15"
+                          y="12"
+                          className="text-[9px] font-bold fill-white font-sans"
+                        >
+                          {node.name}
+                        </text>
+                      </g>
+                    )}
                   </g>
                 );
               })}
             </g>
-
-            {/* Island Watermark Labels */}
-            {ISLAND_LABELS.map((isl) => (
-              <text
-                key={isl.name}
-                x={isl.x}
-                y={isl.y}
-                className="text-[10px] font-black tracking-widest fill-zinc-400/60 dark:fill-zinc-700/60 pointer-events-none select-none font-sans"
-              >
-                {isl.name}
-              </text>
-            ))}
-
-            {/* Tactical Heat Blips / Nodes (Jabodetabek Pilot & Major Hubs) */}
-            {INDONESIA_HEAT_NODES.filter((node) => filterIsland === "ALL" || node.island.includes(filterIsland)).map((node) => {
-              const isSelected = selectedRegionCode === node.code;
-              const heatInfo = regionHeatMap.get(node.code);
-              const threat = heatInfo?.threat || (node.isFocus ? "waspada" : "none");
-              const mentions = heatInfo?.mentions || 0;
-              const isCritical = threat === "kritis" || mentions >= 10;
-              const isHigh = threat === "tinggi" || mentions >= 5;
-
-              let nodeColor = "#10B981"; // Emerald / Kondusif
-              let filter = undefined;
-
-              if (node.isFocus) {
-                if (isCritical) {
-                  nodeColor = "#EF4444"; // Red Critical
-                  filter = "url(#glow-red)";
-                } else if (isHigh) {
-                  nodeColor = "#F97316"; // Orange High
-                  filter = "url(#glow-orange)";
-                } else if (threat === "waspada" || mentions >= 1) {
-                  nodeColor = "#F59E0B"; // Amber Warning
-                }
-              } else {
-                nodeColor = "#71717A"; // Neutral grey for non-pilot nodes
-              }
-
-              return (
-                <g
-                  key={node.code}
-                  className="cursor-pointer group"
-                  onClick={() => setSelectedRegionCode(node.code)}
-                  onMouseEnter={() => setHoveredNode(node)}
-                  onMouseLeave={() => setHoveredNode(null)}
-                >
-                  {/* Outer Pulsing Wave for Critical / High Nodes */}
-                  {(isCritical || isHigh) && (
-                    <circle
-                      cx={node.x}
-                      cy={node.y}
-                      r={isCritical ? "14" : "10"}
-                      fill={nodeColor}
-                      opacity="0.25"
-                      className="animate-ping"
-                      style={{ transformOrigin: `${node.x}px ${node.y}px`, animationDuration: isCritical ? "1.6s" : "2.4s" }}
-                    />
-                  )}
-
-                  {/* Halo Ring */}
-                  <circle
-                    cx={node.x}
-                    cy={node.y}
-                    r={isSelected ? "9" : node.isFocus ? "6.5" : "4"}
-                    fill="none"
-                    stroke={isSelected ? "#38BDF8" : nodeColor}
-                    strokeWidth={isSelected ? "2.5" : "1.5"}
-                    opacity={isSelected ? 1 : 0.8}
-                  />
-
-                  {/* Solid Center Pixel / Radar Dot */}
-                  <circle
-                    cx={node.x}
-                    cy={node.y}
-                    r={isSelected ? "4.5" : node.isFocus ? "3.2" : "2"}
-                    fill={isSelected ? "#38BDF8" : nodeColor}
-                    filter={filter}
-                    className="transition-all duration-200 group-hover:scale-150"
-                    style={{ transformOrigin: `${node.x}px ${node.y}px` }}
-                  />
-
-                  {/* Always-on Tag for Critical Nodes or Selected Node */}
-                  {(isSelected || (node.isFocus && isCritical)) && (
-                    <g transform={`translate(${node.x + 8}, ${node.y - 8})`}>
-                      <rect
-                        x="0"
-                        y="0"
-                        width={node.name.length * 6.5 + 16}
-                        height="18"
-                        rx="4"
-                        className="fill-zinc-900 dark:fill-black stroke-zinc-700 dark:stroke-zinc-800"
-                        strokeWidth="1"
-                      />
-                      <circle cx="8" cy="9" r="3" fill={nodeColor} />
-                      <text
-                        x="15"
-                        y="12"
-                        className="text-[9px] font-bold fill-white font-sans"
-                      >
-                        {node.name}
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })}
           </svg>
 
           {/* Interactive Tooltip Card Floating on Top */}
@@ -375,8 +602,8 @@ export function IndonesiaMap() {
             <div
               className="pointer-events-none absolute p-3 rounded-lg bg-zinc-950/95 text-white border border-zinc-700 shadow-2xl z-50 text-xs backdrop-blur-xs font-sans transition-all"
               style={{
-                left: `${Math.min(80, Math.max(10, (hoveredNode.x / 1000) * 100))}%`,
-                top: `${Math.max(12, (hoveredNode.y / 420) * 100 - 15)}%`,
+                left: `${Math.min(80, Math.max(10, ((hoveredNode.x + pan.x) / 1000) * 100))}%`,
+                top: `${Math.max(12, ((hoveredNode.y + pan.y) / 420) * 100 - 15)}%`,
                 transform: "translate(-50%, -100%)",
               }}
             >
@@ -442,7 +669,11 @@ export function IndonesiaMap() {
                   <button
                     key={reg.kode}
                     type="button"
-                    onClick={() => setSelectedRegionCode(reg.kode)}
+                    onClick={() => {
+                      setSelectedRegionCode(reg.kode);
+                      // If user clicks a kabupaten card, also pan & zoom towards Jabodetabek
+                      applyPreset("Jabodetabek");
+                    }}
                     className={`text-left p-3.5 rounded-lg border transition-all flex flex-col justify-between ${
                       isSelected
                         ? "border-zinc-900 dark:border-white bg-zinc-100 dark:bg-zinc-900 shadow-md ring-2 ring-zinc-900 dark:ring-white"
