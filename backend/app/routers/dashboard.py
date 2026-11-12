@@ -160,6 +160,18 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     menunggu_aksi = len([c for c in cases if c.status in ("menunggu", "ditangani")])
     lewat_tenggat = len([c for c in cases if c.status != "selesai" and c.tenggat < now_utc])
 
+    # Hitung menunggu verifikasi (isu status otomatis atau belum ditinjau dengan level HIGH/CRITICAL)
+    menunggu_verifikasi = len([i for i in issues if (i.status or "").lower() == "otomatis"])
+
+    # Hitung rasio konten belum terpetakan (lokasi_confidence < 0.5 atau lokasi_kejadian is None)
+    total_analyses = db.query(ItemAnalysis).count()
+    unmapped_analyses = (
+        db.query(ItemAnalysis)
+        .filter((ItemAnalysis.lokasi_confidence < 0.5) | (ItemAnalysis.lokasi_kejadian.is_(None)))
+        .count()
+    )
+    unmapped_pct = round((unmapped_analyses / total_analyses * 100), 1) if total_analyses > 0 else 0.0
+
     kpi = DashboardKPI(
         mention_unik=vol_now if vol_now > 0 else konten_terkumpul,
         mention_growth_pct=mention_growth_pct,
@@ -170,6 +182,9 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         total_wilayah_terpantau=len(region_summaries),
         menunggu_aksi=menunggu_aksi,
         lewat_tenggat=lewat_tenggat,
+        menunggu_verifikasi=menunggu_verifikasi,
+        belum_terpetakan_count=unmapped_analyses,
+        belum_terpetakan_pct=unmapped_pct,
     )
 
     # --- Tren 7 hari dari konten nyata (tanggal WIB) ---
@@ -298,21 +313,45 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         "fast_dispatch_count": db.query(Case).count(),
     }
 
-    # --- Authentic Radar: Live News Stream (Recent 20 Real Items) ---
-    latest_items = (
-        db.query(RawItem)
-        .order_by(RawItem.published_at.desc())
-        .limit(20)
-        .all()
-    )
+    # --- Authentic Radar: Live News Stream (Recent 20 Real Items, Sumber Aktif) ---
+    inactive_source_ids = [s.id for s in db.query(Source.id).filter(Source.status_izin != "aktif").all()]
+    query_items = db.query(RawItem)
+    if inactive_source_ids:
+        query_items = query_items.filter(~RawItem.source_id.in_(inactive_source_ids))
+    query_items = query_items.filter(~RawItem.url_kanonik.like("%bsky.app%")).filter(~RawItem.penerbit.like("%Bluesky%"))
+
+    latest_items = query_items.order_by(RawItem.published_at.desc()).limit(20).all()
+
     live_articles = []
     for itm in latest_items:
         an = itm.analysis
         src_obj = itm.source
+
+        # Normalisasi nama penerbit agar rapi di UI
+        clean_penerbit = itm.penerbit or "Media Berita"
+        low_url = (itm.url_kanonik or "").lower()
+        low_pen = clean_penerbit.lower()
+        if "tiktok.com" in low_url or "tiktok" in low_pen:
+            clean_penerbit = "TikTok"
+        elif "x.com" in low_url or "twitter" in low_pen or "twitter.com" in low_url:
+            clean_penerbit = "X (Twitter)"
+        elif "threads.net" in low_url or "threads" in low_pen:
+            clean_penerbit = "Threads"
+        elif "detik" in low_pen or "detik.com" in low_url:
+            clean_penerbit = "Detikcom"
+        elif "cnnindonesia" in low_url or "cnn" in low_pen:
+            clean_penerbit = "CNN Indonesia"
+        elif "antara" in low_pen:
+            clean_penerbit = "ANTARA News"
+        elif "dishub" in low_pen or "pusdatinhub" in low_pen:
+            clean_penerbit = "Dishub DKI Jakarta"
+        elif "bmkg" in low_pen:
+            clean_penerbit = "BMKG"
+
         live_articles.append({
             "id": itm.id,
             "judul": itm.judul,
-            "penerbit": itm.penerbit,
+            "penerbit": clean_penerbit,
             "url": itm.url_kanonik,
             "published_at": itm.published_at.isoformat() if itm.published_at else None,
             "sentimen": an.sentimen if an else "netral",

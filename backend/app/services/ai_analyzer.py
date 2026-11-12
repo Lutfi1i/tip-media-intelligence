@@ -117,38 +117,49 @@ GAZETTEER_REGIONS = {
 }
 
 TOPIC_KEYWORDS = {
-    "Bencana": [
+    "Bencana & Cuaca": [
         "banjir", "genangan", "air naik", "luapan", "longsor", "tanah longsor", "gempa",
         "tanggul jebol", "curah hujan", "pohon tumbang", "cuaca ekstrem", "kebakaran",
         "angin kencang", "rob", "kekeringan", "tsunami", "erupsi", "banjir rob",
         "siaga banjir", "status siaga", "evakuasi"
     ],
-    "Infrastruktur": [
+    "Lalu Lintas & Transportasi": [
+        "macet", "kemacetan", "padat merayap", "lalu lintas", "lalin", "kecelakaan",
+        "tabrakan", "angkutan umum", "transjakarta", "mrt", "lrt", "krl", "angkot",
+        "penutupan jalan", "rekayasa lalin", "contraflow", "one way", "jalan tol",
+        "tilang", "balap liar", "portal jlnt", "pengalihan arus"
+    ],
+    "Infrastruktur & Jalan": [
         "pompa", "drainase", "jalan rusak", "lampu jalan", "jembatan", "saluran air",
         "proyek", "aspal", "trotoar", "pipa pdam", "perbaikan jalan", "pembangunan",
-        "flyover", "underpass", "halte", "mrt", "lrt", "tj", "transjakarta",
+        "flyover", "underpass", "halte",
         "gorong-gorong", "siring", "turap", "beton", "pengaspalan", "pelebaran jalan"
     ],
-    "Pelayanan Publik": [
+    "Layanan Publik": [
         "antrean", "antri", "puskesmas", "ktp", "dukcapil", "pelayanan", "samsat",
         "izin", "birokrasi", "pungli", "kelurahan", "pengaduan", "loket", "bansos",
         "bantuan sosial", "kjp", "kartu jakarta pintar", "pdam", "layanan publik",
         "petugas", "lokasi layanan", "administrasi", "dokumen"
     ],
-    "Keamanan": [
+    "Keamanan & Kriminalitas": [
         "tawuran", "pencurian", "begal", "polisi", "kejahatan", "patroli", "kamtibmas",
         "razia", "narkoba", "curanmor", "penipuan", "preman", "satpol pp", "kriminal",
-        "ditangkap", "tersangka", "satreskrim", "polsek", "polres", "pengeroyokan"
+        "ditangkap", "tersangka", "satreskrim", "polsek", "polres", "pengeroyokan",
+        "demonstrasi", "unjuk rasa"
     ],
-    "Ekonomi": [
-        "harga beras", "pasar", "inflasi", "sembako", "umkm", "pedagang", "subsidi",
-        "harga", "kenaikan tarif", "tarif", "upah minimum", "phk", "pajak", "retribusi",
-        "apbd", "anggaran", "investasi", "ekonomi", "daya beli", "bahan pokok"
-    ],
-    "Kesehatan": [
+    "Kesehatan & Lingkungan": [
         "demam berdarah", "dbd", "stunting", "vaksin", "wabah", "rumah sakit", "bpjs",
         "polusi", "kualitas udara", "ispa", "kesehatan", "gizi", "posyandu",
-        "imunisasi", "covid", "pasien", "dokter", "apotek"
+        "imunisasi", "covid", "pasien", "dokter", "apotek", "sampah", "tps", "limbah"
+    ],
+    "Ekonomi & Harga": [
+        "harga beras", "pasar", "inflasi", "sembako", "umkm", "pedagang", "subsidi",
+        "harga", "kenaikan tarif", "tarif", "upah minimum", "phk", "pajak", "retribusi",
+        "apbd", "anggaran", "investasi", "ekonomi", "daya beli", "bahan pokok", "lapangan kerja"
+    ],
+    "Sosial & Warga": [
+        "warga", "masyarakat", "gotong royong", "bantuan warga", "keluhan warga", "lingkungan rt",
+        "lingkungan rw", "komunitas", "kegiatan warga"
     ],
 }
 
@@ -208,7 +219,7 @@ def analyze_topic(text: str) -> Tuple[str, float]:
             scores[topic] = count
 
     if not scores:
-        return "Umum", 0.60
+        return "Sosial & Warga", 0.60
 
     sorted_topics = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     best_topic, best_score = sorted_topics[0]

@@ -173,6 +173,9 @@ class DashboardKPI(BaseModel):
     total_wilayah_terpantau: int
     menunggu_aksi: int
     lewat_tenggat: int
+    menunggu_verifikasi: int = 0
+    belum_terpetakan_count: int = 0
+    belum_terpetakan_pct: float = 0.0
 
 class TrendPoint(BaseModel):
     day: str

@@ -91,10 +91,11 @@ export default function IsuListPage() {
             className="min-h-[40px] text-xs sm:text-sm border border-zinc-300 dark:border-zinc-800 rounded-md px-3 py-2 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none cursor-pointer"
             aria-label="Filter Status Verifikasi"
           >
-            <option value="">Semua Status</option>
-            <option value="kandidat">Kandidat</option>
+            <option value="">Semua Status Verifikasi</option>
+            <option value="otomatis">Otomatis (Belum Ditinjau)</option>
             <option value="terverifikasi">Terverifikasi</option>
             <option value="dikoreksi">Dikoreksi</option>
+            <option value="ditolak">Ditolak</option>
             <option value="selesai">Selesai</option>
           </select>
         </div>
@@ -139,8 +140,18 @@ export default function IsuListPage() {
                     </span>
                   </div>
 
-                  <span className="text-[11px] font-mono font-bold capitalize px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                    {issue.status}
+                  <span
+                    className={`text-[11px] font-mono font-bold capitalize px-2 py-0.5 rounded border ${
+                      issue.status === "terverifikasi"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800"
+                        : issue.status === "dikoreksi"
+                        ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800"
+                        : issue.status === "ditolak"
+                        ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800"
+                        : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
+                    }`}
+                  >
+                    {issue.status === "otomatis" ? "Otomatis (Belum Ditinjau)" : issue.status}
                   </span>
                 </div>
 

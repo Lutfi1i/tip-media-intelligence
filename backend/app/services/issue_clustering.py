@@ -111,7 +111,7 @@ def cluster_and_sync_issues(db: Session) -> Dict[str, Any]:
                 skor=risk_eval["skor_akhir"],
                 level=risk_eval["level"],
                 alasan_skor_json=json.dumps(risk_eval),
-                status="kandidat",
+                status="otomatis",
                 ringkasan=f"{item.judul}. Dilaporkan oleh {item.penerbit}. {summary_dict['ringkasan']}",
                 pihak_terlibat_json=json.dumps(summary_dict["pihak_terlibat"]),
                 hal_belum_diketahui=summary_dict["hal_belum_diketahui"],

@@ -23,6 +23,9 @@ import { ConversationGalaxy } from "@/components/ConversationGalaxy";
 import { ConversationFlow } from "@/components/ConversationFlow";
 import { LiveNewsStream } from "@/components/LiveNewsStream";
 import { SourceDeepDive } from "@/components/SourceDeepDive";
+import { TopHotIssuesCards } from "@/components/TopHotIssuesCards";
+import { SituationBrief } from "@/components/SituationBrief";
+import { ExecutivePriorityBoard } from "@/components/ExecutivePriorityBoard";
 import {
   RotateCw,
   TrendingUp,
@@ -47,6 +50,8 @@ export default function DashboardPage() {
   const [triageStats, setTriageStats] = useState<TriageStats | undefined>(undefined);
   const [liveArticles, setLiveArticles] = useState<LiveArticle[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  // Mode Pengalaman: "pimpinan" (Understand & Decide) vs "analis" (Investigate & Verify)
+  const [experienceMode, setExperienceMode] = useState<"pimpinan" | "analis">("pimpinan");
 
   const loadData = async () => {
     setLoading(true);
@@ -159,6 +164,32 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Mode Switcher: One System, Two Experiences (Pimpinan vs Analis) */}
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setExperienceMode("pimpinan")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 ${
+                experienceMode === "pimpinan"
+                  ? "bg-white dark:bg-zinc-800 text-sky-600 dark:text-sky-400 shadow-xs"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              <span>Mode Pimpinan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setExperienceMode("analis")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 ${
+                experienceMode === "analis"
+                  ? "bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              <span>Mode Analis</span>
+            </button>
+          </div>
+
           <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono hidden md:inline">
             Pembaruan: {lastRefreshed.toLocaleTimeString("id-ID")} WIB
           </span>
@@ -186,65 +217,115 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* 4 Core Signals KPI Cards (7 cols) */}
+        {/* 4 Core Signals KPI Cards (7 cols) - Sesuai PRD Bagian 10.4 */}
         <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <RadarKpiCard
-            label="Total Laporan Nyata"
-            value={kpi.mention_unik.toLocaleString("id-ID")}
-            hint="Feed berita & telemetri sensor terverifikasi"
+            label="Konten Unik"
+            value={`${kpi.mention_unik.toLocaleString("id-ID")} Konten`}
+            hint={`Dari total konten mentah setelah deduplikasi • ${kpi.belum_terpetakan_pct ?? 0}% belum terpetakan`}
             trend={
               kpi.mention_growth_pct !== null
                 ? `${kpi.mention_growth_pct > 0 ? "+" : ""}${kpi.mention_growth_pct}% 24j`
                 : "Volume stabil"
             }
             trendPositive={(kpi.mention_growth_pct ?? 0) <= 0}
-            icon={<Radio className="w-5 h-5" />}
+            icon={<Radio className="w-5 h-5 text-sky-500" />}
+            gradientColor="sky"
           />
 
           <RadarKpiCard
-            label="Isu Prioritas Aktif"
-            value={kpi.isu_prioritas}
-            hint={`${kpi.critical_count} Kritis, ${kpi.high_count} Tinggi`}
+            label="Isu Prioritas"
+            value={`${kpi.isu_prioritas} Isu`}
+            hint={`${kpi.critical_count} Kritis (skor 85-100), ${kpi.high_count} Tinggi (skor 70-84)`}
             trend={kpi.isu_prioritas > 0 ? "Perlu Respon" : "Kondusif"}
             trendPositive={kpi.isu_prioritas === 0}
-            icon={<AlertTriangle className="w-5 h-5 text-amber-500" />}
+            icon={<AlertTriangle className="w-5 h-5 text-rose-500" />}
+            gradientColor="rose"
           />
 
           <RadarKpiCard
             label="Wilayah Terdampak"
-            value={`${kpi.wilayah_terdampak}/${kpi.total_wilayah_terpantau}`}
-            hint="Wilayah administrasi berstatus waspada"
-            trend="Kemendagri Jabodetabek"
+            value={`${kpi.wilayah_terdampak} Daerah`}
+            hint={`Dari ${kpi.total_wilayah_terpantau} wilayah terpantau di radar`}
+            trend="Kemendagri WGS84"
             trendPositive={true}
             icon={<MapPin className="w-5 h-5 text-emerald-500" />}
+            gradientColor="emerald"
           />
 
           <RadarKpiCard
-            label="Antrean Tindak Lanjut"
-            value={kpi.menunggu_aksi}
-            hint={`${kpi.lewat_tenggat} melewati SLA respons`}
-            trend={kpi.lewat_tenggat > 0 ? "Eskalasi Lewat Tenggat" : "Dalam Batas SLA"}
-            trendPositive={kpi.lewat_tenggat === 0}
-            icon={<Clock className="w-5 h-5" />}
+            label="Menunggu Verifikasi"
+            value={`${kpi.menunggu_verifikasi ?? kpi.menunggu_aksi} Isu`}
+            hint="Antrean triase analis (wajib untuk High & Critical)"
+            trend={(kpi.menunggu_verifikasi ?? 0) > 0 ? "Menunggu Verifikasi" : "Antrean Bersih"}
+            trendPositive={(kpi.menunggu_verifikasi ?? 0) === 0}
+            icon={<Clock className="w-5 h-5 text-amber-500" />}
+            gradientColor="amber"
           />
         </div>
       </div>
 
-      {/* Middle Section: Authentic Radar Sweep Screen (Galaxy) + Conversation Flow */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* Left 7 Cols: Circular Radar Screen Orbit */}
-        <div className="lg:col-span-7">
-          <ConversationGalaxy nodes={galaxyNodes} />
-        </div>
+      {/* Situation Brief - Ringkasan Eksekutif & Arahan Pimpinan (FR-02) */}
+      <SituationBrief
+        statusLevel={
+          kpi.critical_count > 0
+            ? "KRITIS"
+            : kpi.high_count > 0
+            ? "SIAGA"
+            : kpi.wilayah_terdampak > 0
+            ? "WASPADA"
+            : "NORMAL"
+        }
+        issues={priorityIssues}
+        criticalCount={kpi.critical_count}
+        highCount={kpi.high_count}
+        wilayahCount={kpi.wilayah_terdampak}
+        lastUpdated={lastRefreshed}
+      />
 
-        {/* Right 5 Cols: Flow Distribution Diagram */}
-        <div className="lg:col-span-5">
-          <ConversationFlow flows={flowData} />
-        </div>
-      </div>
+      {/* 3 Hot Issues Indonesia Showcase (Colorful Redesign) */}
+      <TopHotIssuesCards issues={priorityIssues} />
 
-      {/* Real Live News Streaming Feed */}
-      <LiveNewsStream articles={liveArticles} />
+      {/* Executive Priority Board (FR-03 - Orientasi Aksi, PIC & SLA) */}
+      <ExecutivePriorityBoard issues={priorityIssues} />
+
+      {/* Conditional Rendering: Analis Tools vs Progressive Disclosure */}
+      {experienceMode === "analis" ? (
+        <>
+          {/* Middle Section: Authentic Radar Sweep Screen (Galaxy) + Conversation Flow */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            {/* Left 7 Cols: Circular Radar Screen Orbit */}
+            <div className="lg:col-span-7">
+              <ConversationGalaxy nodes={galaxyNodes} />
+            </div>
+
+            {/* Right 5 Cols: Flow Distribution Diagram */}
+            <div className="lg:col-span-5">
+              <ConversationFlow flows={flowData} />
+            </div>
+          </div>
+
+          {/* Real Live News Streaming Feed */}
+          <LiveNewsStream articles={liveArticles} />
+        </>
+      ) : (
+        /* Mode Pimpinan: Progressive Disclosure Bar jika pimpinan ingin mengintip telemetri mentah */
+        <div className="p-4 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-sky-500" />
+            <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
+              Instrumen teknis (Radar Orbit Sweep &amp; Conversation Stream) dioptimalkan di <strong>Mode Analis</strong>.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExperienceMode("analis")}
+            className="text-xs font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline"
+          >
+            Buka Instrumen Analis &rarr;
+          </button>
+        </div>
+      )}
 
       {/* Trend & Threat Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

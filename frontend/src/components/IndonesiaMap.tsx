@@ -31,6 +31,7 @@ import {
   Filter,
 } from "lucide-react";
 import { SentimentBadge } from "./RadarUi";
+import { SourceLogoBadge, RealBrandIcon } from "./SourceLogos";
 import {
   INDONESIA_PROVINCES,
   INDONESIA_HEAT_NODES,
@@ -602,8 +603,8 @@ export function IndonesiaMap() {
                 const ringRadius = (isSelected ? 8.5 : node.isFocus ? 6.0 : 3.8) * invScale;
                 const pulseRadius = (isCritical ? 13 : 9) * invScale;
 
-                // Show badge if selected, critical, or if zoomed into region
-                const showBadge = isSelected || isCritical || (zoom >= 2.4 && node.isFocus);
+                // Tampilkan label hanya untuk node yang dipilih atau sedang di-hover agar peta tidak berantakan
+                const showBadge = isSelected || (hoveredNode?.code === node.code);
 
                 return (
                   <g
@@ -1049,7 +1050,7 @@ export function IndonesiaMap() {
                     <button
                       type="button"
                       onClick={() => setChannelFilter("ALL")}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
                         channelFilter === "ALL"
                           ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
                           : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -1060,24 +1061,34 @@ export function IndonesiaMap() {
                     <button
                       type="button"
                       onClick={() => setChannelFilter("berita")}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold transition-colors ${
                         channelFilter === "berita"
-                          ? "bg-sky-600 text-white"
-                          : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          ? "bg-sky-600 text-white shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800"
                       }`}
                     >
-                      Berita Online
+                      <span className="inline-flex items-center gap-1">
+                        <RealBrandIcon name="detik" className="w-3.5 h-3.5" />
+                        <RealBrandIcon name="cnn" className="w-3.5 h-3.5" />
+                        <RealBrandIcon name="antara" className="w-3.5 h-3.5" />
+                      </span>
+                      <span>Berita Resmi</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setChannelFilter("sosmed")}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold transition-colors ${
                         channelFilter === "sosmed"
-                          ? "bg-rose-600 text-white"
-                          : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          ? "bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800"
                       }`}
                     >
-                      Sosmed (X / TikTok / Threads)
+                      <span className="inline-flex items-center gap-1">
+                        <RealBrandIcon name="x" className="w-3.5 h-3.5" />
+                        <RealBrandIcon name="tiktok" className="w-3.5 h-3.5" />
+                        <RealBrandIcon name="threads" className="w-3.5 h-3.5" />
+                      </span>
+                      <span>Sosmed (X / TikTok / Threads)</span>
                     </button>
                   </div>
                 </div>
@@ -1085,11 +1096,17 @@ export function IndonesiaMap() {
                 {filteredMediaItems.length > 0 ? (
                   <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
                     {filteredMediaItems.map((item) => {
-                      const isSosmed = item.channel_type === "sosmed";
-                      const isTwitter = item.platform.includes("X") || item.platform.includes("Twitter");
-                      const isTikTok = item.platform.includes("TikTok");
-                      const isThreads = item.platform.includes("Threads");
-                      const isBluesky = item.platform.includes("Bluesky");
+                      // Cek apakah ada penulis khusus (misal akun @user atau instansi seperti Pusdatinhub)
+                      const normPenulis = (item.penulis || "").toLowerCase().trim();
+                      const normPlatform = (item.platform || "").toLowerCase().trim();
+                      const hasDistinctAuthor =
+                        normPenulis &&
+                        normPenulis !== normPlatform &&
+                        !normPenulis.includes("threads") &&
+                        !normPenulis.includes("tiktok") &&
+                        !normPenulis.includes("twitter") &&
+                        !normPenulis.includes("google") &&
+                        !normPenulis.includes("site:");
 
                       return (
                         <div
@@ -1097,27 +1114,20 @@ export function IndonesiaMap() {
                           className="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-950 text-xs transition-colors hover:border-zinc-400 dark:hover:border-zinc-700"
                         >
                           <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1.5 gap-2">
-                            <div className="flex items-center gap-1.5 truncate">
-                              {/* Platform Badge */}
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 ${
-                                  isTikTok
-                                    ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
-                                    : isTwitter
-                                    ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30"
-                                    : isThreads
-                                    ? "bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30"
-                                    : isBluesky
-                                    ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30"
-                                    : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                                }`}
-                              >
-                                {item.platform}
-                              </span>
+                            <div className="flex items-center gap-2 truncate">
+                              {/* Logo Resmi Asli Platform / Media Langsung dari Asset Asli */}
+                              <SourceLogoBadge
+                                platform={item.platform}
+                                penerbit={item.penerbit}
+                                channelType={item.channel_type}
+                                size="md"
+                              />
 
-                              <span className="font-semibold text-zinc-700 dark:text-zinc-300 truncate">
-                                {item.penulis || item.penerbit}
-                              </span>
+                              {hasDistinctAuthor && (
+                                <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 truncate">
+                                  · {item.penulis}
+                                </span>
+                              )}
                             </div>
 
                             <SentimentBadge sentiment={item.sentimen} />

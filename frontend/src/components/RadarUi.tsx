@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { SourceLogoBadge } from "./SourceLogos";
 
 /**
  * Radar Brand Mark: concentric scanning rings with vector beam and target blip.
@@ -83,32 +84,10 @@ export function RadarBrand({ status = "LIVE RADAR" }: { status?: string }) {
 }
 
 /**
- * Verified Source Signal Badge
+ * Verified Source Signal Badge (Menggunakan Logo Resmi Asli)
  */
 export function SourceBadge({ source }: { source: string }) {
-  const norm = (source || "").toLowerCase();
-  let label = source || "Portal Berita";
-
-  if (norm.includes("antara")) {
-    label = norm.includes("metro") ? "Antara Metro" : "Antara News";
-  } else if (norm.includes("detik")) {
-    label = "detikcom";
-  } else if (norm.includes("cnn")) {
-    label = "CNN Indonesia";
-  } else if (norm.includes("bmkg") || norm.includes("gempa")) {
-    label = "BMKG Resmi";
-  } else if (norm.includes("dishub") || norm.includes("perhubungan")) {
-    label = "Dishub DKI";
-  } else if (norm.includes("crm") || norm.includes("pengaduan")) {
-    label = "Pengaduan Resmi";
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-mono font-semibold border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200">
-      <span className="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100" />
-      {label}
-    </span>
-  );
+  return <SourceLogoBadge platform={source} penerbit={source} />;
 }
 
 /**
@@ -215,7 +194,7 @@ export function InfoTip({
 }
 
 /**
- * Command Center KPI Card
+ * Command Center KPI Card with Dynamic Colorful Badges & Vibrant Gradients
  */
 export function RadarKpiCard({
   label,
@@ -224,6 +203,7 @@ export function RadarKpiCard({
   trend,
   trendPositive,
   icon,
+  gradientColor = "sky",
 }: {
   label: string;
   value: string | number;
@@ -231,28 +211,64 @@ export function RadarKpiCard({
   trend?: string;
   trendPositive?: boolean;
   icon?: React.ReactNode;
+  gradientColor?: "sky" | "rose" | "emerald" | "amber" | "purple";
 }) {
+  const colorMap = {
+    sky: {
+      bar: "from-sky-500 to-blue-600",
+      iconBg: "bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-800",
+      glow: "hover:border-sky-400 dark:hover:border-sky-600",
+    },
+    rose: {
+      bar: "from-rose-500 to-red-600",
+      iconBg: "bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800",
+      glow: "hover:border-rose-400 dark:hover:border-rose-600",
+    },
+    emerald: {
+      bar: "from-emerald-500 to-teal-600",
+      iconBg: "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+      glow: "hover:border-emerald-400 dark:hover:border-emerald-600",
+    },
+    amber: {
+      bar: "from-amber-500 to-orange-600",
+      iconBg: "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+      glow: "hover:border-amber-400 dark:hover:border-amber-600",
+    },
+    purple: {
+      bar: "from-purple-500 to-indigo-600",
+      iconBg: "bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+      glow: "hover:border-purple-400 dark:hover:border-purple-600",
+    },
+  };
+
+  const scheme = colorMap[gradientColor] || colorMap.sky;
+
   return (
-    <div className="panel p-5 relative overflow-hidden group hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors">
+    <div className={`panel p-5 relative overflow-hidden group ${scheme.glow} transition-all duration-300 hover:shadow-lg rounded-2xl bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800`}>
+      {/* Top Colorful Accent Strip */}
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${scheme.bar}`} />
+
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
           {label}
         </p>
         {icon && (
-          <div className="text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
+          <div className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-transform group-hover:scale-110 ${scheme.iconBg}`}>
             {icon}
           </div>
         )}
       </div>
 
-      <div className="mt-2 flex items-baseline gap-2.5">
-        <span className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white font-mono">
+      <div className="mt-2.5 flex items-baseline gap-2.5">
+        <span className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white font-mono">
           {value}
         </span>
         {trend && (
           <span
-            className={`text-xs font-bold font-mono ${
-              trendPositive ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+            className={`text-[11px] font-bold font-mono px-2 py-0.5 rounded-full border ${
+              trendPositive
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
             }`}
           >
             {trend}
@@ -260,7 +276,7 @@ export function RadarKpiCard({
         )}
       </div>
 
-      {hint && <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 leading-normal">{hint}</p>}
     </div>
   );
 }

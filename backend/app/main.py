@@ -4,7 +4,7 @@ from backend.app.config import settings
 from backend.app.database import engine, Base
 from backend.app.seed_data import seed_database
 from backend.app.routers import (
-    profiles, sources, issues, alerts, cases, reports, dashboard, audit, geo
+    profiles, sources, issues, alerts, cases, reports, dashboard, audit, geo, social_pulse
 )
 
 Base.metadata.create_all(bind=engine)
@@ -37,6 +37,7 @@ app.include_router(cases.router, prefix=settings.API_V1_STR)
 app.include_router(reports.router, prefix=settings.API_V1_STR)
 app.include_router(audit.router, prefix=settings.API_V1_STR)
 app.include_router(geo.router, prefix=settings.API_V1_STR)
+app.include_router(social_pulse.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

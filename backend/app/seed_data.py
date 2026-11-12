@@ -45,7 +45,7 @@ SUMBER_NYATA = [
          rate_limit_per_min=30, kredibilitas=0.82, status_izin="aktif"),
     dict(nama="Bluesky Social (Percakapan Publik Isu Jabodetabek)", jenis="media_sosial",
          url="https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=jakarta&limit=25", frekuensi_menit=15,
-         rate_limit_per_min=30, kredibilitas=0.82, status_izin="aktif"),
+         rate_limit_per_min=30, kredibilitas=0.82, status_izin="nonaktif"),
     dict(nama="Kanal Pengaduan Resmi Pemprov DKI", jenis="pengaduan",
          url="https://crm.jakarta.go.id/api/feeds", frekuensi_menit=5,
          rate_limit_per_min=60, kredibilitas=0.95, status_izin="belum_ada_akses"),

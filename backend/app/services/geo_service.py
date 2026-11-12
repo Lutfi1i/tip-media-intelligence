@@ -130,10 +130,11 @@ JABODETABEK_REGIONS = JAWA_REGIONS
 
 
 def _detect_channel_info(penerbit: str, url: str) -> tuple[str, str]:
-    """Mengidentifikasi tipe saluran ('berita' vs 'sosmed') dan nama platform."""
+    """Mengidentifikasi tipe saluran ('berita' vs 'sosmed') dan nama platform/penerbit resmi."""
     url_low = (url or "").lower()
     pen_low = (penerbit or "").lower()
 
+    # Saluran Media Sosial
     if "tiktok.com" in url_low or "tiktok" in pen_low:
         return "sosmed", "TikTok"
     if "x.com" in url_low or "twitter.com" in url_low or "twitter" in pen_low:
@@ -144,6 +145,22 @@ def _detect_channel_info(penerbit: str, url: str) -> tuple[str, str]:
         return "sosmed", "Bluesky"
     if any(s in url_low for s in ("instagram.com", "facebook.com", "youtube.com")):
         return "sosmed", "Media Sosial"
+
+    # Saluran Berita & Kanal Resmi Pemerintah
+    if "detik.com" in url_low or "detikcom" in pen_low or "detik" in pen_low:
+        return "berita", "Detikcom"
+    if "antaranews.com" in url_low or "antara" in pen_low:
+        return "berita", "ANTARA News"
+    if "cnnindonesia.com" in url_low or "cnn indonesia" in pen_low:
+        return "berita", "CNN Indonesia"
+    if "dishub" in url_low or "dishub" in pen_low:
+        return "berita", "Dishub DKI Jakarta"
+    if "bmkg.go.id" in url_low or "bmkg" in pen_low:
+        return "berita", "BMKG"
+    if "kompas.com" in url_low or "kompas" in pen_low:
+        return "berita", "Kompas"
+    if "tempo.co" in url_low or "tempo" in pen_low:
+        return "berita", "Tempo"
 
     return "berita", penerbit or "Media Berita"
 
@@ -205,6 +222,9 @@ def get_indonesia_geo_overview(db: Session) -> Dict[str, Any]:
         }
 
     for item in recent_items:
+        # Filter out Bluesky (dinonaktifkan)
+        if "bsky.app" in (item.url_kanonik or "").lower() or "bluesky" in (item.penerbit or "").lower():
+            continue
         text = f"{item.judul} {item.isi or ''}".lower()
         analysis = item.analysis
         ch_type, _ = _detect_channel_info(item.penerbit, item.url_kanonik)
@@ -329,6 +349,10 @@ def get_region_detail_and_issues(db: Session, kode_wilayah: str) -> Dict[str, An
     total_berita = 0
 
     for item in items:
+        # Filter out Bluesky (dinonaktifkan)
+        if "bsky.app" in (item.url_kanonik or "").lower() or "bluesky" in (item.penerbit or "").lower():
+            continue
+
         text = f"{item.judul} {item.isi or ''}".lower()
         if any(alias in text for alias in aliases):
             analysis = item.analysis
@@ -353,12 +377,19 @@ def get_region_detail_and_issues(db: Session, kode_wilayah: str) -> Dict[str, An
             else:
                 category_counts[cat] = 1
 
+            # Format penulis & penerbit bersih agar logo dan teks tampil rapi
+            display_penulis = item.penulis
+            if not display_penulis or "google" in display_penulis.lower() or "site:" in display_penulis.lower():
+                display_penulis = platform_name
+
+            clean_penerbit = platform_name if ch_type == "sosmed" else (item.penerbit or platform_name)
+
             matched_items.append({
                 "id": item.id,
                 "judul": item.judul,
                 "url": item.url_kanonik,
-                "penerbit": item.penerbit,
-                "penulis": item.penulis or ("@" + item.penerbit.lower().replace(" ", "_")),
+                "penerbit": clean_penerbit,
+                "penulis": display_penulis,
                 "channel_type": ch_type,  # 'berita' | 'sosmed'
                 "platform": platform_name,
                 "published_at": item.published_at.isoformat() if item.published_at else None,

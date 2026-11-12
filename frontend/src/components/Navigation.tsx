@@ -57,6 +57,21 @@ const navSections = [
           </svg>
         ),
       },
+      {
+        label: "Social Pulse",
+        href: "/social-pulse",
+        pathDisplay: "radar.tipmedia.id/social-pulse",
+        iconColor: "text-fuchsia-500",
+        activeClass: "bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-md shadow-fuchsia-500/25",
+        hoverClass: "hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:hover:text-fuchsia-400",
+        badge: "PULSE",
+        badgeColor: "bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-300 border border-fuchsia-500/30",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        ),
+      },
     ],
   },
   {
@@ -64,7 +79,7 @@ const navSections = [
     groupColor: "text-amber-500 dark:text-amber-400",
     items: [
       {
-        label: "Isu & Alert",
+        label: "Isu",
         href: "/isu",
         pathDisplay: "radar.tipmedia.id/antrean-isu",
         iconColor: "text-amber-500",
@@ -247,12 +262,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main Workspace with Left Colorful Radar Command Sidebar */}
       <div className="flex-1 flex flex-col md:flex-row">
-        {/* Left Colorful Sidebar (Desktop) */}
-        <aside className="hidden md:flex md:w-60 lg:w-64 bg-zinc-50/80 dark:bg-[#07090E] border-r border-zinc-200 dark:border-zinc-800/80 flex-col justify-between shrink-0 select-none backdrop-blur-sm">
+        {/* Left Fixed Sidebar (Desktop) - Sesuai Gambar 1 */}
+        <aside className="hidden md:flex md:w-60 lg:w-64 fixed left-0 top-14 bottom-0 bg-white dark:bg-[#07090E] border-r border-zinc-200 dark:border-zinc-800/80 flex-col justify-between shrink-0 select-none z-30 overflow-y-auto">
           <div className="p-4 space-y-6">
             <div className="px-3 pt-2">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
                 <p className="text-[10px] font-mono font-black tracking-widest uppercase text-sky-600 dark:text-sky-400">
                   PUSAT KOMANDO
                 </p>
@@ -361,8 +376,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        {/* Main Content Area (Offset with ml for fixed sidebar on md+) */}
+        <main className="flex-1 md:ml-60 lg:ml-64 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

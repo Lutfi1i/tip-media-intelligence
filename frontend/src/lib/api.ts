@@ -13,6 +13,9 @@ export interface DashboardKPI {
   total_wilayah_terpantau: number;
   menunggu_aksi: number;
   lewat_tenggat: number;
+  menunggu_verifikasi?: number;
+  belum_terpetakan_count?: number;
+  belum_terpetakan_pct?: number;
 }
 
 export interface TrendPoint {
@@ -395,6 +398,7 @@ export interface IndonesiaGeoOverview {
   status: string;
   focus_area: string;
   provinces: ProvinceGeo[];
+  jawa_regions?: JabodetabekRegionGeo[];
   jabodetabek_regions: JabodetabekRegionGeo[];
   total_provinces: number;
   total_active_regions: number;
@@ -410,5 +414,219 @@ export async function fetchIndonesiaGeo(): Promise<IndonesiaGeoOverview> {
 export async function fetchRegionalDetail(kodeWilayah: string) {
   const res = await fetch(`${API_BASE_URL}/geo/region/${kodeWilayah}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Gagal mengambil data wilayah ${kodeWilayah}`);
+  return res.json();
+}
+
+// ==========================================
+// RADAR SOCIAL PULSE INTELLIGENCE INTERFACES
+// ==========================================
+
+export interface SocialPulseOverview {
+  time_range: string;
+  scope_kode: string;
+  scope_name: string;
+  scope_mode: "context" | "strict" | "regional";
+  total_mentions: number;
+  mention_growth_pct: number;
+  trending_topics_count: number;
+  emerging_trends_count: number;
+  negative_ratio_pct: number;
+  sentiment_breakdown: {
+    positif: number;
+    netral: number;
+    negatif: number;
+    campuran: number;
+    "tidak pasti": number;
+  };
+  active_platforms_count: number;
+  platform_distribution: Record<string, number>;
+  data_coverage?: {
+    total_collected: number;
+    relevant_to_scope: number;
+    uncertain_count: number;
+    direct_count: number;
+  };
+  last_updated: string;
+}
+
+export interface SocialSampleMention {
+  id: number;
+  judul: string;
+  isi: string;
+  penerbit: string;
+  penulis?: string;
+  platform: string;
+  url: string;
+  published_at: string;
+  sentimen: string;
+  geo_context?: string;
+  geo_confidence?: "High" | "Medium" | "Low" | "Unknown";
+}
+
+export interface CorrelatedIssueSummary {
+  id: number;
+  kode_referensi: string;
+  judul: string;
+  level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  skor: number;
+  status: string;
+}
+
+export interface SocialTrendingTopic {
+  rank: number;
+  topic: string;
+  hashtags: string[];
+  mention_count: number;
+  growth_pct: number;
+  velocity_score: number;
+  velocity_status: "LONJAKAN TINGGI" | "MENINGKAT" | "STABIL" | "MENURUN";
+  status_color: "rose" | "amber" | "sky" | "slate";
+  platforms: string[];
+  sentiment_pct: {
+    positif: number;
+    netral: number;
+    negatif: number;
+  };
+  correlated_issue: CorrelatedIssueSummary | null;
+  first_detected: string;
+  sample_mentions: SocialSampleMention[];
+}
+
+export interface SocialPlatformMetric {
+  name: string;
+  code: string;
+  icon: string;
+  official_status: string;
+  type: string;
+  color: string;
+  mention_count: number;
+  negative_sentiment_pct: number;
+  positive_sentiment_pct: number;
+  last_data_at: string | null;
+  is_connected: boolean;
+}
+
+export interface SocialCorrelation {
+  social_topic: string;
+  hashtags: string[];
+  mention_count: number;
+  velocity_score: number;
+  velocity_status: string;
+  platforms: string[];
+  issue: CorrelatedIssueSummary;
+  first_detected: string;
+}
+
+export interface GeoSearchResult {
+  kode: string;
+  nama: string;
+  tingkat: "nasional" | "provinsi" | "kabupaten" | "kecamatan" | "kelurahan";
+  konteks: string;
+}
+
+export interface GeoHierarchyResponse {
+  provinces: Array<{ kode: string; nama: string; pulau: string }>;
+  kabupaten: Array<{ kode: string; nama: string; provinsi_kode: string; provinsi_nama: string; tipe: string }>;
+  kecamatan: Array<{ kode: string; nama: string; kabupaten_kode: string; kabupaten_nama: string; provinsi_kode: string; provinsi_nama: string }>;
+  kelurahan: Array<{ kode: string; nama: string; kecamatan_kode: string; kecamatan_nama: string; kabupaten_nama: string; provinsi_nama: string }>;
+}
+
+export interface GeoComparisonItem {
+  scope_kode: string;
+  region_name: string;
+  total_mentions: number;
+  growth_pct: number;
+  trending_topics_count: number;
+  emerging_trends_count: number;
+  negative_sentiment_pct: number;
+  top_topic: string;
+}
+
+export async function fetchSocialPulseOverview(
+  timeRange: string = "24h",
+  scopeKode: string = "ID",
+  scopeMode: string = "context",
+  multiCodes?: string
+): Promise<SocialPulseOverview> {
+  const params = new URLSearchParams({
+    time_range: timeRange,
+    scope_kode: scopeKode,
+    scope_mode: scopeMode,
+  });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+
+  const res = await fetch(`${API_BASE_URL}/social-pulse/overview?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil overview Social Pulse");
+  return res.json();
+}
+
+export async function fetchSocialTrends(
+  platform?: string,
+  timeRange: string = "24h",
+  limit: number = 15,
+  scopeKode: string = "ID",
+  scopeMode: string = "context",
+  multiCodes?: string
+): Promise<SocialTrendingTopic[]> {
+  const params = new URLSearchParams();
+  if (platform && platform !== "Semua") params.append("platform", platform);
+  params.append("time_range", timeRange);
+  params.append("limit", limit.toString());
+  params.append("scope_kode", scopeKode);
+  params.append("scope_mode", scopeMode);
+  if (multiCodes) params.append("multi_codes", multiCodes);
+
+  const res = await fetch(`${API_BASE_URL}/social-pulse/trends?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil tren Social Pulse");
+  return res.json();
+}
+
+export async function fetchSocialPlatforms(
+  scopeKode: string = "ID",
+  scopeMode: string = "context",
+  multiCodes?: string
+): Promise<SocialPlatformMetric[]> {
+  const params = new URLSearchParams({
+    scope_kode: scopeKode,
+    scope_mode: scopeMode,
+  });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+
+  const res = await fetch(`${API_BASE_URL}/social-pulse/platforms?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil metrik platform Social Pulse");
+  return res.json();
+}
+
+export async function fetchSocialCorrelations(
+  scopeKode: string = "ID",
+  scopeMode: string = "context",
+  multiCodes?: string
+): Promise<SocialCorrelation[]> {
+  const params = new URLSearchParams({
+    scope_kode: scopeKode,
+    scope_mode: scopeMode,
+  });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+
+  const res = await fetch(`${API_BASE_URL}/social-pulse/correlations?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil korelasi isu Social Pulse");
+  return res.json();
+}
+
+export async function searchGeoLocations(q: string): Promise<GeoSearchResult[]> {
+  const res = await fetch(`${API_BASE_URL}/social-pulse/geo/search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchGeoHierarchy(): Promise<GeoHierarchyResponse> {
+  const res = await fetch(`${API_BASE_URL}/social-pulse/geo/hierarchy`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil hierarki administratif wilayah");
+  return res.json();
+}
+
+export async function fetchGeoComparison(codes: string = "32.01.01,32.01.02,32.01.03", timeRange: string = "24h"): Promise<GeoComparisonItem[]> {
+  const res = await fetch(`${API_BASE_URL}/social-pulse/comparison?codes=${encodeURIComponent(codes)}&time_range=${timeRange}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal memuat perbandingan wilayah");
   return res.json();
 }

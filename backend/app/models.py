@@ -100,7 +100,7 @@ class Issue(Base):
     skor = Column(Float, default=50.0)             # 0 to 100
     level = Column(String(20), default="MEDIUM")   # CRITICAL, HIGH, MEDIUM, LOW
     alasan_skor_json = Column(Text, default="{}")  # Breakdown of 6 factors
-    status = Column(String(50), default="kandidat") # kandidat, terverifikasi, dikoreksi, ditolak, selesai
+    status = Column(String(50), default="otomatis") # otomatis, terverifikasi, dikoreksi, ditolak, selesai
     ringkasan = Column(Text, nullable=True)
     pihak_terlibat_json = Column(Text, default="[]")
     hal_belum_diketahui = Column(Text, nullable=True)

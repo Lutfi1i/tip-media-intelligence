@@ -1,4 +1,7 @@
 # Environments
+.env
+.env.local
+.env.*.local
 backend/venv/
 __pycache__/
 *.pyc
