@@ -341,6 +341,56 @@ export interface JabodetabekRegionGeo {
   dominant_topic: string;
 }
 
+export interface MediaItem {
+  id: number;
+  judul: string;
+  url: string;
+  penerbit: string;
+  penulis?: string;
+  channel_type: "berita" | "sosmed";
+  platform: string;
+  published_at: string | null;
+  sentimen: string;
+  topik: string;
+  kategori_masalah: string;
+  ringkasan: string;
+}
+
+export interface RegionMatchedIssue {
+  id: number;
+  judul: string;
+  status: string;
+  kategori: string;
+  kategori_masalah: string;
+  tingkat_bahaya: string;
+  skor: number;
+  ringkasan: string;
+  volume_24jam: number;
+}
+
+export interface RegionalDetailResponse {
+  kode: string;
+  nama: string;
+  jenis: string;
+  provinsi: string;
+  lat: number;
+  lng: number;
+  is_focus: boolean;
+  total_articles: number;
+  total_berita: number;
+  total_sosmed: number;
+  total_issues: number;
+  trend: {
+    direction: "naik" | "stabil" | "kondusif";
+    negatif_pct: number;
+    sentimen: { positif: number; netral: number; negatif: number };
+  };
+  category_counts: Record<string, number>;
+  issues: RegionMatchedIssue[];
+  recent_articles: MediaItem[];
+  media_items: MediaItem[];
+}
+
 export interface IndonesiaGeoOverview {
   status: string;
   focus_area: string;
