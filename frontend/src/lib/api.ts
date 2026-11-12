@@ -494,6 +494,7 @@ export interface SocialPulseOverview {
   };
   active_platforms_count: number;
   platform_distribution: Record<string, number>;
+  emotion_breakdown: SocialEmotionShare[];
   unique_accounts: number;
   author_coverage_pct: number;
   engagement: SocialEngagementSummary;
@@ -525,6 +526,7 @@ export interface SocialSampleMention {
   url: string | null;
   published_at: string;
   sentimen: string;
+  emosi?: string[];
   geo_context?: string | null;
   geo_confidence?: "High" | "Medium" | "Low" | "Unknown" | null;
   engagement?: {
@@ -561,6 +563,13 @@ export interface SocialCoordinationCluster {
   flagged: boolean;
   sample_text: string;
   accounts: string[];
+}
+
+export interface SocialEmotionShare {
+  id: string;
+  label: string;
+  count: number;
+  pct: number;
 }
 
 export interface SocialFacetRef {
@@ -604,6 +613,7 @@ export interface SocialAgencyRow {
   platforms: string[];
   top_topics: string[];
   categories: SocialFacetRef[];
+  emotions: SocialEmotionShare[];
   top_negative: SocialSampleMention[];
   latest: SocialSampleMention[];
   engagement: SocialEngagementSummary;
@@ -622,6 +632,7 @@ export interface SocialTrendingTopic {
   rank: number;
   categories: SocialFacetRef[];
   agencies: SocialFacetRef[];
+  emotions: SocialEmotionShare[];
   topic_key: string;
   topic: string;
   topic_type: "hashtag" | "frasa" | "kategori" | "lainnya";

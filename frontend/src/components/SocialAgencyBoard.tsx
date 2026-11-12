@@ -112,6 +112,7 @@ export function SocialAgencyBoard({
                         <td className="px-4 py-3 text-right">
                           <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{r.negative_count}</div>
                           {r.mention_count > 0 && <div className="text-2xs text-zinc-500">{r.sentiment_pct.negatif}%</div>}
+                          {r.emotions[0] && <div className="text-2xs text-zinc-500">{r.emotions[0].label.toLowerCase()}</div>}
                         </td>
                         <td className="px-4 py-3">
                           <VelocityBadge status={r.velocity_status} />

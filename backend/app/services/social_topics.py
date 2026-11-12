@@ -39,6 +39,7 @@ class SocialPost:
     keys: Set[str] = field(default_factory=set)
     categories: List[str] = field(default_factory=list)
     agencies: List[str] = field(default_factory=list)
+    emotions: List[str] = field(default_factory=list)
 
     @property
     def interactions(self) -> Optional[int]:

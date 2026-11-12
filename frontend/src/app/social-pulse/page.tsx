@@ -499,6 +499,11 @@ export default function SocialPulsePage() {
               />
             ))}
           </div>
+          {overview && overview.emotion_breakdown.length > 0 && (
+            <p className="mt-2 text-2xs text-zinc-500" title="Persentase konten yang memuat kata emosi tersebut">
+              Emosi: {overview.emotion_breakdown.slice(0, 3).map((e) => `${e.label.toLowerCase()} ${e.pct}%`).join(", ")}
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
@@ -711,6 +716,11 @@ export default function SocialPulsePage() {
                               <div style={{ width: `${item.sentiment_pct.negatif}%` }} className="bg-rose-500" title={`Negatif ${item.sentiment_pct.negatif}%`} />
                             </div>
                             <div className="text-2xs text-zinc-500">Negatif {item.sentiment_pct.negatif}%</div>
+                            {item.emotions[0] && (
+                              <div className="text-2xs text-zinc-500" title={item.emotions.map((e) => `${e.label} ${e.pct}%`).join(", ")}>
+                                Dominan: {item.emotions[0].label.toLowerCase()}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-4 text-2xs text-zinc-600 dark:text-zinc-300">
@@ -970,6 +980,14 @@ function TopicDetailModal({
             ))}
           </dl>
 
+          {topic.emotions.length > 0 && (
+            <p className="text-xs text-zinc-600 dark:text-zinc-300">
+              <span className="font-semibold">Emosi:</span>{" "}
+              {topic.emotions.map((e) => `${e.label} ${e.pct}%`).join(", ")}
+              <span className="text-zinc-500"> (persentase konten yang memuat kata emosi tersebut)</span>
+            </p>
+          )}
+
           <VolumeTimeline
             data={topic.timeline}
             baselinePerBucket={topic.baseline_per_bucket}
@@ -1063,6 +1081,11 @@ function TopicDetailModal({
                       <RealBrandIcon name={sm.platform} className="h-4 w-4" />
                       <span className="font-bold text-zinc-900 dark:text-zinc-100">{sm.penulis ?? "Akun tidak diketahui"}</span>
                       <span>{sm.platform}</span>
+                      {sm.emosi?.map((e) => (
+                        <span key={e} className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-3xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          {e}
+                        </span>
+                      ))}
                     </div>
                     {sm.geo_context && (
                       <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">

@@ -28,6 +28,7 @@ from backend.app.services.geo_hierarchy import (
     classify_geographic_context,
 )
 from backend.app.services.social_platform import SOCIAL_PLATFORMS, platform_from_url
+from backend.app.services.social_emotion import EMOTION_LABELS, classify_emotions, emotion_breakdown
 from backend.app.services.social_taxonomy import (
     AGENCIES,
     CATEGORIES,
@@ -341,6 +342,7 @@ def _load_dataset(
         )
         post.keys = extract_keys(text, post.topic)
         post.categories, post.agencies = classify(text)
+        post.emotions = classify_emotions(text)
         if category and category not in post.categories:
             continue
         if agency and agency not in post.agencies:
@@ -434,6 +436,7 @@ def _mention_payload(ds: _Dataset, p: SocialPost) -> Dict[str, Any]:
         "url": p.url,
         "published_at": p.published_at.isoformat(),
         "sentimen": p.sentiment,
+        "emosi": [EMOTION_LABELS[e] for e in p.emotions],
         "geo_context": geo.get("label"),
         "geo_confidence": geo.get("confidence"),
         "engagement": {
@@ -514,6 +517,7 @@ def _build_trends(db: Session, ds: _Dataset, time_range: str, sort: str = "laju"
             "locations": locations,
             "categories": [{"id": c, "label": category_label(c), "count": n} for c, n in cat_counts.most_common(3)],
             "agencies": [{"id": a, "label": agency_label(a), "count": n} for a, n in ag_counts.most_common(4)],
+            "emotions": emotion_breakdown((p.emotions for p in posts), len(posts))[:3],
             "correlated_issue": _dominant_issue(ds, posts, issues),
             "first_detected": min(p.published_at for p in posts).isoformat(),
             "last_seen": max(p.published_at for p in posts).isoformat(),
@@ -610,6 +614,7 @@ def get_social_pulse_overview(
         "coordination_flags": sum(1 for t in trends if t["coordination"]["flagged"]),
         "negative_ratio_pct": round(sentiment_counts["negatif"] / max(len(posts), 1) * 100, 1),
         "sentiment_breakdown": sentiment_counts,
+        "emotion_breakdown": emotion_breakdown((p.emotions for p in posts), len(posts)),
         "active_platforms_count": len(platform_counts),
         "platform_distribution": dict(platform_counts),
         "unique_accounts": accounts["unique_accounts"],
@@ -966,6 +971,7 @@ def get_agency_board(
             "platforms": [n for n, _ in Counter(p.platform for p in posts).most_common()],
             "top_topics": topics,
             "categories": [{"id": c, "label": category_label(c), "count": n} for c, n in cat_counts.most_common(3)],
+            "emotions": emotion_breakdown((p.emotions for p in posts), len(posts))[:3],
             "top_negative": [_mention_payload(ds, p) for p in _rank_mentions(negatives)[:3]],
             "latest": [_mention_payload(ds, p) for p in sorted(posts, key=lambda p: p.published_at, reverse=True)[:3]],
             "engagement": engagement_summary(posts),
@@ -1014,11 +1020,13 @@ def get_social_brief(
     prev = sum(1 for p in ds.history if ds.history_window_index[p.id] == 0) if 0 in ds.covered_windows else None
     growth = f", {'naik' if len(posts) >= prev else 'turun'} dari {prev} pada periode sebelumnya" if prev else ""
     platforms = Counter(p.platform for p in posts).most_common(3)
+    emotions = emotion_breakdown((p.emotions for p in posts), len(posts))[:2]
+    emo_txt = (" Emosi yang menonjol: " + ", ".join(f"{e['label'].lower()} ({e['pct']:.0f}%)" for e in emotions) + ".") if emotions else ""
     points.append({
         "kind": "volume",
         "text": (
             f"{_fmt_int(len(posts))} konten medsos{growth}. "
-            f"{round(neg / len(posts) * 100)}% bernada negatif. "
+            f"{round(neg / len(posts) * 100)}% bernada negatif.{emo_txt} "
             f"Kanal terbanyak: {', '.join(f'{n} ({c})' for n, c in platforms)}."
         ),
     })

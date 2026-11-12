@@ -530,3 +530,38 @@ def test_brief_summarizes_volume_agencies_and_caveats(db):
     assert "PLN (2 konten negatif)" in next(p["text"] for p in brief["points"] if p["kind"] == "instansi")
     empty = get_social_brief(db, time_range="24h", category="olahraga")
     assert "Belum ada" in empty["points"][0]["text"]
+
+
+# ---------- emosi ----------
+
+from backend.app.services.social_emotion import classify_emotions, emotion_breakdown  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "text, emo",
+    [
+        ("PLN gak becus, sudah 5 jam padam, warga geram", "marah"),
+        ("Gempa terasa kuat, warga panik dan takut masuk rumah", "takut"),
+        ("Turut berduka, korban jiwa banjir bertambah", "sedih"),
+        ("Sudah lapor 3 kali tapi belum ada respon, kecewa", "kecewa"),
+        ("Terima kasih damkar, cepat tanggap sekali", "senang"),
+        ("Heboh! Warga kaget ada buaya di kali", "terkejut"),
+    ],
+)
+def test_classify_emotions(text, emo):
+    assert emo in classify_emotions(text)
+
+
+def test_emotions_none_and_breakdown():
+    assert classify_emotions("Rapat koordinasi dinas berlangsung sesuai agenda") == []
+    br = emotion_breakdown([["marah", "kecewa"], ["marah"], []], 3)
+    assert br[0] == {"id": "marah", "label": "Marah", "count": 2, "pct": 66.7}
+
+
+def test_overview_and_trends_include_emotions(db):
+    now = datetime.utcnow()
+    _seed_mixed(db, now)
+    ov = get_social_pulse_overview(db, time_range="24h")
+    assert isinstance(ov["emotion_breakdown"], list)
+    t = get_social_trends(db, time_range="24h")[0]
+    assert "emotions" in t and "emosi" in t["sample_mentions"][0]
