@@ -1187,3 +1187,87 @@ def get_period_comparison(
         "note": None if ds_b.coverage_since and period_b.start >= ds_b.coverage_since else
             "Pengumpulan data dimulai di tengah atau setelah periode pembanding, jadi angka pembanding bisa lebih rendah dari kenyataan.",
     }
+
+
+def _region_lookup() -> Dict[str, Dict[str, str]]:
+    from backend.app.services.ai_analyzer import GAZETTEER_REGIONS
+
+    by_name: Dict[str, Dict[str, str]] = {}
+    for key, data in GAZETTEER_REGIONS.items():
+        by_name.setdefault(key.lower(), data)
+        by_name.setdefault(data["nama"].lower(), data)
+    return by_name
+
+
+def rollup_city(location: Optional[str], lookup: Optional[Dict[str, Dict[str, str]]] = None) -> Optional[str]:
+    """Naikkan lokasi (kelurahan/kecamatan/kawasan) ke kota/kabupaten lewat rantai parent gazetir.
+
+    Lokasi tingkat provinsi menjadi "<provinsi> (tingkat provinsi)". None bila tidak dikenali.
+    """
+    if not location:
+        return None
+    lookup = lookup or _region_lookup()
+    node = lookup.get(location.lower())
+    for _ in range(6):
+        if node is None:
+            return None
+        if node["tingkat"] in ("kota", "kabupaten"):
+            return node["nama"]
+        if node["tingkat"] == "provinsi":
+            return f"{node['nama']} (tingkat provinsi)"
+        node = lookup.get(node["parent"].lower())
+    return None
+
+
+def get_region_category_heatmap(
+    db: Session,
+    time_range: str = "24h",
+    scope_kode: str = "ID",
+    scope_mode: str = "context",
+    multi_codes: Optional[List[str]] = None,
+    platform: Optional[str] = None,
+    agency: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Matriks kota/kabupaten x kategori: jumlah konten dan konten negatif per sel."""
+    ds = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, platform, None, agency)
+    lookup = _region_lookup()
+    cells: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(lambda: defaultdict(lambda: {"count": 0, "negative": 0}))
+    region_totals: Counter = Counter()
+    region_neg: Counter = Counter()
+    unlocated = 0
+    for p in ds.current:
+        region = rollup_city(p.location, lookup)
+        if region is None:
+            unlocated += 1
+            continue
+        region_totals[region] += 1
+        neg = p.sentiment == "negatif"
+        region_neg[region] += int(neg)
+        for c in p.categories:
+            cell = cells[region][c]
+            cell["count"] += 1
+            cell["negative"] += int(neg)
+
+    col_totals: Counter = Counter()
+    for region_cells in cells.values():
+        for c, v in region_cells.items():
+            col_totals[c] += v["count"]
+    columns = [{"id": c, "label": category_label(c), "total": n} for c, n in col_totals.most_common()]
+    rows = [
+        {
+            "region": r,
+            "total": n,
+            "negative": region_neg[r],
+            "cells": {c: dict(v) for c, v in cells[r].items()},
+        }
+        for r, n in region_totals.most_common()
+    ]
+    return {
+        "period": ds.period.as_dict(),
+        "total": len(ds.current),
+        "located": len(ds.current) - unlocated,
+        "unlocated": unlocated,
+        "max_cell": max((v["count"] for rc in cells.values() for v in rc.values()), default=0),
+        "columns": columns,
+        "rows": rows,
+    }

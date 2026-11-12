@@ -1132,6 +1132,31 @@ export async function ackSocialAlertEvent(id: number, aktor: string): Promise<So
   );
 }
 
+export interface SocialHeatmap {
+  period: SocialPeriod;
+  total: number;
+  located: number;
+  unlocated: number;
+  max_cell: number;
+  columns: { id: string; label: string; total: number }[];
+  rows: { region: string; total: number; negative: number; cells: Record<string, { count: number; negative: number }> }[];
+}
+
+export async function fetchSocialHeatmap(
+  timeRange: string,
+  scopeKode: string,
+  scopeMode: string,
+  multiCodes?: string,
+  platform?: string,
+  agency?: string
+): Promise<SocialHeatmap> {
+  const params = new URLSearchParams({ time_range: timeRange, scope_kode: scopeKode, scope_mode: scopeMode });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+  if (platform && platform !== "Semua") params.append("platform", platform);
+  if (agency) params.append("agency", agency);
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/heatmap?${params.toString()}`, { cache: "no-store" }), "Gagal memuat peta panas");
+}
+
 export async function escalateSocialSurges(timeRange: string = "6h"): Promise<SocialEscalationResult> {
   const res = await fetch(`${API_BASE_URL}/social-pulse/escalate?time_range=${timeRange}`, { method: "POST" });
   if (!res.ok) throw new Error("Gagal mengeskalasi lonjakan media sosial");

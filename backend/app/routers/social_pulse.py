@@ -20,6 +20,7 @@ from backend.app.services.social_pulse_service import (
     get_agency_board,
     get_social_brief,
     get_period_comparison,
+    get_region_category_heatmap,
     SORT_OPTIONS,
     custom_period_key,
     resolve_period,
@@ -347,6 +348,21 @@ def ack_alert_event(event_id: int, payload: AckIn, db: Session = Depends(get_db)
     record_audit(db, aktor=event.dilihat_oleh, peran="Analis", aksi="LIHAT_ALERT_MEDSOS",
                  objek=f"social-alert-event:{event.id}")
     return event_payload(event)
+
+
+@router.get("/heatmap")
+def read_region_category_heatmap(
+    time_range: str = Depends(period_param),
+    scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
+    scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
+    multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
+    platform: Optional[str] = Query(None, description="Filter platform"),
+    agency: Optional[str] = Query(None, description="Filter instansi"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Matriks kota/kabupaten x kategori untuk melihat kategori yang ramai di setiap wilayah."""
+    codes_list = [c.strip() for c in multi_codes.split(",")] if multi_codes else None
+    return get_region_category_heatmap(db, time_range, scope_kode, scope_mode, codes_list, platform, agency)
 
 
 @router.get("/brief")

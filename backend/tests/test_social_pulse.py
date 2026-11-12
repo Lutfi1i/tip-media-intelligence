@@ -767,3 +767,42 @@ def test_alert_rules_api_flow(db):
         assert db.query(SocialAlertEvent).count() == 0
     finally:
         app.dependency_overrides.clear()
+
+
+# ---------- heatmap wilayah x kategori ----------
+
+from backend.app.services.social_pulse_service import get_region_category_heatmap, rollup_city  # noqa: E402
+
+
+def test_rollup_city():
+    assert rollup_city("Tambun") == "Bekasi"
+    assert rollup_city("Kemang") == "Jakarta Selatan"
+    assert rollup_city("Jakarta Selatan") == "Jakarta Selatan"
+    assert rollup_city("DKI Jakarta") == "DKI Jakarta (tingkat provinsi)"
+    assert rollup_city("Atlantis") is None and rollup_city(None) is None
+
+
+def test_region_category_heatmap(db):
+    now = datetime.utcnow()
+    src = Source(nama="s", jenis="media_sosial", url="https://x.com/s")
+    db.add(src)
+    db.flush()
+    rows = [
+        ("Banjir di Tambun, warga kesal", "Tambun", "negatif"),
+        ("Banjir lagi Bekasi", "Bekasi", "negatif"),
+        ("Kuliner seblak di Kemang", "Kemang", "positif"),
+        ("Info tanpa lokasi soal macet", None, "netral"),
+    ]
+    for i, (text, loc, sent) in enumerate(rows):
+        it = RawItem(source_id=src.id, url_kanonik=f"h{i}", hash=f"h{i}", judul=text, isi=text,
+                     published_at=now - timedelta(hours=1), fetched_at=now - timedelta(days=2), platform="X (Twitter)")
+        db.add(it)
+        db.flush()
+        db.add(ItemAnalysis(item_id=it.id, sentimen=sent, lokasi_kejadian=loc, topik="Umum"))
+    db.commit()
+    hm = get_region_category_heatmap(db, time_range="24h")
+    assert hm["total"] == 4 and hm["located"] == 3 and hm["unlocated"] == 1
+    rows_by = {r["region"]: r for r in hm["rows"]}
+    assert rows_by["Bekasi"]["total"] == 2 and rows_by["Bekasi"]["cells"]["bencana"] == {"count": 2, "negative": 2}
+    assert rows_by["Jakarta Selatan"]["cells"]["kuliner"]["count"] == 1
+    assert hm["max_cell"] == 2 and hm["columns"][0]["id"] == "bencana"

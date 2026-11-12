@@ -12,6 +12,7 @@ import {
   fetchAgencyBoard,
   fetchSocialBrief,
   fetchSocialAlertEvents,
+  fetchSocialHeatmap,
   escalateSocialSurges,
   generateSocialReport,
   getReportViewUrl,
@@ -26,7 +27,9 @@ import {
   SocialAgencyBoard as AgencyBoardData,
   SocialSort,
   SocialBrief,
+  SocialHeatmap as SocialHeatmapData,
 } from "@/lib/api";
+import { SocialHeatmap } from "@/components/SocialHeatmap";
 import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
@@ -40,7 +43,7 @@ import { GeographicComparisonTable } from "@/components/GeographicComparisonTabl
 import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
 import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
 
-type Tab = "tren" | "alert" | "instansi" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type Tab = "tren" | "alert" | "instansi" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
 
@@ -127,6 +130,7 @@ export default function SocialPulsePage() {
   const [facets, setFacets] = useState<SocialFacets | null>(null);
   const [agencyBoard, setAgencyBoard] = useState<AgencyBoardData | null>(null);
   const [brief, setBrief] = useState<SocialBrief | null>(null);
+  const [heatmap, setHeatmap] = useState<SocialHeatmapData | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const refreshUnread = useCallback(() => {
     fetchSocialAlertEvents("baru", 1)
@@ -169,7 +173,7 @@ export default function SocialPulsePage() {
     if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
     if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
     const tab = q.get("tab");
-    if (tab && ["tren", "alert", "instansi", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    if (tab && ["tren", "alert", "instansi", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
     const wilayah = q.get("wilayah");
     if (wilayah) {
       setScopeKode(wilayah);
@@ -190,7 +194,7 @@ export default function SocialPulsePage() {
     try {
       const filters = { category: category || undefined, agency: agency || undefined };
       const plat = selectedPlatform === "Semua" ? undefined : selectedPlatform;
-      const [ovData, trData, pfData, crData, wlData, fcData, agData, brData] = await Promise.all([
+      const [ovData, trData, pfData, crData, wlData, fcData, agData, brData, hmData] = await Promise.all([
         fetchSocialPulseOverview(timeRange, scopeKode, scopeMode, multiParam, filters),
         fetchSocialTrends(plat, timeRange, 30, scopeKode, scopeMode, multiParam, filters, sort),
         fetchSocialPlatforms(scopeKode, scopeMode, multiParam, timeRange),
@@ -199,7 +203,9 @@ export default function SocialPulsePage() {
         fetchSocialFacets(timeRange, scopeKode, scopeMode, multiParam, plat, filters),
         fetchAgencyBoard(timeRange, scopeKode, scopeMode, multiParam, category || undefined),
         fetchSocialBrief(timeRange, scopeKode, scopeMode, multiParam, filters),
+        fetchSocialHeatmap(timeRange, scopeKode, scopeMode, multiParam, plat, agency || undefined),
       ]);
+      setHeatmap(hmData);
       setBrief(brData);
       refreshUnread();
       setFacets(fcData);
@@ -345,6 +351,7 @@ export default function SocialPulsePage() {
     { id: "tren", label: `Topik Tren (${trends.length})` },
     { id: "alert", label: unreadAlerts ? `Aturan Alert (${unreadAlerts} baru)` : "Aturan Alert" },
     { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
+    { id: "peta", label: "Peta Panas" },
     { id: "bandingkan", label: "Bandingkan Periode" },
     { id: "watchlist", label: `Watchlist (${watchlist?.active_terms ?? 0}/${watchlist?.total_terms ?? 0})` },
     { id: "perbandingan", label: "Bandingkan Wilayah" },
@@ -836,6 +843,17 @@ export default function SocialPulsePage() {
           isLoading={isLoading}
           onFocusAgency={(id) => {
             setAgency(id);
+            setActiveTab("tren");
+          }}
+        />
+      )}
+
+      {activeTab === "peta" && (
+        <SocialHeatmap
+          data={heatmap}
+          isLoading={isLoading}
+          onPickCategory={(id) => {
+            setCategory(id);
             setActiveTab("tren");
           }}
         />
