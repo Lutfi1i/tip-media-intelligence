@@ -40,8 +40,13 @@ def test_geo_master_provinces():
     assert aceh["is_focus"] is False
 
 
+# Wilayah inti Jabodetabek; daftar sudah diperluas ke kab/kota Jawa lain, jadi jumlah total tidak dipatok.
+CORE_JABODETABEK = {"31.71", "31.72", "31.73", "31.74", "31.75", "31.01", "32.01", "32.71", "32.16", "32.75", "32.76", "36.03", "36.71", "36.74"}
+
+
 def test_geo_jabodetabek_regions():
-    assert len(JABODETABEK_REGIONS) == 14
+    codes = {r["kode"] for r in JABODETABEK_REGIONS}
+    assert CORE_JABODETABEK <= codes
     jaksel = next((r for r in JABODETABEK_REGIONS if r["kode"] == "31.74"), None)
     assert jaksel is not None
     assert "kemang" in jaksel["aliases"]
@@ -53,7 +58,7 @@ def test_geo_overview_db_query():
         overview = get_indonesia_geo_overview(db)
         assert overview["status"] == "success"
         assert len(overview["provinces"]) == 38
-        assert len(overview["jabodetabek_regions"]) == 14
+        assert CORE_JABODETABEK <= {r["kode"] for r in overview["jabodetabek_regions"]}
 
         # Test drill-down
         detail = get_region_detail_and_issues(db, "31.74")
@@ -74,7 +79,7 @@ async def test_ai_engine_incident_fallback():
         publisher="Antara News"
     )
     assert res["sentimen"] in ("negatif", "campuran")
-    assert res["topik"] in ("Bencana", "Infrastruktur")
+    assert res["topik"] in ("Bencana & Cuaca", "Infrastruktur & Jalan")
     assert res["lokasi_kejadian"] is not None
 
     brief = await generate_executive_brief_with_ai(

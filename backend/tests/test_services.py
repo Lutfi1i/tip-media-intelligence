@@ -37,7 +37,7 @@ def test_sentiment_analysis():
 def test_topic_analysis():
     flood_text = "Genangan air naik di jalan raya akibat curah hujan tinggi dan pompa mati."
     topic, conf = analyze_topic(flood_text)
-    assert topic in ("Bencana", "Infrastruktur")
+    assert topic in ("Bencana & Cuaca", "Infrastruktur & Jalan")
     assert conf >= 0.70
 
 def test_location_gazetteer():
