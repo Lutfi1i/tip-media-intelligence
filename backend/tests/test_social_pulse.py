@@ -588,3 +588,48 @@ def test_topic_notes_history_latest_status_and_audit(db):
         add_note(db, "#x", "#x", "tidak_ada", "Rina")
     with pytest.raises(ValueError):
         add_note(db, "#x", "#x", "dipantau", "  ")
+
+
+# ---------- bandingkan periode ----------
+
+from backend.app.services.social_pulse_service import get_period_comparison, previous_period  # noqa: E402
+
+
+def test_previous_period_same_length():
+    p = resolve_period("7d", datetime(2026, 11, 12, 10, 0))
+    prev = previous_period(p)
+    assert prev.end == p.start and prev.span == p.span
+
+
+def test_period_comparison_deltas(db):
+    now = datetime.utcnow()
+    src = Source(nama="s", jenis="media_sosial", url="https://x.com/s")
+    db.add(src)
+    db.flush()
+    rows = [  # (jam lalu, teks, sentimen)
+        (2, "PLN padam di Depok #plnpadam warga geram", "negatif"),
+        (3, "PLN padam lagi #plnpadam", "negatif"),
+        (5, "Kuliner seblak viral di Bogor", "positif"),
+        (30, "PLN padam semalam #plnpadam", "negatif"),
+        (31, "Macet parah di tol Jagorawi", "negatif"),
+        (33, "Macet lagi di tol Jagorawi pagi ini", "negatif"),
+    ]
+    for i, (h, text, sent) in enumerate(rows):
+        it = RawItem(source_id=src.id, url_kanonik=f"c{i}", hash=f"c{i}", judul=text, isi=text, penulis=f"@u{i}",
+                     published_at=now - timedelta(hours=h), fetched_at=now - timedelta(days=5), platform="X (Twitter)")
+        db.add(it)
+        db.flush()
+        db.add(ItemAnalysis(item_id=it.id, sentimen=sent, topik="Umum"))
+    db.commit()
+
+    cmp = get_period_comparison(db, time_range="24h")
+    assert cmp["summary_a"]["mentions"] == 3 and cmp["summary_b"]["mentions"] == 3
+    cats = {c["id"]: c for c in cmp["categories"]}
+    assert cats["energi"]["a"] == 2 and cats["energi"]["b"] == 1 and cats["energi"]["change_pct"] == 100.0
+    assert cats["transportasi"]["a"] == 0 and cats["transportasi"]["b"] == 2
+    pln = next(r for r in cmp["agencies"] if r["id"] == "pln")
+    assert (pln["a"], pln["b"], pln["negative_a"]) == (2, 1, 2)
+    topics = {t["id"]: t for t in cmp["topics"]}
+    assert topics["#plnpadam"]["status"] == "naik"
+    assert any(t["status"] == "hilang" for t in cmp["topics"])
+    assert cmp["note"] is None

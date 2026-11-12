@@ -43,6 +43,7 @@ from backend.app.services.social_topics import (
     SocialPost,
     account_analysis,
     cluster_posts,
+    count_key_in,
     detect_coordination,
     engagement_summary,
     extract_keys,
@@ -272,6 +273,7 @@ def _load_dataset(
     platform: Optional[str] = None,
     category: Optional[str] = None,
     agency: Optional[str] = None,
+    period: Optional[Period] = None,
 ) -> _Dataset:
     """Muat konten medsos jendela aktif + riwayat baseline.
 
@@ -279,7 +281,7 @@ def _load_dataset(
     baseline sebuah topik dihitung dari himpunan konten yang sama.
     """
     now = datetime.utcnow()
-    period = resolve_period(time_range, now)
+    period = period or resolve_period(time_range, now)
     n_windows = period.n_windows
     window = period.span
     window_start, window_end = period.start, period.end
@@ -1076,3 +1078,112 @@ def get_social_brief(
         })
 
     return {"title": title, "period": ds.period.as_dict(), "points": points, "generated_at": ds.now.isoformat()}
+
+
+
+def previous_period(p: Period) -> Period:
+    """Periode tepat sebelum p dengan panjang sama (pembanding default)."""
+    return Period(
+        key=f"sebelum:{p.key}",
+        start=p.start - p.span,
+        end=p.start,
+        n_windows=p.n_windows,
+        bucket_minutes=p.bucket_minutes,
+        label=f"periode sebelumnya ({(p.start - p.span + WIB).strftime('%Y-%m-%d %H:%M')} s.d. {(p.start + WIB).strftime('%Y-%m-%d %H:%M')} WIB)",
+    )
+
+
+def _delta_row(row_id: str, label: str, a: int, b: int, **extra: Any) -> Dict[str, Any]:
+    return {
+        "id": row_id,
+        "label": label,
+        "a": a,
+        "b": b,
+        "delta": a - b,
+        "change_pct": round((a - b) / b * 100, 1) if b else None,
+        **extra,
+    }
+
+
+def get_period_comparison(
+    db: Session,
+    time_range: str = "7d",
+    compare_range: Optional[str] = None,
+    scope_kode: str = "ID",
+    scope_mode: str = "context",
+    multi_codes: Optional[List[str]] = None,
+    platform: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Bandingkan periode aktif (A) dengan periode pembanding (B, default = periode sebelumnya)."""
+    period_a = resolve_period(time_range)
+    period_b = resolve_period(compare_range) if compare_range else previous_period(period_a)
+    ds_a = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, platform, period=period_a)
+    ds_b = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, platform, period=period_b)
+    a, b = ds_a.current, ds_b.current
+
+    def summary(posts: Sequence[SocialPost]) -> Dict[str, Any]:
+        n = len(posts)
+        return {
+            "mentions": n,
+            "negative_pct": round(sum(1 for p in posts if p.sentiment == "negatif") / n * 100, 1) if n else 0.0,
+            "accounts": account_analysis(posts)["unique_accounts"],
+            "views": engagement_summary(posts)["views"],
+        }
+
+    cat_a = Counter(c for p in a for c in p.categories)
+    cat_b = Counter(c for p in b for c in p.categories)
+    categories = [
+        _delta_row(c.id, c.label, cat_a.get(c.id, 0), cat_b.get(c.id, 0))
+        for c in CATEGORIES
+        if cat_a.get(c.id) or cat_b.get(c.id)
+    ]
+
+    ag_a = Counter(x for p in a for x in p.agencies)
+    ag_b = Counter(x for p in b for x in p.agencies)
+    neg_a = Counter(x for p in a if p.sentiment == "negatif" for x in p.agencies)
+    neg_b = Counter(x for p in b if p.sentiment == "negatif" for x in p.agencies)
+    agencies = [
+        _delta_row(ag.id, ag.label, ag_a.get(ag.id, 0), ag_b.get(ag.id, 0),
+                   negative_a=neg_a.get(ag.id, 0), negative_b=neg_b.get(ag.id, 0))
+        for ag in AGENCIES
+        if ag_a.get(ag.id) or ag_b.get(ag.id)
+    ]
+
+    # Topik: kunci dari pengelompokan masing-masing periode, lalu dihitung keanggotaannya di kedua periode.
+    keys = {k for k, g in cluster_posts(a) if k != UNCLUSTERED_KEY and len(g) >= 2}
+    keys |= {k for k, g in cluster_posts(b) if k != UNCLUSTERED_KEY and len(g) >= 2}
+    topics = []
+    for k in keys:
+        ca, cb = count_key_in(a, k), count_key_in(b, k)
+        status = "baru" if cb == 0 else "hilang" if ca == 0 else "naik" if ca > cb else "turun" if ca < cb else "tetap"
+        topics.append(_delta_row(k, key_label(k), ca, cb, status=status))
+
+    emo_a = {e["id"]: e for e in emotion_breakdown((p.emotions for p in a), len(a))}
+    emo_b = {e["id"]: e for e in emotion_breakdown((p.emotions for p in b), len(b))}
+    emotions = [
+        {"id": eid, "label": EMOTION_LABELS[eid],
+         "a_pct": emo_a.get(eid, {}).get("pct", 0.0), "b_pct": emo_b.get(eid, {}).get("pct", 0.0)}
+        for eid in EMOTION_LABELS
+        if eid in emo_a or eid in emo_b
+    ]
+
+    plat_a = Counter(p.platform for p in a)
+    plat_b = Counter(p.platform for p in b)
+    platforms = [_delta_row(n, n, plat_a.get(n, 0), plat_b.get(n, 0)) for n in sorted(set(plat_a) | set(plat_b))]
+
+    by_delta = lambda r: (-abs(r["delta"]), -r["a"], r["label"])  # noqa: E731
+    return {
+        "scope_kode": scope_kode,
+        "scope_name": _scope_display_name(scope_kode),
+        "period_a": period_a.as_dict(),
+        "period_b": period_b.as_dict(),
+        "summary_a": summary(a),
+        "summary_b": summary(b),
+        "categories": sorted(categories, key=by_delta),
+        "agencies": sorted(agencies, key=by_delta),
+        "topics": sorted(topics, key=by_delta)[:30],
+        "emotions": emotions,
+        "platforms": sorted(platforms, key=by_delta),
+        "note": None if ds_b.coverage_since and period_b.start >= ds_b.coverage_since else
+            "Pengumpulan data dimulai di tengah atau setelah periode pembanding, jadi angka pembanding bisa lebih rendah dari kenyataan.",
+    }

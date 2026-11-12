@@ -64,6 +64,12 @@ export function parseUtc(iso: string): Date {
   return new Date(/[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
 }
 
+/** Rentang tanggal WIB relatif hari ini, mis. wibDateRange(-13, -7) = minggu sebelum minggu lalu. */
+export function wibDateRange(startOffset: number, endOffset: number): { start: string; end: string } {
+  const day = (o: number) => new Date(Date.now() + 7 * 3600_000 + o * 86_400_000).toISOString().slice(0, 10);
+  return { start: day(startOffset), end: day(endOffset) };
+}
+
 /** Format waktu dalam WIB (Asia/Jakarta), tidak bergantung zona waktu peramban. */
 export function formatWib(iso: string | null | undefined, withDate = true): string {
   if (!iso) return "-";

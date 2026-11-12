@@ -28,6 +28,7 @@ import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
 import { SocialBriefCard } from "@/components/SocialBriefCard";
+import { SocialPeriodComparison } from "@/components/SocialPeriodComparison";
 import { NOTE_STATUS_STYLE, SocialTopicNotes } from "@/components/SocialTopicNotes";
 import { MediaAvatarStack, RealBrandIcon } from "@/components/SourceLogos";
 import { GeographicScopeSelector } from "@/components/GeographicScopeSelector";
@@ -35,7 +36,7 @@ import { GeographicComparisonTable } from "@/components/GeographicComparisonTabl
 import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
 import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
 
-type Tab = "tren" | "instansi" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type Tab = "tren" | "instansi" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
 
@@ -158,7 +159,7 @@ export default function SocialPulsePage() {
     if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
     if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
     const tab = q.get("tab");
-    if (tab && ["tren", "instansi", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    if (tab && ["tren", "instansi", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
     const wilayah = q.get("wilayah");
     if (wilayah) {
       setScopeKode(wilayah);
@@ -317,8 +318,9 @@ export default function SocialPulsePage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "tren", label: `Topik Tren (${trends.length})` },
     { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
+    { id: "bandingkan", label: "Bandingkan Periode" },
     { id: "watchlist", label: `Watchlist (${watchlist?.active_terms ?? 0}/${watchlist?.total_terms ?? 0})` },
-    { id: "perbandingan", label: "Perbandingan Wilayah" },
+    { id: "perbandingan", label: "Bandingkan Wilayah" },
     { id: "platform", label: `Status Platform (${healthSummary.aktif}/${healthSummary.total})` },
     { id: "korelasi", label: `Korelasi Isu RADAR (${correlations.length})` },
   ];
@@ -780,6 +782,16 @@ export default function SocialPulsePage() {
             setAgency(id);
             setActiveTab("tren");
           }}
+        />
+      )}
+
+      {activeTab === "bandingkan" && (
+        <SocialPeriodComparison
+          timeRange={timeRange}
+          scopeKode={scopeKode}
+          scopeMode={scopeMode}
+          multiCodes={multiParam}
+          platform={selectedPlatform}
         />
       )}
 

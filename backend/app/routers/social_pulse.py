@@ -19,6 +19,7 @@ from backend.app.services.social_pulse_service import (
     get_social_facets,
     get_agency_board,
     get_social_brief,
+    get_period_comparison,
     SORT_OPTIONS,
     custom_period_key,
     resolve_period,
@@ -189,6 +190,29 @@ def create_topic_note(payload: TopicNoteIn, db: Session = Depends(get_db)) -> Di
         return add_note(db, payload.topic_key, payload.topic_label, payload.status, payload.aktor, payload.catatan, payload.peran)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/compare")
+def read_period_comparison(
+    time_range: str = Depends(period_param),
+    compare_start: Optional[str] = Query(None, description="Tanggal mulai pembanding (WIB). Kosong = periode sebelumnya"),
+    compare_end: Optional[str] = Query(None, description="Tanggal akhir pembanding (WIB), ikut dihitung"),
+    scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
+    scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
+    multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
+    platform: Optional[str] = Query(None, description="Filter platform"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Bandingkan periode aktif dengan periode pembanding: volume, kategori, instansi, topik, emosi, platform."""
+    compare_key = None
+    if compare_start:
+        compare_key = custom_period_key(compare_start, compare_end or compare_start)
+        try:
+            resolve_period(compare_key)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"periode pembanding: {exc}")
+    codes_list = [c.strip() for c in multi_codes.split(",")] if multi_codes else None
+    return get_period_comparison(db, time_range, compare_key, scope_kode, scope_mode, codes_list, platform)
 
 
 @router.get("/brief")
