@@ -694,7 +694,23 @@ export interface SocialTrendingTopic {
     duplicate_share_pct: number;
     clusters: SocialCoordinationCluster[];
   };
+  propagation: SocialPropagation;
   sample_mentions: SocialSampleMention[];
+}
+
+export interface SocialPropagationStep {
+  platform: string;
+  first_at: string;
+  lag_minutes: number;
+  posts: number;
+  first_author: string | null;
+  first_url: string | null;
+}
+
+export interface SocialPropagation {
+  origin: string | null;
+  span_minutes: number | null;
+  steps: SocialPropagationStep[];
 }
 
 export type SocialHealthState =
@@ -1198,6 +1214,68 @@ export async function addSocialWatchedAccount(payload: { handle: string; label?:
 
 export async function deleteSocialWatchedAccount(id: number) {
   return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/watched-accounts/${id}`, { method: "DELETE" }), "Akun gagal dihapus");
+}
+
+export interface SocialSearchParams {
+  q: string;
+  platform: string;
+  category: string;
+  agency: string;
+  emotion: string;
+  sentimen: string;
+  author: string;
+  sort: string;
+}
+
+export interface SocialSearchItem {
+  id: number;
+  judul: string;
+  isi: string;
+  platform: string;
+  penulis: string | null;
+  penerbit: string | null;
+  url: string | null;
+  published_at: string;
+  sentimen: string;
+  lokasi: string | null;
+  kategori: string[];
+  instansi: string[];
+  emosi: string[];
+  geo_context: string;
+  engagement: { likes: number | null; shares: number | null; replies: number | null; views: number | null; interactions: number | null };
+}
+
+export interface SocialSearchResult {
+  period: SocialPeriod;
+  query: string;
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  items: SocialSearchItem[];
+}
+
+function searchQuery(p: SocialSearchParams & { time_range: string; scope_kode: string; scope_mode: string }): URLSearchParams {
+  const params = new URLSearchParams();
+  Object.entries(p).forEach(([k, v]) => {
+    if (v) params.append(k, String(v));
+  });
+  return params;
+}
+
+export async function searchSocialContent(
+  p: SocialSearchParams & { time_range: string; scope_kode: string; scope_mode: string },
+  page = 1,
+  pageSize = 25
+): Promise<SocialSearchResult> {
+  const params = searchQuery(p);
+  params.append("page", String(page));
+  params.append("page_size", String(pageSize));
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/search?${params.toString()}`, { cache: "no-store" }), "Pencarian gagal");
+}
+
+export function socialSearchExportUrl(p: SocialSearchParams & { time_range: string; scope_kode: string; scope_mode: string }): string {
+  return `${API_BASE_URL}/social-pulse/search/export?${searchQuery(p).toString()}`;
 }
 
 export async function escalateSocialSurges(timeRange: string = "6h"): Promise<SocialEscalationResult> {

@@ -5,6 +5,7 @@ serta kapabilitas Geographic Scope Intelligence (FR-GEO-01 s/d FR-GEO-09).
 
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,7 @@ from backend.app.services.social_pulse_service import (
 from backend.app.services.social_taxonomy import catalog as social_catalog
 from backend.app.services.social_notes import NOTE_STATUSES, add_note, list_notes
 from backend.app.services.social_accounts import add_account, get_account_activity, remove_account
+from backend.app.services.social_search import SEARCH_SORTS, export_social_content_csv, search_social_content
 from backend.app.services.social_alert_rules import (
     METRICS as ALERT_METRICS,
     WINDOWS as ALERT_WINDOWS,
@@ -400,6 +402,47 @@ def delete_watched_account(account_id: int, db: Session = Depends(get_db)) -> Di
     if not remove_account(db, account_id):
         raise HTTPException(status_code=404, detail="akun pantauan tidak ditemukan")
     return {"deleted": account_id}
+
+
+def _search_filters(
+    q: Optional[str] = Query(None, max_length=200, description='Kata kunci; frasa dalam tanda kutip, mis. "jalan rusak"'),
+    time_range: str = Depends(period_param),
+    scope_kode: str = Query("ID"),
+    scope_mode: str = Query("context"),
+    platform: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    agency: Optional[str] = Query(None),
+    emotion: Optional[str] = Query(None),
+    sentimen: Optional[str] = Query(None),
+    author: Optional[str] = Query(None, max_length=120),
+    sort: str = Query("terbaru", description="terbaru, terlama, jangkauan"),
+) -> Dict[str, Any]:
+    return {
+        "q": q, "time_range": time_range, "scope_kode": scope_kode, "scope_mode": scope_mode, "platform": platform,
+        "category": category, "agency": agency, "emotion": emotion, "sentimen": sentimen, "author": author,
+        "sort": sort if sort in SEARCH_SORTS else "terbaru",
+    }
+
+
+@router.get("/search")
+def search_content(
+    filters: Dict[str, Any] = Depends(_search_filters),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=5, le=100),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Cari konten medsos tersimpan dengan filter teks, periode, platform, kategori, instansi, emosi, sentimen, dan akun."""
+    return search_social_content(db, page=page, page_size=page_size, **filters)
+
+
+@router.get("/search/export")
+def export_search(filters: Dict[str, Any] = Depends(_search_filters), db: Session = Depends(get_db)) -> StreamingResponse:
+    """Unduh hasil pencarian sebagai CSV (maksimal 5.000 baris)."""
+    return StreamingResponse(
+        export_social_content_csv(db, **filters),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="social-pulse-konten.csv"'},
+    )
 
 
 @router.get("/brief")

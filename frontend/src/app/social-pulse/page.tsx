@@ -31,6 +31,7 @@ import {
 } from "@/lib/api";
 import { SocialHeatmap } from "@/components/SocialHeatmap";
 import { SocialWatchedAccounts } from "@/components/SocialWatchedAccounts";
+import { SocialContentSearch } from "@/components/SocialContentSearch";
 import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
@@ -44,7 +45,7 @@ import { GeographicComparisonTable } from "@/components/GeographicComparisonTabl
 import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
 import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
 
-type Tab = "tren" | "alert" | "instansi" | "akun" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type Tab = "tren" | "cari" | "alert" | "instansi" | "akun" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
 
@@ -99,12 +100,12 @@ function csvCell(value: unknown): string {
 function downloadTrendsCsv(trends: SocialTrendingTopic[], label: string) {
   const header = [
     "peringkat", "topik", "jenis", "konten", "status_laju", "skor_laju", "pertumbuhan_pct", "rasio_baseline",
-    "kategori", "instansi", "platform", "negatif_pct", "akun_unik", "isu_radar", "pertama_terdeteksi_utc", "terakhir_utc",
+    "kategori", "instansi", "platform", "platform_pertama", "negatif_pct", "akun_unik", "isu_radar", "pertama_terdeteksi_utc", "terakhir_utc",
   ];
   const rows = trends.map((t) => [
     t.rank, t.topic, t.topic_type, t.mention_count, t.velocity_status, t.velocity_score, t.growth_pct ?? "",
     t.velocity.baseline_windows ? t.velocity.ratio : "", t.categories.map((c) => c.label).join(" | "),
-    t.agencies.map((a) => a.label).join(" | "), t.platforms.join(" | "), t.sentiment_pct.negatif,
+    t.agencies.map((a) => a.label).join(" | "), t.platforms.join(" | "), t.propagation.origin ?? "", t.sentiment_pct.negatif,
     t.accounts.unique_accounts, t.correlated_issue?.kode_referensi ?? "", t.first_detected, t.last_seen,
   ]);
   const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
@@ -120,6 +121,17 @@ function downloadTrendsCsv(trends: SocialTrendingTopic[], label: string) {
 function growthText(value: number | null | undefined): string {
   if (value === null || value === undefined) return "Belum ada pembanding";
   return `${value >= 0 ? "+" : ""}${value}%`;
+}
+
+/** Selisih menit sebagai "+2 j 15 m", "+3 hr 4 j", atau "+40 m". */
+function lagText(minutes: number): string {
+  if (minutes < 60) return `+${minutes} m`;
+  if (minutes < 1440) {
+    const m = minutes % 60;
+    return `+${Math.floor(minutes / 60)} j${m ? ` ${m} m` : ""}`;
+  }
+  const h = Math.floor((minutes % 1440) / 60);
+  return `+${Math.floor(minutes / 1440)} hr${h ? ` ${h} j` : ""}`;
 }
 
 export default function SocialPulsePage() {
@@ -174,7 +186,7 @@ export default function SocialPulsePage() {
     if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
     if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
     const tab = q.get("tab");
-    if (tab && ["tren", "alert", "instansi", "akun", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    if (tab && ["tren", "cari", "alert", "instansi", "akun", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
     const wilayah = q.get("wilayah");
     if (wilayah) {
       setScopeKode(wilayah);
@@ -350,6 +362,7 @@ export default function SocialPulsePage() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "tren", label: `Topik Tren (${trends.length})` },
+    { id: "cari", label: "Cari Konten" },
     { id: "alert", label: unreadAlerts ? `Aturan Alert (${unreadAlerts} baru)` : "Aturan Alert" },
     { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
     { id: "akun", label: "Akun Pantauan" },
@@ -850,6 +863,8 @@ export default function SocialPulsePage() {
         />
       )}
 
+      {activeTab === "cari" && <SocialContentSearch timeRange={timeRange} scopeKode={scopeKode} scopeMode={scopeMode} facets={facets} />}
+
       {activeTab === "akun" && (
         <SocialWatchedAccounts timeRange={timeRange} scopeKode={scopeKode} scopeMode={scopeMode} multiCodes={multiParam} />
       )}
@@ -1104,6 +1119,45 @@ function TopicDetailModal({
             baselinePerBucket={topic.baseline_per_bucket}
             title={`Volume per interval${topic.peak_at ? `, puncak ${formatWib(topic.peak_at)} WIB` : ""}`}
           />
+
+          {/* Topik kategori menggabungkan banyak isu, jadi urutan platformnya tidak menggambarkan penyebaran. */}
+          {topic.propagation.steps.length > 1 && (topic.topic_type === "hashtag" || topic.topic_type === "frasa") && (
+            <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Jalur penyebaran</h4>
+              <ol className="mt-3 space-y-2.5">
+                {topic.propagation.steps.map((s, i) => (
+                  <li key={s.platform} className="flex items-start gap-3 text-xs">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-100 font-mono text-2xs font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">{s.platform}</span>
+                        <span className="font-mono text-zinc-600 dark:text-zinc-300">{formatWib(s.first_at)} WIB</span>
+                        <span className="font-mono text-zinc-500">{i === 0 ? "pertama" : lagText(s.lag_minutes)}</span>
+                      </div>
+                      <div className="truncate text-2xs text-zinc-500">
+                        {s.posts} konten
+                        {s.first_author && <>, pertama oleh {s.first_author}</>}
+                        {s.first_url && (
+                          <>
+                            {" "}
+                            <a href={s.first_url} target="_blank" rel="noopener noreferrer" className="text-sky-700 hover:underline dark:text-sky-300">
+                              buka
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-3 text-2xs text-zinc-500">
+                Urutan menurut waktu terbit konten pertama di tiap platform. Platform tanpa sumber aktif tidak tercatat, jadi topik ini bisa
+                saja sudah muncul lebih dulu di tempat lain.
+              </p>
+            </section>
+          )}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">

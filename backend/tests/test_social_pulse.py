@@ -876,3 +876,31 @@ def test_watched_account_activity_and_suggestions(db):
     assert tmc["latest_posts"][0]["judul"] == "Info lalin pagi ini lancar"
     suggested = [s["handle_norm"] for s in act["suggestions"]]
     assert "kulinerbogor" in suggested and "tmcpoldametro" not in suggested
+
+
+# ---------- pencarian & arsip ----------
+
+from backend.app.services.social_search import export_social_content_csv, search_social_content  # noqa: E402
+
+
+def test_search_filters_pagination_and_export(db):
+    now = datetime.utcnow()
+    _seed_mixed(db, now)
+    r = search_social_content(db, q="PLN", time_range="24h")
+    assert r["total"] == 3 and all("PLN" in i["judul"] for i in r["items"])
+    assert search_social_content(db, q='"PLN Depok"', time_range="24h")["total"] == 1
+    assert search_social_content(db, q="pln padam", time_range="24h")["total"] == 2  # semua kata harus ada
+    assert search_social_content(db, agency="damkar", time_range="24h")["total"] == 1
+    assert search_social_content(db, category="kuliner", sentimen="positif", time_range="24h")["total"] == 1
+    assert search_social_content(db, author="@u4", time_range="24h")["total"] == 1
+
+    p1 = search_social_content(db, time_range="24h", page=1, page_size=5)
+    p2 = search_social_content(db, time_range="24h", page=2, page_size=5)
+    assert p1["total"] == 6 and p1["pages"] == 2 and len(p1["items"]) == 5 and len(p2["items"]) == 1
+    assert p1["items"][0]["published_at"] > p1["items"][-1]["published_at"]  # terbaru dulu
+
+    csv_text = "".join(export_social_content_csv(
+        db, q="PLN", time_range="24h", scope_kode="ID", scope_mode="context", platform=None, category=None,
+        agency=None, emotion=None, sentimen=None, author=None, sort="terbaru"))
+    lines = csv_text.lstrip("﻿").strip().splitlines()
+    assert lines[0].startswith("waktu_utc,platform,akun") and len(lines) == 4
