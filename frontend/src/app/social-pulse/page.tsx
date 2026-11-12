@@ -32,6 +32,7 @@ import {
 import { SocialHeatmap } from "@/components/SocialHeatmap";
 import { SocialWatchedAccounts } from "@/components/SocialWatchedAccounts";
 import { SocialContentSearch } from "@/components/SocialContentSearch";
+import { SocialSpreadTrace } from "@/components/SocialSpreadTrace";
 import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
@@ -1032,6 +1033,9 @@ export default function SocialPulsePage() {
           topic={selectedTopic}
           scopeName={scopeName}
           windowLabel={windowLabel}
+          timeRange={timeRange}
+          scopeKode={scopeKode}
+          scopeMode={scopeMode}
           onClose={() => setSelectedTopic(null)}
           onNoteSaved={loadData}
         />
@@ -1044,12 +1048,18 @@ function TopicDetailModal({
   topic,
   scopeName,
   windowLabel,
+  timeRange,
+  scopeKode,
+  scopeMode,
   onClose,
   onNoteSaved,
 }: {
   topic: SocialTrendingTopic;
   scopeName: string;
   windowLabel: string;
+  timeRange: string;
+  scopeKode: string;
+  scopeMode: string;
   onClose: () => void;
   onNoteSaved: () => void;
 }) {
@@ -1208,6 +1218,8 @@ function TopicDetailModal({
               )}
             </section>
           </div>
+
+          <SocialSpreadTrace timeRange={timeRange} scopeKode={scopeKode} scopeMode={scopeMode} topicKey={topic.topic_key} />
 
           <SocialTopicNotes topicKey={topic.topic_key} topicLabel={topic.topic} onSaved={onNoteSaved} />
 

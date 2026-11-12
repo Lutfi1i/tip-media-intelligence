@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { SocialFacets, SocialSearchResult, searchSocialContent, socialSearchExportUrl, SocialSearchParams } from "@/lib/api";
 import { RealBrandIcon } from "@/components/SourceLogos";
 import { formatCompact, formatWib } from "@/components/SocialCharts";
+import { SocialSpreadTrace } from "@/components/SocialSpreadTrace";
 
 const PLATFORMS = ["", "X (Twitter)", "TikTok", "YouTube", "Threads", "Instagram", "Reddit", "Telegram"];
 const EMOTIONS: [string, string][] = [["marah", "Marah"], ["takut", "Takut"], ["sedih", "Sedih"], ["kecewa", "Kecewa"], ["senang", "Senang"], ["terkejut", "Terkejut"]];
@@ -123,6 +124,9 @@ export function SocialContentSearch({
       </form>
 
       {error && <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">{error}</p>}
+      {params.q.trim() && (
+        <SocialSpreadTrace timeRange={timeRange} scopeKode={scopeKode} scopeMode={scopeMode} q={params.q.trim()} />
+      )}
       {data && (
         <p className="text-xs text-zinc-500">
           {data.total.toLocaleString("id-ID")} konten ditemukan{loading ? ", memuat..." : ""}. Halaman {data.page} dari {data.pages}.

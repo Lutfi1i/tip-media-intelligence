@@ -30,6 +30,7 @@ from backend.app.services.social_taxonomy import catalog as social_catalog
 from backend.app.services.social_notes import NOTE_STATUSES, add_note, list_notes
 from backend.app.services.social_accounts import add_account, get_account_activity, remove_account
 from backend.app.services.social_search import SEARCH_SORTS, export_social_content_csv, search_social_content
+from backend.app.services.social_spread import get_spread_trace
 from backend.app.services.social_alert_rules import (
     METRICS as ALERT_METRICS,
     WINDOWS as ALERT_WINDOWS,
@@ -443,6 +444,22 @@ def export_search(filters: Dict[str, Any] = Depends(_search_filters), db: Sessio
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="social-pulse-konten.csv"'},
     )
+
+
+@router.get("/spread")
+def read_spread_trace(
+    time_range: str = Depends(period_param),
+    topic_key: Optional[str] = Query(None, max_length=255, description="Kunci topik dari tabel tren, mis. #banjirbekasi"),
+    q: Optional[str] = Query(None, max_length=200, description="Atau kata kunci bebas"),
+    scope_kode: str = Query("ID"),
+    scope_mode: str = Query("context"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Di mana topik/kata kunci pertama muncul (medsos atau berita) dan urutan kanal yang menyusul."""
+    try:
+        return get_spread_trace(db, time_range, topic_key, q, scope_kode, scope_mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/brief")

@@ -1278,6 +1278,61 @@ export function socialSearchExportUrl(p: SocialSearchParams & { time_range: stri
   return `${API_BASE_URL}/social-pulse/search/export?${searchQuery(p).toString()}`;
 }
 
+export interface SocialSpreadItem {
+  id: number;
+  judul: string;
+  channel: string;
+  group: "medsos" | "berita";
+  platform: string;
+  penulis: string | null;
+  penerbit: string | null;
+  url: string | null;
+  published_at: string;
+  sentimen: string;
+}
+
+export interface SocialSpreadTrace {
+  period: SocialPeriod;
+  topic_key: string | null;
+  query: string;
+  label: string;
+  total: number;
+  social_count: number;
+  news_count: number;
+  first: SocialSpreadItem | null;
+  first_social: SocialSpreadItem | null;
+  first_news: SocialSpreadItem | null;
+  origin: "medsos" | "berita" | null;
+  lag_minutes: number | null;
+  channels: {
+    channel: string;
+    group: "medsos" | "berita";
+    platform: string;
+    first_at: string;
+    first_title: string;
+    first_url: string | null;
+    count: number;
+    minutes_after_first: number;
+    accounts: number;
+  }[];
+  timeline: { medsos: SocialTimelineBucket[]; berita: SocialTimelineBucket[] };
+  early_items: SocialSpreadItem[];
+}
+
+export async function fetchSpreadTrace(p: {
+  time_range: string;
+  scope_kode: string;
+  scope_mode: string;
+  topic_key?: string;
+  q?: string;
+}): Promise<SocialSpreadTrace> {
+  const params = new URLSearchParams();
+  Object.entries(p).forEach(([k, v]) => {
+    if (v) params.append(k, String(v));
+  });
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/spread?${params.toString()}`, { cache: "no-store" }), "Gagal memuat jejak penyebaran");
+}
+
 export async function escalateSocialSurges(timeRange: string = "6h"): Promise<SocialEscalationResult> {
   const res = await fetch(`${API_BASE_URL}/social-pulse/escalate?time_range=${timeRange}`, { method: "POST" });
   if (!res.ok) throw new Error("Gagal mengeskalasi lonjakan media sosial");

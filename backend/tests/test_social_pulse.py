@@ -904,3 +904,42 @@ def test_search_filters_pagination_and_export(db):
         agency=None, emotion=None, sentimen=None, author=None, sort="terbaru"))
     lines = csv_text.lstrip("﻿").strip().splitlines()
     assert lines[0].startswith("waktu_utc,platform,akun") and len(lines) == 4
+
+
+# ---------- jejak penyebaran ----------
+
+from backend.app.services.social_spread import get_spread_trace  # noqa: E402
+
+
+def test_spread_trace_origin_and_channel_order(db):
+    now = datetime.utcnow()
+    src = Source(nama="s", jenis="media_sosial", url="https://x.com/s")
+    db.add(src)
+    db.flush()
+    rows = [  # (menit lalu, platform, penerbit, penulis, teks)
+        (300, "Telegram", "Telegram: Info", "@infowarga", "Tanggul jebol di Kemang #tanggulkemang"),
+        (280, "X (Twitter)", "X", "@warga1", "Air masuk rumah, tanggul jebol #tanggulkemang"),
+        (270, "X (Twitter)", "X", "@warga2", "Benar tanggul jebol #tanggulkemang"),
+        (240, "berita", "Kompas.com", None, "Tanggul Kemang jebol, warga mengungsi #tanggulkemang"),
+        (200, "TikTok", "TikTok", None, "Video tanggul jebol Kemang #tanggulkemang"),
+        (100, "X (Twitter)", "X", "@lain", "Topik lain sama sekali"),
+    ]
+    for i, (m, plat, pen, author, text) in enumerate(rows):
+        db.add(RawItem(source_id=src.id, url_kanonik=f"sp{i}", hash=f"sp{i}", judul=text, isi=text, penerbit=pen,
+                       penulis=author, platform=plat, published_at=now - timedelta(minutes=m), fetched_at=now))
+    db.commit()
+
+    tr = get_spread_trace(db, time_range="24h", topic_key="#tanggulkemang")
+    assert tr["total"] == 5 and tr["social_count"] == 4 and tr["news_count"] == 1
+    assert tr["origin"] == "medsos" and tr["first"]["channel"] == "Telegram"
+    assert tr["lag_minutes"] == 60  # berita menyusul 60 menit setelah postingan medsos pertama
+    assert [c["channel"] for c in tr["channels"]] == ["Telegram", "X (Twitter)", "Berita · Kompas.com", "TikTok"]
+    assert tr["channels"][1]["accounts"] == 2 and tr["channels"][2]["minutes_after_first"] == 60
+    assert sum(b["count"] for b in tr["timeline"]["medsos"]) == 4
+
+    by_q = get_spread_trace(db, time_range="24h", q="tanggul jebol")
+    assert by_q["total"] == 5
+    empty = get_spread_trace(db, time_range="24h", q="tidakadasamasekali")
+    assert empty["total"] == 0 and empty["origin"] is None
+    with pytest.raises(ValueError):
+        get_spread_trace(db, time_range="24h")
