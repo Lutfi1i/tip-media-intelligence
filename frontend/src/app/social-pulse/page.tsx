@@ -10,6 +10,7 @@ import {
   fetchSocialWatchlist,
   fetchSocialFacets,
   fetchAgencyBoard,
+  fetchSocialBrief,
   escalateSocialSurges,
   pollSources,
   SocialPulseOverview,
@@ -21,9 +22,12 @@ import {
   SocialFacets,
   SocialAgencyBoard as AgencyBoardData,
   SocialSort,
+  SocialBrief,
 } from "@/lib/api";
 import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
+import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
+import { SocialBriefCard } from "@/components/SocialBriefCard";
 import { MediaAvatarStack, RealBrandIcon } from "@/components/SourceLogos";
 import { GeographicScopeSelector } from "@/components/GeographicScopeSelector";
 import { GeographicComparisonTable } from "@/components/GeographicComparisonTable";
@@ -33,12 +37,6 @@ import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } fr
 type Tab = "tren" | "instansi" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
-const TIME_RANGES = [
-  { label: "1 Jam", value: "1h", window: "1 jam" },
-  { label: "6 Jam", value: "6h", window: "6 jam" },
-  { label: "24 Jam", value: "24h", window: "24 jam" },
-  { label: "7 Hari", value: "7d", window: "7 hari" },
-];
 
 const PLATFORM_FILTERS = ["Semua", "X (Twitter)", "TikTok", "YouTube", "Threads", "Instagram", "Reddit", "Telegram"];
 
@@ -122,6 +120,7 @@ export default function SocialPulsePage() {
   const [sort, setSort] = useState<SocialSort>("laju");
   const [facets, setFacets] = useState<SocialFacets | null>(null);
   const [agencyBoard, setAgencyBoard] = useState<AgencyBoardData | null>(null);
+  const [brief, setBrief] = useState<SocialBrief | null>(null);
 
   const [scopeKode, setScopeKode] = useState<string>("ID");
   const [scopeName, setScopeName] = useState<string>("Seluruh Indonesia");
@@ -144,12 +143,34 @@ export default function SocialPulsePage() {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("tren");
 
+  const [ready, setReady] = useState(false);
+
+  // Filter dibaca dari URL sekali saat halaman dibuka, agar tampilan bisa dibagikan lewat tautan.
   useEffect(() => {
     setExtraTerms(readStoredTerms());
+    const q = new URLSearchParams(window.location.search);
+    const periode = q.get("periode");
+    if (periode) setTimeRange(periode);
+    if (q.get("kategori")) setCategory(q.get("kategori") as string);
+    if (q.get("instansi")) setAgency(q.get("instansi") as string);
+    const urut = q.get("urut");
+    if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
+    if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
+    const tab = q.get("tab");
+    if (tab && ["tren", "instansi", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    const wilayah = q.get("wilayah");
+    if (wilayah) {
+      setScopeKode(wilayah);
+      setScopeName(q.get("nama") || wilayah);
+      const mode = q.get("mode");
+      if (mode === "context" || mode === "strict" || mode === "regional") setScopeMode(mode);
+    }
+    setReady(true);
   }, []);
 
   const multiParam = multiCodes.length > 0 ? multiCodes.join(",") : undefined;
-  const windowLabel = TIME_RANGES.find((t) => t.value === timeRange)?.window ?? timeRange;
+  // Label periode dari backend ("24 jam terakhir", "2026-11-01 s.d. 2026-11-03").
+  const windowLabel = overview?.period.label ?? "";
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -157,7 +178,7 @@ export default function SocialPulsePage() {
     try {
       const filters = { category: category || undefined, agency: agency || undefined };
       const plat = selectedPlatform === "Semua" ? undefined : selectedPlatform;
-      const [ovData, trData, pfData, crData, wlData, fcData, agData] = await Promise.all([
+      const [ovData, trData, pfData, crData, wlData, fcData, agData, brData] = await Promise.all([
         fetchSocialPulseOverview(timeRange, scopeKode, scopeMode, multiParam, filters),
         fetchSocialTrends(plat, timeRange, 30, scopeKode, scopeMode, multiParam, filters, sort),
         fetchSocialPlatforms(scopeKode, scopeMode, multiParam, timeRange),
@@ -165,7 +186,9 @@ export default function SocialPulsePage() {
         fetchSocialWatchlist(timeRange, scopeKode, scopeMode, multiParam, extraTerms, filters),
         fetchSocialFacets(timeRange, scopeKode, scopeMode, multiParam, plat, filters),
         fetchAgencyBoard(timeRange, scopeKode, scopeMode, multiParam, category || undefined),
+        fetchSocialBrief(timeRange, scopeKode, scopeMode, multiParam, filters),
       ]);
+      setBrief(brData);
       setFacets(fcData);
       setAgencyBoard(agData);
       setOverview(ovData);
@@ -183,8 +206,26 @@ export default function SocialPulsePage() {
   }, [timeRange, selectedPlatform, scopeKode, scopeMode, multiParam, extraTerms, category, agency, sort]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (ready) loadData();
+  }, [loadData, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const q = new URLSearchParams();
+    if (timeRange !== "24h") q.set("periode", timeRange);
+    if (category) q.set("kategori", category);
+    if (agency) q.set("instansi", agency);
+    if (sort !== "laju") q.set("urut", sort);
+    if (selectedPlatform !== "Semua") q.set("kanal", selectedPlatform);
+    if (activeTab !== "tren") q.set("tab", activeTab);
+    if (scopeKode !== "ID") {
+      q.set("wilayah", scopeKode);
+      q.set("nama", scopeName);
+      q.set("mode", scopeMode);
+    }
+    const qs = q.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, [ready, timeRange, category, agency, sort, selectedPlatform, activeTab, scopeKode, scopeName, scopeMode]);
 
   const handleApplyScope = (newKode: string, newName: string, newMode: ScopeMode, newMultiList?: string[]) => {
     setScopeKode(newKode);
@@ -221,7 +262,8 @@ export default function SocialPulsePage() {
   };
 
   const handleEscalate = async () => {
-    const range = timeRange === "7d" ? "24h" : timeRange;
+    // Eskalasi hanya untuk jendela terkini; periode panjang atau kustom memakai 24 jam terakhir.
+    const range = ["1h", "6h", "24h"].includes(timeRange) ? timeRange : "24h";
     setIsEscalating(true);
     setActionMessage(null);
     try {
@@ -304,20 +346,6 @@ export default function SocialPulsePage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex rounded-xl bg-zinc-800/80 p-1 ring-1 ring-white/10" role="group" aria-label="Rentang waktu">
-              {TIME_RANGES.map((t) => (
-                <button
-                  key={t.value}
-                  onClick={() => setTimeRange(t.value)}
-                  aria-pressed={timeRange === t.value}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                    timeRange === t.value ? "bg-fuchsia-600 text-white shadow-xs" : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
             <button
               onClick={handleManualPoll}
               disabled={isRefreshing}
@@ -331,7 +359,11 @@ export default function SocialPulsePage() {
           </div>
         </div>
 
-        <div className="relative z-10 mt-6 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+        <div className="relative z-10 mt-5">
+          <SocialPeriodPicker value={timeRange} onChange={setTimeRange} />
+        </div>
+
+        <div className="relative z-10 mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
           <span className="mr-2 text-xs font-medium text-zinc-400">Filter kanal (tabel tren):</span>
           {PLATFORM_FILTERS.map((plat) => {
             const isSel = selectedPlatform === plat;
@@ -391,17 +423,20 @@ export default function SocialPulsePage() {
 
       {baselineIncomplete && (
         <div className="rounded-xl border border-violet-300/60 bg-violet-50 px-4 py-3 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200">
-          <strong>Baseline masih dibangun:</strong> {baseline.windows_available} dari {baseline.windows_target} periode {windowLabel} sebelumnya
+          <strong>Baseline masih dibangun:</strong> {baseline.windows_available} dari {baseline.windows_target} periode pembanding sebelumnya
           sudah punya data
           {baseline.coverage_since ? ` (pengumpulan medsos sejak ${formatWib(baseline.coverage_since)} WIB)` : ""}. Topik tanpa pembanding
           berstatus BARU dan belum dieskalasi otomatis. Hasil akan makin akurat setelah penarikan berkala berjalan beberapa periode.
         </div>
       )}
 
+      <SocialBriefCard brief={brief} isLoading={isLoading} />
+
       {/* KPI */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Percakapan {windowLabel}</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Percakapan</div>
+          <div className="text-2xs text-zinc-500">{windowLabel}</div>
           <div className="mt-3 text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
             {isLoading && !overview ? "..." : (overview?.total_mentions ?? 0).toLocaleString("id-ID")}
           </div>
@@ -486,7 +521,7 @@ export default function SocialPulsePage() {
 
       {overview && overview.timeline.length > 0 && (
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <VolumeTimeline data={overview.timeline} baselinePerBucket={null} title={`Volume percakapan medsos, ${windowLabel} terakhir (WIB)`} />
+          <VolumeTimeline data={overview.timeline} baselinePerBucket={null} title={`Volume percakapan medsos, ${windowLabel} (WIB)`} />
           {healthSummary.bermasalah.length > 0 && (
             <p className="mt-3 text-2xs text-amber-700 dark:text-amber-400">
               Perhatian: {healthSummary.bermasalah.map((p) => `${p.name} (${HEALTH_LABEL[p.health_state].toLowerCase()})`).join(", ")}. Volume dari kanal
@@ -575,7 +610,7 @@ export default function SocialPulsePage() {
                   ) : trends.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-4 py-12 text-center text-sm text-zinc-500">
-                        Tidak ada percakapan medsos untuk {scopeName} dalam {windowLabel} terakhir
+                        Tidak ada percakapan medsos untuk {scopeName} pada periode {windowLabel}
                         {category || agency ? " dengan filter kategori atau instansi ini" : ""}. Coba rentang waktu lebih panjang, hapus
                         filter, atau tarik data baru.
                       </td>
@@ -741,7 +776,7 @@ export default function SocialPulsePage() {
           <div>
             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Status Konektor Platform</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Status diambil dari hasil tarikan terakhir setiap sumber. Volume dihitung untuk {scopeName}, {windowLabel} terakhir.
+              Status diambil dari hasil tarikan terakhir setiap sumber. Volume dihitung untuk {scopeName}, {windowLabel}.
             </p>
           </div>
 
@@ -905,7 +940,7 @@ function TopicDetailModal({
             <div className="flex flex-wrap items-center gap-2">
               <VelocityBadge status={topic.velocity_status} />
               <span className="text-xs text-zinc-500">
-                {topic.mention_count} konten di {scopeName}, {windowLabel} terakhir
+                {topic.mention_count} konten di {scopeName}, {windowLabel}
               </span>
             </div>
             <h3 id="topic-detail-title" className="text-xl font-bold text-zinc-900 dark:text-zinc-100">

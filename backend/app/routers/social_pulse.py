@@ -17,7 +17,10 @@ from backend.app.services.social_pulse_service import (
     get_social_watchlist,
     get_social_facets,
     get_agency_board,
+    get_social_brief,
     SORT_OPTIONS,
+    custom_period_key,
+    resolve_period,
 )
 from backend.app.services.social_taxonomy import catalog as social_catalog
 from backend.app.services.social_escalation import escalate_social_surges
@@ -30,6 +33,20 @@ from backend.app.services.geo_hierarchy import (
 )
 
 router = APIRouter(prefix="/social-pulse", tags=["Social Pulse"])
+
+
+def period_param(
+    time_range: str = Query("24h", description="Preset: 1h, 6h, 24h, 7d, 30d. Diabaikan bila start diisi."),
+    start: Optional[str] = Query(None, description="Tanggal mulai WIB (YYYY-MM-DD) untuk periode kustom"),
+    end: Optional[str] = Query(None, description="Tanggal akhir WIB (YYYY-MM-DD), ikut dihitung. Default = start"),
+) -> str:
+    """Satukan preset atau rentang tanggal kustom menjadi kunci periode yang dipahami service."""
+    key = custom_period_key(start, end or start) if start else time_range
+    try:
+        resolve_period(key)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return key
 
 @router.get("/geo/hierarchy")
 def get_geographic_hierarchy() -> Dict[str, Any]:
@@ -53,7 +70,7 @@ def search_geo_locations(
 
 @router.get("/overview")
 def read_social_pulse_overview(
-    time_range: str = Query("24h", description="Rentang waktu: 1h, 6h, 24h, 7d"),
+    time_range: str = Depends(period_param),
     scope_kode: str = Query("ID", description="Kode wilayah Kemendagri (contoh: 32.01.01 untuk Cibinong, ID untuk Nasional)"),
     scope_mode: str = Query("context", description="Mode filter: context (Wilayah+Konteks), strict (Lokasi Ketat), regional (Konteks Regional)"),
     multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma (contoh: 32.01.01,32.01.02)"),
@@ -77,7 +94,7 @@ def read_social_pulse_overview(
 @router.get("/trends")
 def read_social_trends(
     platform: Optional[str] = Query(None, description="Filter platform: Threads, X (Twitter), TikTok, YouTube, atau Semua"),
-    time_range: str = Query("24h", description="Rentang waktu: 1h, 6h, 24h, 7d"),
+    time_range: str = Depends(period_param),
     scope_kode: str = Query("ID", description="Kode wilayah Kemendagri (contoh: 32.01.01)"),
     scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
     multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
@@ -105,7 +122,7 @@ def read_social_trends(
 
 @router.get("/platforms")
 def read_platform_metrics(
-    time_range: str = Query("7d", description="Rentang waktu metrik volume: 1h, 6h, 24h, 7d"),
+    time_range: str = Depends(period_param),
     scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
     scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
     multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
@@ -124,7 +141,7 @@ def read_platform_metrics(
 
 @router.get("/watchlist")
 def read_social_watchlist(
-    time_range: str = Query("24h", description="Rentang waktu: 1h, 6h, 24h, 7d"),
+    time_range: str = Depends(period_param),
     scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
     scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
     multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
@@ -148,6 +165,21 @@ def read_social_watchlist(
     )
 
 
+@router.get("/brief")
+def read_social_brief(
+    time_range: str = Depends(period_param),
+    scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
+    scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
+    multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
+    category: Optional[str] = Query(None, description="Filter kategori"),
+    agency: Optional[str] = Query(None, description="Filter instansi"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Ringkasan situasi beberapa kalimat untuk pimpinan, dihitung dari data periode dan filter aktif."""
+    codes_list = [c.strip() for c in multi_codes.split(",")] if multi_codes else None
+    return get_social_brief(db, time_range, scope_kode, scope_mode, codes_list, category, agency)
+
+
 @router.get("/taxonomy")
 def read_social_taxonomy() -> Dict[str, Any]:
     """Daftar kategori dan instansi yang dikenali beserta id-nya untuk filter."""
@@ -156,7 +188,7 @@ def read_social_taxonomy() -> Dict[str, Any]:
 
 @router.get("/facets")
 def read_social_facets(
-    time_range: str = Query("24h", description="Rentang waktu: 1h, 6h, 24h, 7d"),
+    time_range: str = Depends(period_param),
     scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
     scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
     multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
@@ -172,7 +204,7 @@ def read_social_facets(
 
 @router.get("/agencies")
 def read_agency_board(
-    time_range: str = Query("24h", description="Rentang waktu: 1h, 6h, 24h, 7d"),
+    time_range: str = Depends(period_param),
     scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
     scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
     multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
@@ -215,7 +247,7 @@ def read_social_correlations(
 @router.get("/comparison")
 def read_geographic_comparison(
     codes: str = Query("32.01.01,32.01.02,32.01.03", description="Daftar kode wilayah dipisah koma (contoh: Cibinong, Bojonggede, Citeureup)"),
-    time_range: str = Query("24h", description="Rentang waktu: 1h, 6h, 24h, 7d"),
+    time_range: str = Depends(period_param),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Membandingkan indikator intelijen sosial antarwilayah (FR-GEO-06)."""

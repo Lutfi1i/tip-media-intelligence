@@ -9,6 +9,7 @@ disediakan sumber, atau baseline belum ada), nilainya dikembalikan sebagai null,
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -50,9 +51,83 @@ from backend.app.services.social_topics import (
 )
 
 # Panjang jendela (jam), jumlah jendela riwayat untuk baseline, dan pembagian timeline.
-WINDOW_HOURS = {"1h": 1, "6h": 6, "24h": 24, "7d": 168}
-BASELINE_WINDOWS = {"1h": 24, "6h": 28, "24h": 14, "7d": 4}
-TIMELINE_BUCKETS = {"1h": (12, 5), "6h": (12, 30), "24h": (24, 60), "7d": (28, 360)}
+WINDOW_HOURS = {"1h": 1, "6h": 6, "24h": 24, "7d": 168, "30d": 720}
+BASELINE_WINDOWS = {"1h": 24, "6h": 28, "24h": 14, "7d": 4, "30d": 3}
+TIMELINE_BUCKETS = {"1h": (12, 5), "6h": (12, 30), "24h": (24, 60), "7d": (28, 360), "30d": (30, 1440)}
+PRESET_LABELS = {"1h": "1 jam terakhir", "6h": "6 jam terakhir", "24h": "24 jam terakhir", "7d": "7 hari terakhir", "30d": "30 hari terakhir"}
+
+# Periode kustom: "custom:YYYY-MM-DD:YYYY-MM-DD" dalam tanggal WIB, tanggal akhir ikut dihitung.
+WIB = timedelta(hours=7)
+MAX_CUSTOM_DAYS = 92
+BASELINE_SPAN = timedelta(days=28)
+
+
+@dataclass(frozen=True)
+class Period:
+    key: str
+    start: datetime  # UTC naif
+    end: datetime  # UTC naif, eksklusif
+    n_windows: int
+    bucket_minutes: int
+    label: str
+
+    @property
+    def span(self) -> timedelta:
+        return self.end - self.start
+
+    @property
+    def n_buckets(self) -> int:
+        return max(1, math.ceil(self.span / timedelta(minutes=self.bucket_minutes)))
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"key": self.key, "start": self.start.isoformat(), "end": self.end.isoformat(), "label": self.label}
+
+
+def _auto_bucket_minutes(span: timedelta) -> int:
+    if span <= timedelta(hours=2):
+        return 5
+    if span <= timedelta(hours=12):
+        return 30
+    if span <= timedelta(days=3):
+        return 60
+    if span <= timedelta(days=14):
+        return 360
+    return 1440
+
+
+def custom_period_key(start: str, end: str) -> str:
+    return f"custom:{start}:{end}"
+
+
+def resolve_period(time_range: str, now: Optional[datetime] = None) -> Period:
+    """Terjemahkan preset ("24h") atau "custom:2026-11-01:2026-11-10" menjadi Period. ValueError bila tidak valid."""
+    now = now or datetime.utcnow()
+    if time_range in WINDOW_HOURS:
+        window = timedelta(hours=WINDOW_HOURS[time_range])
+        n_buckets, minutes = TIMELINE_BUCKETS[time_range]
+        return Period(time_range, now - window, now, BASELINE_WINDOWS[time_range], minutes, PRESET_LABELS[time_range])
+
+    if not time_range.startswith("custom:"):
+        raise ValueError(f"rentang waktu tidak dikenal: {time_range}")
+    try:
+        _, start_s, end_s = time_range.split(":")
+        start_d = datetime.strptime(start_s, "%Y-%m-%d")
+        end_d = datetime.strptime(end_s, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError("format periode harus custom:YYYY-MM-DD:YYYY-MM-DD")
+    if end_d < start_d:
+        raise ValueError("tanggal akhir lebih awal dari tanggal mulai")
+    if (end_d - start_d).days + 1 > MAX_CUSTOM_DAYS:
+        raise ValueError(f"periode maksimal {MAX_CUSTOM_DAYS} hari")
+
+    start = start_d - WIB  # 00:00 WIB
+    end = min(end_d + timedelta(days=1) - WIB, now)  # akhir hari WIB, dipotong di waktu sekarang
+    if end <= start:
+        raise ValueError("periode berada di masa depan")
+    span = end - start
+    n_windows = max(2, min(14, int(BASELINE_SPAN / span)))
+    label = start_s if start_s == end_s else f"{start_s} s.d. {end_s}"
+    return Period(time_range, start, end, n_windows, _auto_bucket_minutes(span), label)
 
 # Volume minimum agar sebuah topik bisa berstatus lonjakan. Di bawah ini statusnya SINYAL LEMAH.
 MIN_SURGE_VOLUME = 3
@@ -88,8 +163,9 @@ _SITE_RE = re.compile(r"site:([a-z0-9.\-]+)", re.IGNORECASE)
 @dataclass
 class _Dataset:
     now: datetime
+    period: Period
     window_start: datetime
-    window_hours: int
+    window_end: datetime
     current: List[SocialPost]
     history: List[SocialPost]
     covered_windows: List[int]  # indeks jendela riwayat yang sudah tercakup data (0 = jendela tepat sebelumnya)
@@ -200,17 +276,21 @@ def _load_dataset(
     Filter kategori/instansi diterapkan ke jendela aktif dan riwayat sekaligus, sehingga
     baseline sebuah topik dihitung dari himpunan konten yang sama.
     """
-    hours = WINDOW_HOURS.get(time_range, 24)
-    n_windows = BASELINE_WINDOWS.get(time_range, 14)
     now = datetime.utcnow()
-    window = timedelta(hours=hours)
-    window_start = now - window
+    period = resolve_period(time_range, now)
+    n_windows = period.n_windows
+    window = period.span
+    window_start, window_end = period.start, period.end
     history_start = window_start - window * n_windows
 
     rows: List[Tuple[RawItem, Optional[ItemAnalysis]]] = (
         db.query(RawItem, ItemAnalysis)
         .outerjoin(ItemAnalysis, ItemAnalysis.item_id == RawItem.id)
-        .filter(RawItem.platform.in_(SOCIAL_PLATFORMS), RawItem.published_at >= history_start)
+        .filter(
+            RawItem.platform.in_(SOCIAL_PLATFORMS),
+            RawItem.published_at >= history_start,
+            RawItem.published_at < window_end,
+        )
         .order_by(RawItem.published_at.desc())
         .all()
     )
@@ -292,8 +372,9 @@ def _load_dataset(
 
     return _Dataset(
         now=now,
+        period=period,
         window_start=window_start,
-        window_hours=hours,
+        window_end=window_end,
         current=current,
         history=history,
         covered_windows=covered,
@@ -317,10 +398,11 @@ def _history_counts(ds: _Dataset, matcher) -> List[int]:
     return [counts.get(i, 0) for i in ds.covered_windows]
 
 
-def _timeline(ds: _Dataset, posts: Sequence[SocialPost], time_range: str) -> List[Dict[str, Any]]:
-    n_buckets, minutes = TIMELINE_BUCKETS.get(time_range, (24, 60))
-    size = timedelta(minutes=minutes)
-    start = ds.now - size * n_buckets
+def _timeline(ds: _Dataset, posts: Sequence[SocialPost], time_range: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Jumlah konten per interval dalam jendela aktif. Interval mengikuti panjang periode."""
+    n_buckets = ds.period.n_buckets
+    size = timedelta(minutes=ds.period.bucket_minutes)
+    start = ds.window_end - size * n_buckets
     counts = [0] * n_buckets
     for p in posts:
         idx = int((p.published_at - start) / size)
@@ -514,6 +596,7 @@ def get_social_pulse_overview(
 
     return {
         "time_range": time_range,
+        "period": ds.period.as_dict(),
         "scope_kode": scope_kode,
         "scope_name": _scope_display_name(scope_kode),
         "scope_mode": scope_mode,
@@ -535,7 +618,7 @@ def get_social_pulse_overview(
         "timeline": _timeline(ds, posts, time_range),
         "baseline": {
             "windows_available": len(ds.covered_windows),
-            "windows_target": BASELINE_WINDOWS.get(time_range, 14),
+            "windows_target": ds.period.n_windows,
             "coverage_since": ds.coverage_since.isoformat() if ds.coverage_since else None,
             "min_surge_volume": MIN_SURGE_VOLUME,
         },
@@ -897,3 +980,87 @@ def get_agency_board(
         "posts_mentioning_agency": sum(1 for p in ds.current if p.agencies),
         "agencies": rows,
     }
+
+
+def _fmt_int(n: Optional[int]) -> str:
+    return "-" if n is None else f"{n:,}".replace(",", ".")
+
+
+def get_social_brief(
+    db: Session,
+    time_range: str = "24h",
+    scope_kode: str = "ID",
+    scope_mode: str = "context",
+    multi_codes: Optional[List[str]] = None,
+    category: Optional[str] = None,
+    agency: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Ringkasan situasi dalam beberapa kalimat, disusun dari angka yang sama dengan dashboard (tanpa LLM)."""
+    ds = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, None, category, agency)
+    trends = _build_trends(db, ds, time_range)
+    posts = ds.current
+    scope_name = _scope_display_name(scope_kode)
+    points: List[Dict[str, Any]] = []
+
+    filters = [category_label(category) if category else None, agency_label(agency) if agency else None]
+    filter_txt = f" (filter: {', '.join(f for f in filters if f)})" if any(filters) else ""
+    title = f"Ringkasan Social Pulse {scope_name}, {ds.period.label}{filter_txt}"
+
+    if not posts:
+        points.append({"kind": "volume", "text": "Belum ada percakapan medsos yang tercatat untuk periode dan filter ini."})
+        return {"title": title, "period": ds.period.as_dict(), "points": points, "generated_at": ds.now.isoformat()}
+
+    neg = sum(1 for p in posts if p.sentiment == "negatif")
+    prev = sum(1 for p in ds.history if ds.history_window_index[p.id] == 0) if 0 in ds.covered_windows else None
+    growth = f", {'naik' if len(posts) >= prev else 'turun'} dari {prev} pada periode sebelumnya" if prev else ""
+    platforms = Counter(p.platform for p in posts).most_common(3)
+    points.append({
+        "kind": "volume",
+        "text": (
+            f"{_fmt_int(len(posts))} konten medsos{growth}. "
+            f"{round(neg / len(posts) * 100)}% bernada negatif. "
+            f"Kanal terbanyak: {', '.join(f'{n} ({c})' for n, c in platforms)}."
+        ),
+    })
+
+    rising = [t for t in trends if t["velocity_status"] in ("LONJAKAN TINGGI", "MENINGKAT")][:3]
+    if rising:
+        parts = [f"{t['topic']} ({t['mention_count']} konten, {t['velocity']['ratio']}x baseline)" for t in rising]
+        points.append({"kind": "lonjakan", "text": "Topik yang naik: " + "; ".join(parts) + "."})
+    elif trends:
+        top = sorted(trends, key=lambda t: -t["mention_count"])[:3]
+        note = " Belum ada pembanding periode sebelumnya, jadi laju belum bisa dinilai." if not ds.covered_windows else ""
+        points.append({
+            "kind": "topik",
+            "text": "Topik terbanyak: " + "; ".join(f"{t['topic']} ({t['mention_count']} konten)" for t in top) + "." + note,
+        })
+
+    ag_neg = Counter(a for p in posts if p.sentiment == "negatif" for a in p.agencies)
+    if ag_neg:
+        parts = [f"{agency_label(a)} ({n} konten negatif)" for a, n in ag_neg.most_common(3)]
+        points.append({"kind": "instansi", "text": "Instansi yang paling banyak dikeluhkan: " + "; ".join(parts) + "."})
+
+    reach = [p for p in posts if (p.views or 0) > 0 or (p.interactions or 0) > 0]
+    if reach:
+        best = max(reach, key=lambda p: ((p.views or 0), (p.interactions or 0)))
+        metric = f"{_fmt_int(best.views)} tayangan" if best.views else f"{_fmt_int(best.interactions)} interaksi"
+        points.append({
+            "kind": "jangkauan",
+            "text": f"Jangkauan tertinggi: \"{best.title[:120]}\" oleh {best.author or best.platform} ({metric}).",
+            "url": best.url,
+        })
+
+    flagged = [t for t in trends if t["coordination"]["flagged"]]
+    if flagged:
+        points.append({
+            "kind": "koordinasi",
+            "text": f"Teks kembar dari banyak akun terdeteksi pada {len(flagged)} topik ({', '.join(t['topic'] for t in flagged[:3])}). Perlu dicek sumbernya.",
+        })
+
+    if len(ds.covered_windows) < ds.period.n_windows:
+        points.append({
+            "kind": "catatan",
+            "text": f"Catatan: baseline baru {len(ds.covered_windows)} dari {ds.period.n_windows} periode pembanding, penilaian laju belum penuh.",
+        })
+
+    return {"title": title, "period": ds.period.as_dict(), "points": points, "generated_at": ds.now.isoformat()}

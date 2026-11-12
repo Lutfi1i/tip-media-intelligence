@@ -8,6 +8,12 @@ module.exports = {
   ],
   theme: {
     extend: {
+      // Dipakai luas di komponen (text-2xs / text-3xs) tetapi sebelumnya tidak terdefinisi,
+      // sehingga teks jatuh ke ukuran induknya.
+      fontSize: {
+        "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+        "3xs": ["0.625rem", { lineHeight: "0.875rem" }],
+      },
       fontFamily: {
         sans: ["'Plus Jakarta Sans'", "sans-serif"],
         mono: ["'Plus Jakarta Sans'", "sans-serif"],

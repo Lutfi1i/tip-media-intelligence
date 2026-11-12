@@ -457,3 +457,76 @@ def test_engagement_summary_views_only_is_not_zero_interactions():
     summary = engagement_summary(posts)
     assert summary["views"] == 150
     assert summary["interactions"] is None and summary["likes"] is None
+
+
+# ---------- periode tanggal & ringkasan ----------
+
+from backend.app.services.social_pulse_service import get_social_brief, resolve_period  # noqa: E402
+
+
+def test_resolve_period_presets_and_custom_wib():
+    now = datetime(2026, 11, 12, 10, 0)  # 17:00 WIB
+    p = resolve_period("30d", now)
+    assert p.span == timedelta(days=30) and p.n_buckets == 30 and p.n_windows == 3
+
+    c = resolve_period("custom:2026-11-01:2026-11-03", now)
+    assert c.start == datetime(2026, 10, 31, 17, 0)  # 1 Nov 00:00 WIB
+    assert c.end == datetime(2026, 11, 3, 17, 0)  # akhir 3 Nov WIB, tanggal akhir ikut dihitung
+    assert c.bucket_minutes == 60 and c.n_buckets == 72
+    assert c.label == "2026-11-01 s.d. 2026-11-03"
+
+    today = resolve_period("custom:2026-11-12:2026-11-12", now)
+    assert today.end == now  # dipotong di waktu sekarang
+
+
+@pytest.mark.parametrize(
+    "key, msg",
+    [
+        ("custom:2026-11-05:2026-11-01", "lebih awal"),
+        ("custom:2026-01-01:2026-11-01", "maksimal"),
+        ("custom:2026-12-01:2026-12-02", "masa depan"),
+        ("custom:kemarin:hari-ini", "format"),
+        ("90m", "tidak dikenal"),
+    ],
+)
+def test_resolve_period_rejects_invalid(key, msg):
+    with pytest.raises(ValueError, match=msg):
+        resolve_period(key, datetime(2026, 11, 12, 10, 0))
+
+
+def test_custom_period_filters_window_and_uses_previous_windows_as_baseline(db):
+    now = datetime.utcnow()
+    src = Source(nama="s", jenis="media_sosial", url="https://x.com/s")
+    db.add(src)
+    db.flush()
+    day = (now + timedelta(hours=7)).date() - timedelta(days=3)  # tanggal WIB 3 hari lalu
+    day_start_utc = datetime(day.year, day.month, day.day) - timedelta(hours=7)
+    rows = [
+        (day_start_utc + timedelta(hours=2), "#banjirbekasi di dalam periode"),
+        (day_start_utc + timedelta(hours=5), "#banjirbekasi di dalam periode juga"),
+        (day_start_utc + timedelta(hours=30), "#banjirbekasi sesudah periode"),
+        (day_start_utc - timedelta(hours=10), "#banjirbekasi sehari sebelumnya"),
+    ]
+    for i, (ts, text) in enumerate(rows):
+        db.add(RawItem(source_id=src.id, url_kanonik=f"p{i}", hash=f"p{i}", judul=text, isi=text, published_at=ts,
+                       fetched_at=day_start_utc - timedelta(days=10), platform="X (Twitter)"))
+    db.commit()
+
+    key = f"custom:{day.isoformat()}:{day.isoformat()}"
+    ov = get_social_pulse_overview(db, time_range=key)
+    assert ov["total_mentions"] == 2
+    assert ov["previous_mentions"] == 1
+    assert ov["period"]["key"] == key
+    assert len(ov["timeline"]) == 24  # interval 1 jam untuk periode 1 hari
+
+
+def test_brief_summarizes_volume_agencies_and_caveats(db):
+    now = datetime.utcnow()
+    _seed_mixed(db, now)
+    brief = get_social_brief(db, time_range="24h")
+    kinds = [p["kind"] for p in brief["points"]]
+    assert kinds[0] == "volume" and "6 konten" in brief["points"][0]["text"]
+    assert "instansi" in kinds
+    assert "PLN (2 konten negatif)" in next(p["text"] for p in brief["points"] if p["kind"] == "instansi")
+    empty = get_social_brief(db, time_range="24h", category="olahraga")
+    assert "Belum ada" in empty["points"][0]["text"]

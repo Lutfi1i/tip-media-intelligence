@@ -456,8 +456,23 @@ export interface SocialVelocity {
   baseline_windows: number;
 }
 
+export interface SocialPeriod {
+  key: string;
+  start: string;
+  end: string;
+  label: string;
+}
+
+export interface SocialBrief {
+  title: string;
+  period: SocialPeriod;
+  points: { kind: string; text: string; url?: string | null }[];
+  generated_at: string;
+}
+
 export interface SocialPulseOverview {
   time_range: string;
+  period: SocialPeriod;
   scope_kode: string;
   scope_name: string;
   scope_mode: "context" | "strict" | "regional";
@@ -891,6 +906,21 @@ export async function fetchAgencyBoard(
   if (category) params.append("category", category);
   const res = await fetch(`${API_BASE_URL}/social-pulse/agencies?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil papan instansi");
+  return res.json();
+}
+
+export async function fetchSocialBrief(
+  timeRange: string,
+  scopeKode: string,
+  scopeMode: string,
+  multiCodes?: string,
+  filters?: SocialFilters
+): Promise<SocialBrief> {
+  const params = new URLSearchParams({ time_range: timeRange, scope_kode: scopeKode, scope_mode: scopeMode });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+  appendFilters(params, filters);
+  const res = await fetch(`${API_BASE_URL}/social-pulse/brief?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil ringkasan situasi");
   return res.json();
 }
 
