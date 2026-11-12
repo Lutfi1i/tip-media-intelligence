@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from typing import List
 import json
@@ -8,6 +8,8 @@ from backend.app.models import Report
 from backend.app.schemas import ReportOut
 from backend.app.services.report_generator import generate_report_document
 from backend.app.services.audit import record_audit
+from backend.app.services.social_report import generate_social_report
+from backend.app.routers.social_pulse import period_param
 
 router = APIRouter(prefix="/reports", tags=["Executive Reports"])
 
@@ -55,6 +57,34 @@ def create_report(
         created_at=report.created_at,
         data_snapshot=json.loads(report.data_snapshot_json or "{}")
     )
+
+@router.post("/social", response_model=ReportOut)
+def create_social_report(
+    time_range: str = Depends(period_param),
+    scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
+    db: Session = Depends(get_db),
+):
+    """Susun laporan Social Pulse (HTML siap cetak) untuk preset atau rentang tanggal kustom."""
+    report = generate_social_report(db, time_range=time_range, scope_kode=scope_kode)
+    record_audit(
+        db,
+        aktor="Sistem Otomatis",
+        peran="Admin",
+        aksi="GENERATE_LAPORAN_SOCIAL_PULSE",
+        objek=f"report:{report.id}",
+        detail={"periode": report.periode, "scope_kode": scope_kode},
+    )
+    return ReportOut(
+        id=report.id,
+        judul=report.judul,
+        jenis=report.jenis,
+        periode=report.periode,
+        file_url=report.file_url,
+        dibuat_oleh=report.dibuat_oleh,
+        created_at=report.created_at,
+        data_snapshot={k: v for k, v in json.loads(report.data_snapshot_json or "{}").items() if k != "rendered_html"},
+    )
+
 
 @router.get("/{report_id}/view")
 def view_report_html(report_id: int, db: Session = Depends(get_db)):

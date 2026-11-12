@@ -633,3 +633,43 @@ def test_period_comparison_deltas(db):
     assert topics["#plnpadam"]["status"] == "naik"
     assert any(t["status"] == "hilang" for t in cmp["topics"])
     assert cmp["note"] is None
+
+
+# ---------- laporan Social Pulse ----------
+
+import json as _json  # noqa: E402
+
+from backend.app.services.social_report import generate_social_report  # noqa: E402
+
+
+def test_social_report_renders_and_escapes_post_text(db):
+    now = datetime.utcnow()
+    _seed_mixed(db, now)
+    src = db.query(Source).first()
+    for i in range(2):
+        it = RawItem(source_id=src.id, url_kanonik=f"xss{i}", hash=f"xss{i}", platform="X (Twitter)",
+                     judul="<script>alert(1)</script> PLN padam #plnpadam", isi="<script>alert(1)</script> PLN padam #plnpadam",
+                     published_at=now - timedelta(hours=1), fetched_at=now - timedelta(days=3))
+        db.add(it)
+    db.commit()
+
+    report = generate_social_report(db, time_range="24h")
+    html = _json.loads(report.data_snapshot_json)["rendered_html"]
+    assert report.jenis == "social_harian"
+    assert report.file_url == f"/api/v1/reports/{report.id}/view"
+    assert "Laporan Social Pulse" in html and "Ringkasan" in html and "PLN" in html
+    assert "<script" not in html.lower()
+
+
+def test_social_report_template_autoescapes():
+    from backend.app.services.social_report import TEMPLATE, _fmt
+    html = TEMPLATE.render(
+        judul="Uji", scope_name="X", period={"label": "p"}, dibuat="-",
+        brief={"points": [{"text": "<img src=x onerror=alert(1)>"}]},
+        overview={"emotion_breakdown": [], "baseline": {"min_surge_volume": 3, "windows_available": 0, "windows_target": 14}},
+        trends=[], agencies=[], platforms=[], fmt=_fmt,
+        cmp={"summary_a": {"mentions": 0, "negative_pct": 0, "accounts": 0, "views": None},
+             "summary_b": {"mentions": 0, "negative_pct": 0, "accounts": 0, "views": None},
+             "period_b": {"label": "q"}, "note": None, "categories": []},
+    )
+    assert "<img src=x" not in html and "&lt;img src=x onerror=alert(1)&gt;" in html

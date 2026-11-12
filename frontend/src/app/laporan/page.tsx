@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   fetchReports,
+  generateSocialReport,
   generateNewReport,
   getReportViewUrl,
 } from "@/lib/api";
@@ -51,6 +52,20 @@ export default function LaporanPage() {
     }
   };
 
+  const handleSocialReport = async (range: "24h" | "7d") => {
+    setGenerating(true);
+    setGenSuccess(null);
+    try {
+      const rep = await generateSocialReport(range);
+      setGenSuccess(`Laporan Social Pulse (${rep.periode}) berhasil disusun.`);
+      await loadReports();
+    } catch (err: any) {
+      alert(err.message || "Gagal menyusun laporan Social Pulse");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const latestReport = reports.length > 0 ? reports[0] : null;
 
   return (
@@ -80,6 +95,22 @@ export default function LaporanPage() {
             className="min-h-[38px] px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 rounded-md text-xs font-bold transition-colors disabled:opacity-50 shadow-xs"
           >
             + Susun Laporan Mingguan
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSocialReport("24h")}
+            disabled={generating}
+            className="min-h-[38px] px-3.5 py-1.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-md text-xs font-bold transition-colors disabled:opacity-50"
+          >
+            + Social Pulse 24 Jam
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSocialReport("7d")}
+            disabled={generating}
+            className="min-h-[38px] px-3.5 py-1.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-md text-xs font-bold transition-colors disabled:opacity-50"
+          >
+            + Social Pulse 7 Hari
           </button>
         </div>
       </div>

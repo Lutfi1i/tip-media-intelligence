@@ -253,6 +253,16 @@ export async function generateNewReport(jenis: string, periode: string) {
   return res.json();
 }
 
+export async function generateSocialReport(timeRange: string = "24h", scopeKode: string = "ID") {
+  const params = new URLSearchParams({ time_range: timeRange, scope_kode: scopeKode });
+  const res = await fetch(`${API_BASE_URL}/reports/social?${params.toString()}`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(typeof body?.detail === "string" ? body.detail : "Gagal menyusun laporan Social Pulse");
+  }
+  return res.json() as Promise<{ id: number; judul: string; periode: string }>;
+}
+
 export function getReportViewUrl(reportId: number) {
   return `/api/v1/reports/${reportId}/view`;
 }

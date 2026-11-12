@@ -12,6 +12,8 @@ import {
   fetchAgencyBoard,
   fetchSocialBrief,
   escalateSocialSurges,
+  generateSocialReport,
+  getReportViewUrl,
   pollSources,
   SocialPulseOverview,
   SocialTrendingTopic,
@@ -245,6 +247,7 @@ export default function SocialPulsePage() {
   const handleManualPoll = async () => {
     setIsRefreshing(true);
     setActionMessage(null);
+    setReportLink(null);
     try {
       const res = await pollSources(false);
       const esc = res?.eskalasi_medsos;
@@ -268,6 +271,7 @@ export default function SocialPulsePage() {
     const range = ["1h", "6h", "24h"].includes(timeRange) ? timeRange : "24h";
     setIsEscalating(true);
     setActionMessage(null);
+    setReportLink(null);
     try {
       const res = await escalateSocialSurges(range);
       const parts = [
@@ -286,6 +290,19 @@ export default function SocialPulsePage() {
       setActionMessage("Eskalasi gagal dijalankan.");
     } finally {
       setIsEscalating(false);
+    }
+  };
+
+  const [reportLink, setReportLink] = useState<string | null>(null);
+  const handleReport = async () => {
+    setActionMessage(null);
+    setReportLink(null);
+    try {
+      const rep = await generateSocialReport(timeRange, scopeKode);
+      setReportLink(getReportViewUrl(rep.id));
+      setActionMessage(`Laporan "${rep.judul}" sudah disusun.`);
+    } catch (e) {
+      setActionMessage(e instanceof Error ? e.message : "Laporan gagal disusun.");
     }
   };
 
@@ -396,8 +413,18 @@ export default function SocialPulsePage() {
       )}
       {actionMessage && (
         <div role="status" className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
-          <span>{actionMessage}</span>
-          <button onClick={() => setActionMessage(null)} className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">
+          <span>
+            {actionMessage}
+            {reportLink && (
+              <>
+                {" "}
+                <a href={reportLink} target="_blank" rel="noopener noreferrer" className="font-semibold text-fuchsia-600 hover:underline dark:text-fuchsia-400">
+                  Buka laporan
+                </a>
+              </>
+            )}
+          </span>
+          <button onClick={() => { setActionMessage(null); setReportLink(null); }} className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">
             Tutup
           </button>
         </div>
@@ -574,6 +601,12 @@ export default function SocialPulsePage() {
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              onClick={handleReport}
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Buat Laporan
+            </button>
             <button
               onClick={() => downloadTrendsCsv(trends, timeRange)}
               disabled={trends.length === 0}
