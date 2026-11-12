@@ -40,6 +40,9 @@ class Settings:
     JEV_INCIDENT_THRESHOLD: float = float(os.getenv("JEV_INCIDENT_THRESHOLD", "0.60"))
     JEV_NOISE_THRESHOLD: float = float(os.getenv("JEV_NOISE_THRESHOLD", "0.75"))
 
+    # Penarikan data otomatis (menit). 0 = nonaktif, data hanya ditarik lewat tombol/endpoint poll.
+    AUTO_COLLECT_MINUTES: int = int(os.getenv("AUTO_COLLECT_MINUTES", "0"))
+
     # Alert thresholds
     CRITICAL_SCORE_MIN: float = 85.0
     HIGH_SCORE_MIN: float = 70.0

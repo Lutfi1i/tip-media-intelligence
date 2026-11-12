@@ -1,13 +1,15 @@
 from datetime import datetime
 import json
 import logging
-from backend.app.database import SessionLocal, Base, engine
+from backend.app.database import SessionLocal, engine
+from backend.app.schema_sync import ensure_schema
 from backend.app.models import (
     MonitoringProfile, ProfileRule, Source, Issue, RawItem,
     Region, AuditLog
 )
 from backend.app.services.collector import collect_all
 from backend.app.services.issue_clustering import cluster_and_sync_issues
+from backend.app.services.social_platform import legacy_platform
 
 logger = logging.getLogger("tip_seed")
 
@@ -41,8 +43,74 @@ SUMBER_NYATA = [
          url="https://news.google.com/rss/search?q=site:tiktok.com+jakarta+kejadian+OR+banjir+OR+macet&hl=id&gl=ID&ceid=ID:id", frekuensi_menit=10,
          rate_limit_per_min=30, kredibilitas=0.84, status_izin="aktif"),
     dict(nama="Threads - Percakapan Warganet & Keluhan Publik", jenis="media_sosial",
-         url="https://news.google.com/rss/search?q=%22threads.net%22+OR+%22Threads%22+jakarta+macet+OR+banjir&hl=id&gl=ID&ceid=ID:id", frekuensi_menit=10,
+         url="https://news.google.com/rss/search?q=site:threads.com+OR+site:threads.net+jakarta+OR+bogor+OR+depok+OR+bekasi+OR+tangerang&hl=id&gl=ID&ceid=ID:id", frekuensi_menit=10,
          rate_limit_per_min=30, kredibilitas=0.82, status_izin="aktif"),
+    dict(nama="YouTube - Video Warga & Liputan Jabodetabek", jenis="media_sosial",
+         url="https://www.youtube.com/results?sp=EgIIAw%3D%3D&search_query=jakarta+terkini", frekuensi_menit=30,
+         rate_limit_per_min=30, kredibilitas=0.80, status_izin="aktif"),
+    dict(nama="Instagram - Akun Publik & Instansi Jabodetabek", jenis="media_sosial",
+         url="https://news.google.com/rss/search?q=site:instagram.com+jakarta+OR+bogor+OR+depok+OR+bekasi+OR+tangerang&hl=id&gl=ID&ceid=ID:id", frekuensi_menit=20,
+         rate_limit_per_min=30, kredibilitas=0.78, status_izin="aktif"),
+    dict(nama="Reddit - r/indonesia (Postingan Terbaru)", jenis="media_sosial",
+         url="https://www.reddit.com/r/indonesia/new/.rss", frekuensi_menit=20,
+         rate_limit_per_min=10, kredibilitas=0.70, status_izin="aktif"),
+    dict(nama="TikTok - Kuliner & Jajanan Jabodetabek", jenis="media_sosial",
+         url="https://news.google.com/rss/search?hl=id&gl=ID&ceid=ID:id&q=site:tiktok.com+kuliner+OR+makanan+OR+jajanan+jakarta+OR+bogor+OR+depok+OR+bekasi+OR+tangerang", frekuensi_menit=20,
+         rate_limit_per_min=30, kredibilitas=0.75, status_izin="aktif"),
+    dict(nama="Instagram - Kuliner & Wisata Jabodetabek", jenis="media_sosial",
+         url="https://news.google.com/rss/search?hl=id&gl=ID&ceid=ID:id&q=site:instagram.com+kuliner+OR+wisata+jakarta+OR+bogor+OR+depok+OR+bekasi+OR+tangerang", frekuensi_menit=20,
+         rate_limit_per_min=30, kredibilitas=0.75, status_izin="aktif"),
+    dict(nama="TikTok - Konten Viral Jabodetabek", jenis="media_sosial",
+         url="https://news.google.com/rss/search?hl=id&gl=ID&ceid=ID:id&q=site:tiktok.com+viral+jakarta+OR+bekasi+OR+depok+OR+tangerang+OR+bogor", frekuensi_menit=15,
+         rate_limit_per_min=30, kredibilitas=0.75, status_izin="aktif"),
+    dict(nama="X (Twitter) - Keluhan Layanan Instansi (PLN, PDAM, Damkar, Transportasi)", jenis="media_sosial",
+         url="https://news.google.com/rss/search?hl=id&gl=ID&ceid=ID:id&q=site:x.com+pln+OR+pdam+OR+damkar+OR+%22pam+jaya%22+OR+transjakarta+OR+krl", frekuensi_menit=15,
+         rate_limit_per_min=30, kredibilitas=0.82, status_izin="aktif"),
+    dict(nama="YouTube - Politik & Pemerintahan Daerah", jenis="media_sosial",
+         url="https://www.youtube.com/results?sp=EgIIAw%3D%3D&search_query=gubernur+jakarta", frekuensi_menit=30,
+         rate_limit_per_min=30, kredibilitas=0.78, status_izin="aktif"),
+    dict(nama="RSS Berita Nasional (Republika)", jenis="rss",
+         url="https://www.republika.co.id/rss/", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.85, status_izin="aktif"),
+    dict(nama="RSS Berita Nasional (Liputan6)", jenis="rss",
+         url="https://feed.liputan6.com/rss/news", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.84, status_izin="aktif"),
+    dict(nama="RSS Berita Nasional (Okezone)", jenis="rss",
+         url="https://sindikasi.okezone.com/index.php/rss/1/RSS2.0", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.80, status_izin="aktif"),
+    dict(nama="RSS Berita Nasional (Kumparan)", jenis="rss",
+         url="https://lapi.kumparan.com/v2.0/rss/", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.82, status_izin="aktif"),
+    dict(nama="Berita Megapolitan (Kompas via Google News)", jenis="rss",
+         url="https://news.google.com/rss/search?hl=id&gl=ID&ceid=ID:id&q=site:megapolitan.kompas.com", frekuensi_menit=15,
+         rate_limit_per_min=30, kredibilitas=0.88, status_izin="aktif"),
+    dict(nama="Data Resmi BMKG (Peringatan Dini Cuaca)", jenis="situs_resmi",
+         url="https://www.bmkg.go.id/alerts/nowcast/id/rss.xml", frekuensi_menit=15,
+         rate_limit_per_min=20, kredibilitas=0.98, status_izin="aktif"),
+    dict(nama="YouTube - Kuliner & Wisata Jabodetabek", jenis="media_sosial",
+         url="https://www.youtube.com/results?sp=EgIIAw%3D%3D&search_query=kuliner+jakarta", frekuensi_menit=30,
+         rate_limit_per_min=10, kredibilitas=0.75, status_izin="aktif"),
+    dict(nama="Telegram - Info BMKG", jenis="media_sosial",
+         url="https://t.me/s/infobmkg", frekuensi_menit=15,
+         rate_limit_per_min=10, kredibilitas=0.95, status_izin="aktif"),
+    dict(nama="Telegram - Antara News", jenis="media_sosial",
+         url="https://t.me/s/antaranewscom", frekuensi_menit=15,
+         rate_limit_per_min=10, kredibilitas=0.88, status_izin="aktif"),
+    dict(nama="Telegram - Kumparan", jenis="media_sosial",
+         url="https://t.me/s/kumparancom", frekuensi_menit=15,
+         rate_limit_per_min=10, kredibilitas=0.86, status_izin="aktif"),
+    dict(nama="Telegram - Republika", jenis="media_sosial",
+         url="https://t.me/s/republikaonline", frekuensi_menit=15,
+         rate_limit_per_min=10, kredibilitas=0.85, status_izin="aktif"),
+    dict(nama="GDELT - Berita Jakarta (Ratusan Media Indonesia)", jenis="rss",
+         url="https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&sort=datedesc&timespan=1d&query=jakarta%20sourcecountry:ID&maxrecords=75", frekuensi_menit=30,
+         rate_limit_per_min=6, kredibilitas=0.80, status_izin="aktif"),
+    dict(nama="GDELT - Berita Bekasi, Depok, Bogor", jenis="rss",
+         url="https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&sort=datedesc&timespan=1d&query=(bekasi%20OR%20depok%20OR%20bogor)%20sourcecountry:ID&maxrecords=50", frekuensi_menit=30,
+         rate_limit_per_min=6, kredibilitas=0.80, status_izin="aktif"),
+    dict(nama="GDELT - Berita Tangerang", jenis="rss",
+         url="https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&sort=datedesc&timespan=1d&query=tangerang%20sourcecountry:ID&maxrecords=50", frekuensi_menit=30,
+         rate_limit_per_min=6, kredibilitas=0.80, status_izin="aktif"),
     dict(nama="Bluesky Social (Percakapan Publik Isu Jabodetabek)", jenis="media_sosial",
          url="https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=jakarta&limit=25", frekuensi_menit=15,
          rate_limit_per_min=30, kredibilitas=0.82, status_izin="nonaktif"),
@@ -87,6 +155,17 @@ def sinkronkan_sumber(db) -> int:
     return perubahan
 
 
+def backfill_platforms(db) -> int:
+    """Isi kolom platform yang masih NULL memakai tebakan dari URL, judul, dan penerbit."""
+    rows = db.query(RawItem).filter(RawItem.platform.is_(None)).all()
+    for row in rows:
+        row.platform = legacy_platform(row.penerbit, row.url_kanonik, row.judul)
+    if rows:
+        db.commit()
+        logger.info("Platform diisi untuk %d konten lama", len(rows))
+    return len(rows)
+
+
 def seed_database():
     """Inisialisasi basis data TIP Media Intelligence dengan 100% data nyata.
     
@@ -96,7 +175,7 @@ def seed_database():
     - Koleksi pertama dijalankan langsung dari feed publik aktif.
     - Isu dan statistik wilayah dikelompokkan dan dihitung dari artikel nyata.
     """
-    Base.metadata.create_all(bind=engine)
+    ensure_schema(engine)
     db = SessionLocal()
 
     # 1. Inisialisasi Wilayah bila belum ada
@@ -150,6 +229,9 @@ def seed_database():
         )
         db.add(rule)
         db.commit()
+
+    # 3b. Lengkapi kolom platform untuk baris lama yang dibuat sebelum kolom itu ada.
+    backfill_platforms(db)
 
     # 4. Tarik data nyata pertama kali jika belum ada RawItem
     total_raw = db.query(RawItem).count()

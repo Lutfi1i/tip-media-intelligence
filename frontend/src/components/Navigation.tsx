@@ -377,7 +377,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Main Content Area (Offset with ml for fixed sidebar on md+) */}
-        <main className="flex-1 md:ml-60 lg:ml-64 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 min-w-0 md:ml-60 lg:ml-64 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

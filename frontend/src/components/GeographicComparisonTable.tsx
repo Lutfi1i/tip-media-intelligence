@@ -106,10 +106,15 @@ export function GeographicComparisonTable({ timeRange }: GeographicComparisonTab
                     <td
                       key={c.scope_kode}
                       className={`px-4 py-3 text-right font-bold ${
-                        c.growth_pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"
+                        c.growth_pct === null
+                          ? "text-zinc-400"
+                          : c.growth_pct >= 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-zinc-500"
                       }`}
+                      title={c.growth_pct === null ? "Belum ada data periode sebelumnya" : undefined}
                     >
-                      {c.growth_pct >= 0 ? "+" : ""}{c.growth_pct}%
+                      {c.growth_pct === null ? "Belum ada pembanding" : `${c.growth_pct >= 0 ? "+" : ""}${c.growth_pct}%`}
                     </td>
                   ))}
                 </tr>
@@ -128,8 +133,8 @@ export function GeographicComparisonTable({ timeRange }: GeographicComparisonTab
                     Topik Tren Teratas
                   </td>
                   {comparisonData.map((c) => (
-                    <td key={c.scope_kode} className="px-4 py-3 text-right font-medium text-zinc-800 dark:text-zinc-200 max-w-[200px] truncate" title={c.top_topic}>
-                      {c.top_topic}
+                    <td key={c.scope_kode} className="px-4 py-3 text-right font-medium text-zinc-800 dark:text-zinc-200 max-w-[200px] truncate" title={c.top_topic ?? undefined}>
+                      {c.top_topic ?? "Belum ada topik"}
                     </td>
                   ))}
                 </tr>

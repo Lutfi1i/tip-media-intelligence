@@ -1,30 +1,131 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   fetchSocialPulseOverview,
   fetchSocialTrends,
   fetchSocialPlatforms,
   fetchSocialCorrelations,
+  fetchSocialWatchlist,
+  fetchSocialFacets,
+  fetchAgencyBoard,
+  escalateSocialSurges,
   pollSources,
   SocialPulseOverview,
   SocialTrendingTopic,
   SocialPlatformMetric,
   SocialCorrelation,
+  SocialWatchlist,
+  SocialHealthState,
+  SocialFacets,
+  SocialAgencyBoard as AgencyBoardData,
+  SocialSort,
 } from "@/lib/api";
+import { SocialFilterBar } from "@/components/SocialFilterBar";
+import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { MediaAvatarStack, RealBrandIcon } from "@/components/SourceLogos";
 import { GeographicScopeSelector } from "@/components/GeographicScopeSelector";
 import { GeographicComparisonTable } from "@/components/GeographicComparisonTable";
+import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
+import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
+
+type Tab = "tren" | "instansi" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type ScopeMode = "context" | "strict" | "regional";
+
+const TIME_RANGES = [
+  { label: "1 Jam", value: "1h", window: "1 jam" },
+  { label: "6 Jam", value: "6h", window: "6 jam" },
+  { label: "24 Jam", value: "24h", window: "24 jam" },
+  { label: "7 Hari", value: "7d", window: "7 hari" },
+];
+
+const PLATFORM_FILTERS = ["Semua", "X (Twitter)", "TikTok", "YouTube", "Threads", "Instagram", "Reddit", "Telegram"];
+
+const HEALTH_STYLE: Record<SocialHealthState, string> = {
+  aktif: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/30 dark:text-emerald-400",
+  terlambat: "bg-amber-500/10 text-amber-700 ring-amber-500/30 dark:text-amber-400",
+  kosong: "bg-amber-500/10 text-amber-700 ring-amber-500/30 dark:text-amber-400",
+  gagal: "bg-rose-500/10 text-rose-700 ring-rose-500/30 dark:text-rose-400",
+  belum_ditarik: "bg-zinc-500/10 text-zinc-600 ring-zinc-500/30 dark:text-zinc-400",
+  nonaktif: "bg-zinc-500/10 text-zinc-600 ring-zinc-500/30 dark:text-zinc-400",
+  tanpa_sumber: "bg-zinc-500/10 text-zinc-600 ring-zinc-500/30 dark:text-zinc-400",
+};
+
+const HEALTH_LABEL: Record<SocialHealthState, string> = {
+  aktif: "Aktif",
+  terlambat: "Terlambat",
+  kosong: "Tanpa konten terkini",
+  gagal: "Gagal",
+  belum_ditarik: "Belum ditarik",
+  nonaktif: "Nonaktif",
+  tanpa_sumber: "Belum ada sumber",
+};
+
+const WATCH_STORAGE_KEY = "tip.socialPulse.extraTerms";
+
+function readStoredTerms(): string[] {
+  try {
+    const raw = window.localStorage.getItem(WATCH_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((t) => typeof t === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeTerms(terms: string[]) {
+  try {
+    window.localStorage.setItem(WATCH_STORAGE_KEY, JSON.stringify(terms));
+  } catch {
+    // Penyimpanan peramban tidak tersedia: kata kunci tetap berlaku sampai halaman ditutup.
+  }
+}
+
+function csvCell(value: unknown): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  return /[",\n;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** Unduh tabel tren sebagai CSV (dibuat di peramban dari data yang sedang tampil). */
+function downloadTrendsCsv(trends: SocialTrendingTopic[], label: string) {
+  const header = [
+    "peringkat", "topik", "jenis", "konten", "status_laju", "skor_laju", "pertumbuhan_pct", "rasio_baseline",
+    "kategori", "instansi", "platform", "negatif_pct", "akun_unik", "isu_radar", "pertama_terdeteksi_utc", "terakhir_utc",
+  ];
+  const rows = trends.map((t) => [
+    t.rank, t.topic, t.topic_type, t.mention_count, t.velocity_status, t.velocity_score, t.growth_pct ?? "",
+    t.velocity.baseline_windows ? t.velocity.ratio : "", t.categories.map((c) => c.label).join(" | "),
+    t.agencies.map((a) => a.label).join(" | "), t.platforms.join(" | "), t.sentiment_pct.negatif,
+    t.accounts.unique_accounts, t.correlated_issue?.kode_referensi ?? "", t.first_detected, t.last_seen,
+  ]);
+  const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `social-pulse-tren-${label}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function growthText(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "Belum ada pembanding";
+  return `${value >= 0 ? "+" : ""}${value}%`;
+}
 
 export default function SocialPulsePage() {
   const [timeRange, setTimeRange] = useState<string>("24h");
   const [selectedPlatform, setSelectedPlatform] = useState<string>("Semua");
+  const [category, setCategory] = useState<string>("");
+  const [agency, setAgency] = useState<string>("");
+  const [sort, setSort] = useState<SocialSort>("laju");
+  const [facets, setFacets] = useState<SocialFacets | null>(null);
+  const [agencyBoard, setAgencyBoard] = useState<AgencyBoardData | null>(null);
 
-  // Geographic Scope State (FR-GEO-01 s/d FR-GEO-08)
   const [scopeKode, setScopeKode] = useState<string>("ID");
   const [scopeName, setScopeName] = useState<string>("Seluruh Indonesia");
-  const [scopeMode, setScopeMode] = useState<"context" | "strict" | "regional">("context");
+  const [scopeMode, setScopeMode] = useState<ScopeMode>("context");
   const [multiCodes, setMultiCodes] = useState<string[]>([]);
   const [isMultiSelect, setIsMultiSelect] = useState<boolean>(false);
 
@@ -32,50 +133,60 @@ export default function SocialPulsePage() {
   const [trends, setTrends] = useState<SocialTrendingTopic[]>([]);
   const [platforms, setPlatforms] = useState<SocialPlatformMetric[]>([]);
   const [correlations, setCorrelations] = useState<SocialCorrelation[]>([]);
+  const [watchlist, setWatchlist] = useState<SocialWatchlist | null>(null);
+  const [extraTerms, setExtraTerms] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<SocialTrendingTopic | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<"tren" | "platform" | "korelasi" | "perbandingan">("tren");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [isEscalating, setIsEscalating] = useState<boolean>(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("tren");
 
-  const loadData = async (
-    range: string,
-    plat: string,
-    sKode: string,
-    sMode: "context" | "strict" | "regional",
-    mCodes?: string[]
-  ) => {
+  useEffect(() => {
+    setExtraTerms(readStoredTerms());
+  }, []);
+
+  const multiParam = multiCodes.length > 0 ? multiCodes.join(",") : undefined;
+  const windowLabel = TIME_RANGES.find((t) => t.value === timeRange)?.window ?? timeRange;
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
     try {
-      setIsLoading(true);
-      const multiParam = mCodes && mCodes.length > 0 ? mCodes.join(",") : undefined;
-      const [ovData, trData, pfData, crData] = await Promise.all([
-        fetchSocialPulseOverview(range, sKode, sMode, multiParam),
-        fetchSocialTrends(plat === "Semua" ? undefined : plat, range, 20, sKode, sMode, multiParam),
-        fetchSocialPlatforms(sKode, sMode, multiParam),
-        fetchSocialCorrelations(sKode, sMode, multiParam),
+      const filters = { category: category || undefined, agency: agency || undefined };
+      const plat = selectedPlatform === "Semua" ? undefined : selectedPlatform;
+      const [ovData, trData, pfData, crData, wlData, fcData, agData] = await Promise.all([
+        fetchSocialPulseOverview(timeRange, scopeKode, scopeMode, multiParam, filters),
+        fetchSocialTrends(plat, timeRange, 30, scopeKode, scopeMode, multiParam, filters, sort),
+        fetchSocialPlatforms(scopeKode, scopeMode, multiParam, timeRange),
+        fetchSocialCorrelations(scopeKode, scopeMode, multiParam),
+        fetchSocialWatchlist(timeRange, scopeKode, scopeMode, multiParam, extraTerms, filters),
+        fetchSocialFacets(timeRange, scopeKode, scopeMode, multiParam, plat, filters),
+        fetchAgencyBoard(timeRange, scopeKode, scopeMode, multiParam, category || undefined),
       ]);
+      setFacets(fcData);
+      setAgencyBoard(agData);
       setOverview(ovData);
       setTrends(trData);
       setPlatforms(pfData);
       setCorrelations(crData);
+      setWatchlist(wlData);
       setLastRefreshed(new Date());
     } catch (err) {
       console.error("Gagal memuat data Social Pulse:", err);
+      setLoadError("Data Social Pulse gagal dimuat. Periksa apakah backend berjalan, lalu muat ulang.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [timeRange, selectedPlatform, scopeKode, scopeMode, multiParam, extraTerms, category, agency, sort]);
 
   useEffect(() => {
-    loadData(timeRange, selectedPlatform, scopeKode, scopeMode, multiCodes);
-  }, [timeRange, selectedPlatform, scopeKode, scopeMode, multiCodes]);
+    loadData();
+  }, [loadData]);
 
-  const handleApplyScope = (
-    newKode: string,
-    newName: string,
-    newMode: "context" | "strict" | "regional",
-    newMultiList?: string[]
-  ) => {
+  const handleApplyScope = (newKode: string, newName: string, newMode: ScopeMode, newMultiList?: string[]) => {
     setScopeKode(newKode);
     setScopeName(newName);
     setScopeMode(newMode);
@@ -90,104 +201,152 @@ export default function SocialPulsePage() {
 
   const handleManualPoll = async () => {
     setIsRefreshing(true);
+    setActionMessage(null);
     try {
-      await pollSources(false);
-      await loadData(timeRange, selectedPlatform, scopeKode, scopeMode, multiCodes);
+      const res = await pollSources(false);
+      const esc = res?.eskalasi_medsos;
+      setActionMessage(
+        `Tarik data selesai: ${res?.total_baru ?? 0} konten baru, ${res?.total_gagal ?? 0} sumber gagal.` +
+          (esc && (esc.created.length || esc.updated.length)
+            ? ` Lonjakan medsos dieskalasi: ${esc.created.length} isu baru, ${esc.updated.length} diperbarui.`
+            : "")
+      );
+      await loadData();
     } catch (e) {
       console.error("Gagal sinkronisasi data sosial:", e);
+      setActionMessage("Tarik data gagal. Coba lagi beberapa saat.");
     } finally {
       setIsRefreshing(false);
     }
   };
 
+  const handleEscalate = async () => {
+    const range = timeRange === "7d" ? "24h" : timeRange;
+    setIsEscalating(true);
+    setActionMessage(null);
+    try {
+      const res = await escalateSocialSurges(range);
+      const parts = [
+        res.created.length ? `${res.created.length} isu baru (${res.created.join(", ")})` : null,
+        res.updated.length ? `${res.updated.length} isu diperbarui (${res.updated.join(", ")})` : null,
+        res.skipped.length ? `${res.skipped.length} dilewati karena ditolak analis` : null,
+      ].filter(Boolean);
+      setActionMessage(
+        parts.length
+          ? `Eskalasi jendela ${range}: ${parts.join(", ")}. Isu masuk antrean verifikasi analis.`
+          : `Tidak ada topik berstatus LONJAKAN TINGGI pada jendela ${range}.`
+      );
+      await loadData();
+    } catch (e) {
+      console.error(e);
+      setActionMessage("Eskalasi gagal dijalankan.");
+    } finally {
+      setIsEscalating(false);
+    }
+  };
+
+  const addTerm = (term: string) => {
+    if (extraTerms.some((t) => t.toLowerCase() === term.toLowerCase())) return;
+    const next = [...extraTerms, term];
+    setExtraTerms(next);
+    storeTerms(next);
+  };
+
+  const removeTerm = (term: string) => {
+    const next = extraTerms.filter((t) => t !== term);
+    setExtraTerms(next);
+    storeTerms(next);
+  };
+
+  const healthSummary = useMemo(() => {
+    const withSource = platforms.filter((p) => p.health_state !== "tanpa_sumber");
+    return {
+      aktif: withSource.filter((p) => p.health_state === "aktif").length,
+      total: withSource.length,
+      bermasalah: withSource.filter((p) => ["gagal", "terlambat", "kosong"].includes(p.health_state)),
+    };
+  }, [platforms]);
+
+  const baseline = overview?.baseline;
+  const baselineIncomplete = baseline && baseline.windows_available < baseline.windows_target;
+  const surgingCount = trends.filter((t) => t.velocity_status === "LONJAKAN TINGGI").length;
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "tren", label: `Topik Tren (${trends.length})` },
+    { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
+    { id: "watchlist", label: `Watchlist (${watchlist?.active_terms ?? 0}/${watchlist?.total_terms ?? 0})` },
+    { id: "perbandingan", label: "Perbandingan Wilayah" },
+    { id: "platform", label: `Status Platform (${healthSummary.aktif}/${healthSummary.total})` },
+    { id: "korelasi", label: `Korelasi Isu RADAR (${correlations.length})` },
+  ];
+
   return (
     <div className="space-y-6 pb-16">
-      {/* HEADER & CONTEXT BAR */}
+      {/* HEADER */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-slate-900 to-zinc-950 p-6 text-white shadow-xl ring-1 ring-white/10">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-fuchsia-600/15 blur-3xl pointer-events-none" />
-        <div className="absolute right-48 -bottom-16 h-48 w-48 rounded-full bg-blue-600/15 blur-3xl pointer-events-none" />
-
         <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-500/20 px-3 py-1 text-xs font-semibold text-fuchsia-300 ring-1 ring-fuchsia-500/30">
-                <span className="h-2 w-2 rounded-full bg-fuchsia-400 animate-pulse" />
-                REALTIME SOCIAL INTELLIGENCE
+                <span className="h-2 w-2 rounded-full bg-fuchsia-400" />
+                SOCIAL PULSE
               </span>
               <span className="text-xs text-zinc-400">
-                Diperbarui: {lastRefreshed.toLocaleTimeString("id-ID")} WIB
+                Diperbarui: {lastRefreshed ? lastRefreshed.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" }) : "-"} WIB
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white lg:text-3xl">
-              RADAR Social Pulse
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white lg:text-3xl">RADAR Social Pulse</h1>
             <p className="max-w-2xl text-sm text-zinc-300">
-              Instrumen deteksi dini percakapan warganet lintas platform (Threads, X, YouTube, TikTok). Pantau percepatan tren, sentimen publik, dan korelasi langsung ke sistem penanganan isu RADAR.
+              Pantau topik yang sedang naik di X, TikTok, YouTube, Threads, Instagram, Reddit, dan Telegram. Laju dihitung terhadap baseline periode
+              sebelumnya, dan lonjakan bisa diteruskan ke antrean verifikasi analis.
             </p>
           </div>
 
-          {/* Action controls */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* Time range selector */}
-            <div className="inline-flex rounded-xl bg-zinc-800/80 p-1 ring-1 ring-white/10 backdrop-blur-xs">
-              {[
-                { label: "1 Jam", value: "1h" },
-                { label: "6 Jam", value: "6h" },
-                { label: "24 Jam", value: "24h" },
-                { label: "7 Hari", value: "7d" },
-              ].map((t) => (
+            <div className="inline-flex rounded-xl bg-zinc-800/80 p-1 ring-1 ring-white/10" role="group" aria-label="Rentang waktu">
+              {TIME_RANGES.map((t) => (
                 <button
                   key={t.value}
                   onClick={() => setTimeRange(t.value)}
+                  aria-pressed={timeRange === t.value}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                    timeRange === t.value
-                      ? "bg-fuchsia-600 text-white shadow-xs"
-                      : "text-zinc-400 hover:text-white"
+                    timeRange === t.value ? "bg-fuchsia-600 text-white shadow-xs" : "text-zinc-400 hover:text-white"
                   }`}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
-
-            {/* Poll manual button */}
             <button
               onClick={handleManualPoll}
               disabled={isRefreshing}
               className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-zinc-900 shadow-md transition-all hover:bg-zinc-100 disabled:opacity-50"
             >
-              <svg
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin text-fuchsia-600" : "text-zinc-700"}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className={`h-4 w-4 ${isRefreshing ? "animate-spin text-fuchsia-600" : "text-zinc-700"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              {isRefreshing ? "Menyinkronkan..." : "Tarik Data Baru"}
+              {isRefreshing ? "Menarik data..." : "Tarik Data Baru"}
             </button>
           </div>
         </div>
 
-        {/* Platform filter tabs */}
         <div className="relative z-10 mt-6 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
-          <span className="text-xs font-medium text-zinc-400 mr-2">Filter Kanal:</span>
-          {["Semua", "Threads", "X (Twitter)", "YouTube", "TikTok"].map((plat) => {
+          <span className="mr-2 text-xs font-medium text-zinc-400">Filter kanal (tabel tren):</span>
+          {PLATFORM_FILTERS.map((plat) => {
             const isSel = selectedPlatform === plat;
             return (
               <button
                 key={plat}
                 onClick={() => setSelectedPlatform(plat)}
+                aria-pressed={isSel}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                   isSel
                     ? "bg-fuchsia-500/25 text-white ring-1 ring-fuchsia-400"
-                    : "bg-zinc-800/60 text-zinc-300 hover:bg-zinc-800 hover:text-white ring-1 ring-white/5"
+                    : "bg-zinc-800/60 text-zinc-300 ring-1 ring-white/5 hover:bg-zinc-800 hover:text-white"
                 }`}
               >
-                {plat === "Threads" && <RealBrandIcon name="threads" className="w-3.5 h-3.5" />}
-                {plat === "X (Twitter)" && <RealBrandIcon name="x" className="w-3.5 h-3.5" />}
-                {plat === "YouTube" && <RealBrandIcon name="youtube" className="w-3.5 h-3.5" />}
-                {plat === "TikTok" && <RealBrandIcon name="tiktok" className="w-3.5 h-3.5" />}
+                {plat !== "Semua" && <RealBrandIcon name={plat} className="h-3.5 w-3.5" />}
                 {plat}
               </button>
             );
@@ -195,7 +354,20 @@ export default function SocialPulsePage() {
         </div>
       </div>
 
-      {/* GEOGRAPHIC SCOPE SELECTOR (FR-GEO-01 S/D FR-GEO-08) */}
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          {loadError}
+        </div>
+      )}
+      {actionMessage && (
+        <div role="status" className="flex items-start justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200">
+          <span>{actionMessage}</span>
+          <button onClick={() => setActionMessage(null)} className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-100">
+            Tutup
+          </button>
+        </div>
+      )}
+
       <GeographicScopeSelector
         currentScopeKode={scopeKode}
         currentScopeName={scopeName}
@@ -207,224 +379,173 @@ export default function SocialPulsePage() {
         dataCoverage={overview?.data_coverage}
       />
 
-      {/* EXECUTIVE KPI CARDS (TERFILTER GEOGRAFIS) */}
+      <SocialFilterBar
+        facets={facets}
+        category={category}
+        agency={agency}
+        sort={sort}
+        onCategory={setCategory}
+        onAgency={setAgency}
+        onSort={setSort}
+      />
+
+      {baselineIncomplete && (
+        <div className="rounded-xl border border-violet-300/60 bg-violet-50 px-4 py-3 text-xs text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200">
+          <strong>Baseline masih dibangun:</strong> {baseline.windows_available} dari {baseline.windows_target} periode {windowLabel} sebelumnya
+          sudah punya data
+          {baseline.coverage_since ? ` (pengumpulan medsos sejak ${formatWib(baseline.coverage_since)} WIB)` : ""}. Topik tanpa pembanding
+          berstatus BARU dan belum dieskalasi otomatis. Hasil akan makin akurat setelah penarikan berkala berjalan beberapa periode.
+        </div>
+      )}
+
+      {/* KPI */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {/* KPI 1: Total Mentions */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-semibold uppercase tracking-wider">Total Percakapan</span>
-            <span className="rounded-full bg-blue-500/10 px-2 py-0.5 font-bold text-blue-600 dark:text-blue-400">
-              {timeRange}
-            </span>
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Percakapan {windowLabel}</div>
+          <div className="mt-3 text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
+            {isLoading && !overview ? "..." : (overview?.total_mentions ?? 0).toLocaleString("id-ID")}
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
-              {isLoading ? "..." : (overview?.total_mentions ?? 0).toLocaleString("id-ID")}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">mentions</span>
-          </div>
-          <div className="mt-2 flex items-center text-xs">
+          <div className="mt-2 text-xs">
             <span
-              className={`inline-flex items-center gap-1 font-semibold ${
-                (overview?.mention_growth_pct ?? 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"
+              className={`font-semibold ${
+                overview?.mention_growth_pct === null || overview?.mention_growth_pct === undefined
+                  ? "text-zinc-400"
+                  : overview.mention_growth_pct >= 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-zinc-500"
               }`}
             >
-              {(overview?.mention_growth_pct ?? 0) >= 0 ? "+" : ""}
-              {overview?.mention_growth_pct ?? 0}%
+              {growthText(overview?.mention_growth_pct)}
             </span>
-            <span className="ml-1 text-zinc-500 dark:text-zinc-400">vs periode lalu</span>
+            {overview?.previous_mentions !== null && overview?.previous_mentions !== undefined && (
+              <span className="ml-1 text-zinc-500 dark:text-zinc-400">vs {overview.previous_mentions} periode lalu</span>
+            )}
           </div>
         </div>
 
-        {/* KPI 2: Trending Topics */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-semibold uppercase tracking-wider">Topik Tren Lokal</span>
-            <span className="h-2 w-2 rounded-full bg-fuchsia-500" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
-              {isLoading ? "..." : overview?.trending_topics_count ?? 0}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">klaster narasi</span>
-          </div>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 truncate">
-            {scopeKode === "ID" ? "Tren nasional publik" : `Tren wilayah ${scopeName}`}
-          </p>
-        </div>
-
-        {/* KPI 3: Emerging / Lonjakan Baru */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-semibold uppercase tracking-wider">Lonjakan Baru</span>
-            <span className="rounded-full bg-rose-500/10 px-2 py-0.5 font-bold text-rose-600 dark:text-rose-400 animate-pulse">
-              SURGING
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-rose-600 dark:text-rose-400">
-              {isLoading ? "..." : overview?.emerging_trends_count ?? 0}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">isu melonjak</span>
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Topik Terkelompok</div>
+          <div className="mt-3 text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
+            {isLoading && !overview ? "..." : overview?.trending_topics_count ?? 0}
           </div>
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Akselerasi laju &gt;150% di wilayah ini
+            Topik dengan 2 konten atau lebih{overview?.new_trends_count ? `, ${overview.new_trends_count} tanpa pembanding` : ""}
           </p>
         </div>
 
-        {/* KPI 4: Rasio Sentimen Negatif */}
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Lonjakan &amp; Kenaikan</div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-rose-600 dark:text-rose-400">
+              {isLoading && !overview ? "..." : overview?.surging_trends_count ?? 0}
+            </span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">lonjakan tinggi</span>
+          </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            +{Math.max(0, (overview?.emerging_trends_count ?? 0) - (overview?.surging_trends_count ?? 0))} meningkat. Ambang: rasio &gt;= 3x atau z-score &gt;= 3,
+            minimal {baseline?.min_surge_volume ?? 3} konten
+          </p>
+        </div>
+
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
             <span className="font-semibold uppercase tracking-wider">Sentimen Negatif</span>
-            <span className="font-bold text-amber-600 dark:text-amber-400">
-              {isLoading ? "..." : `${overview?.negative_ratio_pct ?? 0}%`}
-            </span>
+            <span className="font-bold text-zinc-800 dark:text-zinc-200">{overview ? `${overview.negative_ratio_pct}%` : "..."}</span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
-              {isLoading ? "..." : overview?.sentiment_breakdown?.negatif ?? 0}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">keluhan warga</span>
-          </div>
-          <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-            <div
-              style={{
-                width: `${
-                  overview?.total_mentions
-                    ? ((overview.sentiment_breakdown?.positif ?? 0) / overview.total_mentions) * 100
-                    : 0
-                }%`,
-              }}
-              className="bg-emerald-500"
-              title="Positif"
-            />
-            <div
-              style={{
-                width: `${
-                  overview?.total_mentions
-                    ? ((overview.sentiment_breakdown?.netral ?? 0) / overview.total_mentions) * 100
-                    : 0
-                }%`,
-              }}
-              className="bg-zinc-400"
-              title="Netral"
-            />
-            <div
-              style={{
-                width: `${
-                  overview?.total_mentions
-                    ? ((overview.sentiment_breakdown?.negatif ?? 0) / overview.total_mentions) * 100
-                    : 0
-                }%`,
-              }}
-              className="bg-rose-500"
-              title="Negatif"
-            />
+          <div className="mt-3 text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">{overview?.sentiment_breakdown?.negatif ?? 0}</div>
+          <div className="mt-2 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" role="img"
+            aria-label={`Positif ${overview?.sentiment_breakdown?.positif ?? 0}, netral ${overview?.sentiment_breakdown?.netral ?? 0}, negatif ${overview?.sentiment_breakdown?.negatif ?? 0}`}>
+            {(["positif", "netral", "negatif"] as const).map((k) => (
+              <div
+                key={k}
+                title={`${k}: ${overview?.sentiment_breakdown?.[k] ?? 0}`}
+                style={{ width: `${overview?.total_mentions ? ((overview.sentiment_breakdown?.[k] ?? 0) / overview.total_mentions) * 100 : 0}%` }}
+                className={k === "positif" ? "bg-emerald-500" : k === "netral" ? "bg-zinc-400" : "bg-rose-500"}
+              />
+            ))}
           </div>
         </div>
 
-        {/* KPI 5: Platform Terpantau */}
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-semibold uppercase tracking-wider">Kanal Terlibat</span>
-            <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Aktif
-            </span>
-          </div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Kanal &amp; Akun</div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
-              {isLoading ? "..." : overview?.active_platforms_count ?? 0}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">sumber terdeteksi</span>
+            <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">{overview?.active_platforms_count ?? 0}</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">kanal, {overview?.unique_accounts ?? 0} akun</span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5">
-            <RealBrandIcon name="threads" className="w-4 h-4" />
-            <RealBrandIcon name="x" className="w-4 h-4" />
-            <RealBrandIcon name="youtube" className="w-4 h-4" />
-            <RealBrandIcon name="tiktok" className="w-4 h-4" />
-            <span className="text-2xs text-zinc-400">Multi-Kanal</span>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {Object.keys(overview?.platform_distribution ?? {}).map((p) => (
+              <RealBrandIcon key={p} name={p} className="h-4 w-4" />
+            ))}
+            <span className="text-2xs text-zinc-500">
+              Nama akun tersedia di {overview?.author_coverage_pct ?? 0}% konten
+              {overview?.engagement.views ? `, ${formatCompact(overview.engagement.views)} tayangan tercatat` : ""}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* VIEW TABS NAVIGATION */}
-      <div className="flex items-center border-b border-zinc-200 dark:border-zinc-800">
-        <button
-          onClick={() => setActiveTab("tren")}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
-            activeTab === "tren"
-              ? "border-fuchsia-600 text-fuchsia-600 dark:border-fuchsia-400 dark:text-fuchsia-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-          </svg>
-          Topik Tren Wilayah ({trends.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("perbandingan")}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
-            activeTab === "perbandingan"
-              ? "border-fuchsia-600 text-fuchsia-600 dark:border-fuchsia-400 dark:text-fuchsia-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          Perbandingan Antar-Wilayah (FR-GEO-06)
-        </button>
-        <button
-          onClick={() => setActiveTab("platform")}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
-            activeTab === "platform"
-              ? "border-fuchsia-600 text-fuchsia-600 dark:border-fuchsia-400 dark:text-fuchsia-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-          Status Platform ({platforms.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("korelasi")}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
-            activeTab === "korelasi"
-              ? "border-fuchsia-600 text-fuchsia-600 dark:border-fuchsia-400 dark:text-fuchsia-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-          </svg>
-          Korelasi Isu RADAR ({correlations.length})
-        </button>
+      {overview && overview.timeline.length > 0 && (
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+          <VolumeTimeline data={overview.timeline} baselinePerBucket={null} title={`Volume percakapan medsos, ${windowLabel} terakhir (WIB)`} />
+          {healthSummary.bermasalah.length > 0 && (
+            <p className="mt-3 text-2xs text-amber-700 dark:text-amber-400">
+              Perhatian: {healthSummary.bermasalah.map((p) => `${p.name} (${HEALTH_LABEL[p.health_state].toLowerCase()})`).join(", ")}. Volume dari kanal
+              ini bisa lebih rendah dari kenyataan.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* TABS */}
+      <div className="flex items-center overflow-x-auto border-b border-zinc-200 dark:border-zinc-800" role="tablist">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={activeTab === t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold transition-all ${
+              activeTab === t.id
+                ? "border-fuchsia-600 text-fuchsia-600 dark:border-fuchsia-400 dark:text-fuchsia-400"
+                : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* TAB 1: TRENDING TOPICS TABLE */}
+      {/* TAB: TREN */}
       {activeTab === "tren" && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                Peringkat Tren Percakapan Warganet: {scopeName}
+                Topik Tren: {scopeName}
+                {category && facets && ` · ${facets.categories.find((c) => c.id === category)?.label ?? category}`}
+                {agency && facets && ` · ${facets.agencies.find((a) => a.id === agency)?.label ?? agency}`}
               </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Data percakapan yang tervalidasi relevan dengan cakupan wilayah aktif ({scopeMode === "context" ? "Wilayah + Konteks" : scopeMode === "strict" ? "Lokasi Ketat" : "Konteks Regional"}).
+              <p className="max-w-2xl text-xs text-zinc-500 dark:text-zinc-400">
+                Topik dikelompokkan dari hashtag, frasa dua kata yang berulang, dan kategori isu. Urutan berdasarkan skor laju, yang
+                menggabungkan z-score, rasio terhadap baseline, dan volume.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-rose-500" /> Lonjakan Tinggi
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-amber-500" /> Meningkat
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-sky-500" /> Stabil
-              </span>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              onClick={() => downloadTrendsCsv(trends, timeRange)}
+              disabled={trends.length === 0}
+              className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Unduh CSV
+            </button>
+            <button
+              onClick={handleEscalate}
+              disabled={isEscalating || surgingCount === 0}
+              title={surgingCount === 0 ? "Tidak ada topik berstatus LONJAKAN TINGGI" : undefined}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isEscalating ? "Mengeskalasi..." : `Eskalasi ${surgingCount} Lonjakan ke Analis`}
+            </button>
             </div>
           </div>
 
@@ -433,177 +554,162 @@ export default function SocialPulsePage() {
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-zinc-200 bg-zinc-50/75 text-2xs uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-400">
                   <tr>
-                    <th scope="col" className="px-4 py-3.5 font-bold">Peringkat &amp; Topik</th>
-                    <th scope="col" className="px-4 py-3.5 font-bold text-center">Volume Mentions</th>
-                    <th scope="col" className="px-4 py-3.5 font-bold text-center">Kecepatan (Velocity)</th>
-                    <th scope="col" className="px-4 py-3.5 font-bold text-center">Kanal Terlibat</th>
-                    <th scope="col" className="px-4 py-3.5 font-bold text-center">Sentimen Warga</th>
-                    <th scope="col" className="px-4 py-3.5 font-bold text-center">Korelasi Isu</th>
-                    <th scope="col" className="px-4 py-3.5 font-bold text-right">Aksi</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold">Topik</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold text-right">Konten</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold">Laju</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold">Pola Waktu</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold">Kanal</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold">Sentimen</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold">Akun</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold">Isu RADAR</th>
+                    <th scope="col" className="px-4 py-3.5 font-bold text-right">Rincian</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {isLoading ? (
+                  {isLoading && trends.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-sm text-zinc-500">
-                        <div className="inline-flex items-center gap-2">
-                          <svg className="h-5 w-5 animate-spin text-fuchsia-600" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                          </svg>
-                          Memfilter data percakapan untuk wilayah {scopeName}...
-                        </div>
+                      <td colSpan={9} className="px-4 py-12 text-center text-sm text-zinc-500">
+                        Mengelompokkan percakapan untuk {scopeName}...
                       </td>
                     </tr>
                   ) : trends.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-sm text-zinc-500">
-                        Tidak ada percakapan publik ditemukan untuk cakupan {scopeName} pada mode {scopeMode}. Coba ubah mode ke &quot;Konteks Regional&quot; atau periksa wilayah sekitar.
+                      <td colSpan={9} className="px-4 py-12 text-center text-sm text-zinc-500">
+                        Tidak ada percakapan medsos untuk {scopeName} dalam {windowLabel} terakhir
+                        {category || agency ? " dengan filter kategori atau instansi ini" : ""}. Coba rentang waktu lebih panjang, hapus
+                        filter, atau tarik data baru.
                       </td>
                     </tr>
                   ) : (
-                    trends.map((item) => {
-                      const isSurging = item.velocity_status === "LONJAKAN TINGGI";
-                      const isRising = item.velocity_status === "MENINGKAT";
-
-                      return (
-                        <tr
-                          key={item.rank}
-                          className="group transition-colors hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40"
-                        >
-                          {/* Rank & Topic */}
-                          <td className="px-4 py-4">
-                            <div className="flex items-start gap-3">
-                              <span
-                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                                  item.rank === 1
-                                    ? "bg-amber-500 text-white shadow-xs"
-                                    : item.rank === 2
-                                    ? "bg-slate-400 text-white"
-                                    : item.rank === 3
-                                    ? "bg-amber-700 text-white"
-                                    : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                                }`}
-                              >
-                                #{item.rank}
-                              </span>
-                              <div className="space-y-1">
-                                <h3 className="font-bold text-zinc-900 group-hover:text-fuchsia-600 dark:text-zinc-100 dark:group-hover:text-fuchsia-400">
-                                  {item.topic}
-                                </h3>
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  {item.hashtags.map((ht, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-2xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                    trends.map((item) => (
+                      <tr key={item.topic_key} className="group align-top transition-colors hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
+                        <td className="px-4 py-4">
+                          <div className="flex items-start gap-3">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-100 font-mono text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                              {item.rank}
+                            </span>
+                            <div className="min-w-0 space-y-1">
+                              <h3 className="font-bold text-zinc-900 dark:text-zinc-100">{item.topic}</h3>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-2xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                                  {item.topic_type}
+                                </span>
+                                {item.hashtags.filter((h) => h !== item.topic).slice(0, 2).map((ht) => (
+                                  <span key={ht} className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-2xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                                    {ht}
+                                  </span>
+                                ))}
+                                {item.coordination.flagged && (
+                                  <span
+                                    className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-700 dark:text-amber-300"
+                                    title="Ada teks hampir identik dari 3 akun atau lebih dalam 2 jam"
+                                  >
+                                    Indikasi teks kembar
+                                  </span>
+                                )}
+                              </div>
+                              {item.related_phrases.length > 0 && (
+                                <p className="text-2xs text-zinc-500">Terkait: {item.related_phrases.join(", ")}</p>
+                              )}
+                              {(item.categories.length > 0 || item.agencies.length > 0) && (
+                                <div className="flex flex-wrap gap-1 pt-0.5">
+                                  {item.categories.filter((c) => c.label !== item.topic).slice(0, 2).map((c) => (
+                                    <button
+                                      key={c.id}
+                                      onClick={() => setCategory(c.id)}
+                                      title={`Filter kategori ${c.label}`}
+                                      className="rounded-full bg-sky-500/10 px-2 py-0.5 text-2xs font-medium text-sky-700 hover:bg-sky-500/20 dark:text-sky-300"
                                     >
-                                      {ht}
-                                    </span>
+                                      {c.label}
+                                    </button>
+                                  ))}
+                                  {item.agencies.slice(0, 2).map((a) => (
+                                    <button
+                                      key={a.id}
+                                      onClick={() => setAgency(a.id)}
+                                      title={`Filter instansi ${a.label}`}
+                                      className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-2xs font-medium text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                                    >
+                                      {a.label}
+                                    </button>
                                   ))}
                                 </div>
-                              </div>
+                              )}
                             </div>
-                          </td>
-
-                          {/* Mention volume & growth */}
-                          <td className="px-4 py-4 text-center">
-                            <div className="font-bold text-zinc-900 dark:text-zinc-100">
-                              {item.mention_count} <span className="text-xs font-normal text-zinc-500">mentions</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{item.mention_count}</div>
+                          <div
+                            className={`text-2xs font-semibold ${
+                              item.growth_pct === null ? "text-zinc-400" : item.growth_pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"
+                            }`}
+                          >
+                            {item.growth_pct === null ? "tanpa pembanding" : `${item.growth_pct >= 0 ? "+" : ""}${item.growth_pct}%`}
+                          </div>
+                          {item.engagement.views !== null && (
+                            <div className="text-2xs text-zinc-500" title={`Dari ${item.engagement.posts_with_data} konten yang datanya tersedia`}>
+                              {formatCompact(item.engagement.views)} tayangan
                             </div>
-                            <span
-                              className={`inline-block mt-0.5 text-2xs font-semibold ${
-                                item.growth_pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400"
-                              }`}
-                            >
-                              {item.growth_pct >= 0 ? "+" : ""}{item.growth_pct}%
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col items-start gap-1">
+                            <VelocityBadge status={item.velocity_status} />
+                            <span className="text-2xs text-zinc-500">
+                              Skor <strong className="font-mono text-zinc-800 dark:text-zinc-200">{item.velocity_score}</strong>
+                              {item.velocity.baseline_windows > 0 && <> · {item.velocity.ratio}x</>}
                             </span>
-                          </td>
-
-                          {/* Velocity status & score */}
-                          <td className="px-4 py-4 text-center">
-                            <div className="inline-flex flex-col items-center gap-1">
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-2xs font-bold ${
-                                  isSurging
-                                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 ring-1 ring-rose-500/30"
-                                    : isRising
-                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30"
-                                    : "bg-sky-500/15 text-sky-700 dark:text-sky-300 ring-1 ring-sky-500/30"
-                                }`}
-                              >
-                                {isSurging && <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />}
-                                {item.velocity_status}
-                              </span>
-                              <span className="text-2xs font-medium text-zinc-500">
-                                Skor Laju: <strong className="text-zinc-800 dark:text-zinc-200">{item.velocity_score}</strong>/100
-                              </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Sparkline data={item.timeline} label={`Pola waktu ${item.topic}`} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <MediaAvatarStack sources={item.platforms} max={3} size="md" />
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="w-24 space-y-1">
+                            <div className="flex h-1.5 w-full gap-px overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                              <div style={{ width: `${item.sentiment_pct.positif}%` }} className="bg-emerald-500" title={`Positif ${item.sentiment_pct.positif}%`} />
+                              <div style={{ width: `${item.sentiment_pct.netral}%` }} className="bg-zinc-400" title={`Netral ${item.sentiment_pct.netral}%`} />
+                              <div style={{ width: `${item.sentiment_pct.negatif}%` }} className="bg-rose-500" title={`Negatif ${item.sentiment_pct.negatif}%`} />
                             </div>
-                          </td>
-
-                          {/* Channels involved with MediaAvatarStack */}
-                          <td className="px-4 py-4 text-center">
-                            <div className="flex justify-center">
-                              <MediaAvatarStack sources={item.platforms} max={3} size="md" />
-                            </div>
-                          </td>
-
-                          {/* Sentiment mini bar */}
-                          <td className="px-4 py-4 text-center">
-                            <div className="w-28 mx-auto space-y-1">
-                              <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-                                <div
-                                  style={{ width: `${item.sentiment_pct.positif}%` }}
-                                  className="bg-emerald-500"
-                                  title={`Positif: ${item.sentiment_pct.positif}%`}
-                                />
-                                <div
-                                  style={{ width: `${item.sentiment_pct.netral}%` }}
-                                  className="bg-zinc-400"
-                                  title={`Netral: ${item.sentiment_pct.netral}%`}
-                                />
-                                <div
-                                  style={{ width: `${item.sentiment_pct.negatif}%` }}
-                                  className="bg-rose-500"
-                                  title={`Negatif: ${item.sentiment_pct.negatif}%`}
-                                />
-                              </div>
-                              <div className="flex justify-between text-3xs text-zinc-400">
-                                <span className="text-emerald-600 font-semibold">{item.sentiment_pct.positif}%</span>
-                                <span className="text-rose-600 font-semibold">{item.sentiment_pct.negatif}%</span>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Correlated Issue */}
-                          <td className="px-4 py-4 text-center">
-                            {item.correlated_issue ? (
-                              <Link
-                                href="/isu"
-                                className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                              >
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                {item.correlated_issue.kode_referensi}
-                              </Link>
-                            ) : (
-                              <span className="text-2xs text-zinc-400">Belum Terhubung</span>
-                            )}
-                          </td>
-
-                          {/* Action Button */}
-                          <td className="px-4 py-4 text-right">
-                            <button
-                              onClick={() => setSelectedTopic(item)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-fuchsia-50 px-2.5 py-1.5 text-xs font-semibold text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-950/50 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/50 transition-colors"
+                            <div className="text-2xs text-zinc-500">Negatif {item.sentiment_pct.negatif}%</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-2xs text-zinc-600 dark:text-zinc-300">
+                          {item.accounts.unique_accounts > 0 ? (
+                            <>
+                              <div className="font-semibold">{item.accounts.unique_accounts} akun</div>
+                              <div className="text-zinc-500">{item.accounts.top_accounts[0]?.handle}</div>
+                            </>
+                          ) : (
+                            <span className="text-zinc-400" title="Sumber tidak menyediakan nama akun">Tidak tersedia</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          {item.correlated_issue ? (
+                            <Link
+                              href={`/isu/${item.correlated_issue.id}`}
+                              className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 font-mono text-xs font-semibold text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                             >
-                              <span>Lihat Cuitan &amp; Postingan Asli</span>
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
+                              {item.correlated_issue.kode_referensi}
+                            </Link>
+                          ) : (
+                            <span className="text-2xs text-zinc-400">Belum tertaut</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <button
+                            onClick={() => setSelectedTopic(item)}
+                            className="rounded-lg bg-fuchsia-50 px-2.5 py-1.5 text-xs font-semibold text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-950/50 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/50"
+                          >
+                            Lihat
+                          </button>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -612,85 +718,93 @@ export default function SocialPulsePage() {
         </div>
       )}
 
-      {/* TAB 2: GEOGRAPHIC COMPARISON TABLE (FR-GEO-06) */}
-      {activeTab === "perbandingan" && (
-        <GeographicComparisonTable timeRange={timeRange} />
+      {activeTab === "instansi" && (
+        <SocialAgencyBoard
+          data={agencyBoard}
+          isLoading={isLoading}
+          onFocusAgency={(id) => {
+            setAgency(id);
+            setActiveTab("tren");
+          }}
+        />
       )}
 
-      {/* TAB 3: PLATFORM CONNECTORS GRID */}
+      {activeTab === "watchlist" && (
+        <SocialWatchlistPanel data={watchlist} isLoading={isLoading} extraTerms={extraTerms} onAddTerm={addTerm} onRemoveTerm={removeTerm} />
+      )}
+
+      {activeTab === "perbandingan" && <GeographicComparisonTable timeRange={timeRange} />}
+
+      {/* TAB: PLATFORM */}
       {activeTab === "platform" && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              Status Konektor Platform untuk Cakupan: {scopeName}
-            </h2>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Status Konektor Platform</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Volume dan sentimen media sosial yang terdeteksi di wilayah ini per platform.
+              Status diambil dari hasil tarikan terakhir setiap sumber. Volume dihitung untuk {scopeName}, {windowLabel} terakhir.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {platforms.map((plat) => (
-              <div
-                key={plat.code}
-                className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <div className="flex items-start justify-between">
+              <div key={plat.code} className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <RealBrandIcon name={plat.icon} className="w-8 h-8" />
+                    <RealBrandIcon name={plat.icon} className="h-8 w-8" />
                     <div>
                       <h3 className="font-bold text-zinc-900 dark:text-zinc-100">{plat.name}</h3>
                       <p className="text-2xs text-zinc-500 dark:text-zinc-400">{plat.type}</p>
                     </div>
                   </div>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-2xs font-semibold ${
-                      plat.is_connected
-                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/30"
-                        : "bg-amber-500/10 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/30"
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        plat.is_connected ? "bg-emerald-500" : "bg-amber-500"
-                      }`}
-                    />
-                    {plat.official_status}
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-2xs font-semibold ring-1 ${HEALTH_STYLE[plat.health_state]}`}>
+                    {HEALTH_LABEL[plat.health_state]}
                   </span>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
                   <div>
-                    <span className="text-2xs text-zinc-500 dark:text-zinc-400">Mentions Wilayah Ini</span>
-                    <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                      {plat.mention_count.toLocaleString("id-ID")}
-                    </p>
+                    <dt className="text-2xs text-zinc-500">Konten</dt>
+                    <dd className="font-mono text-lg font-bold text-zinc-900 dark:text-zinc-100">{plat.mention_count}</dd>
                   </div>
                   <div>
-                    <span className="text-2xs text-zinc-500 dark:text-zinc-400">Sentimen Negatif</span>
-                    <p className="text-lg font-bold text-rose-600 dark:text-rose-400">
-                      {plat.negative_sentiment_pct}%
-                    </p>
+                    <dt className="text-2xs text-zinc-500">Negatif</dt>
+                    <dd className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{plat.mention_count ? `${plat.negative_sentiment_pct}%` : "-"}</dd>
                   </div>
-                </div>
+                  <div>
+                    <dt className="text-2xs text-zinc-500">Interaksi</dt>
+                    <dd className="text-lg font-bold text-zinc-900 dark:text-zinc-100" title={plat.engagement.interactions === null ? "Sumber tidak menyediakan data interaksi" : undefined}>
+                      {formatCompact(plat.engagement.interactions)}
+                    </dd>
+                  </div>
+                </dl>
 
-                <div className="mt-4 flex items-center justify-between text-2xs text-zinc-400 dark:text-zinc-500">
-                  <span>
-                    Data Terakhir:{" "}
-                    {plat.last_data_at
-                      ? new Date(plat.last_data_at).toLocaleDateString("id-ID", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "Dalam Antrean"}
-                  </span>
-                  <button
-                    onClick={handleManualPoll}
-                    disabled={isRefreshing}
-                    className="font-semibold text-fuchsia-600 hover:text-fuchsia-700 dark:text-fuchsia-400"
-                  >
-                    Sinkronkan
-                  </button>
+                {plat.sources.length > 0 && (
+                  <ul className="mt-4 space-y-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                    {plat.sources.map((s) => (
+                      <li key={s.id} className="text-2xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate font-medium text-zinc-700 dark:text-zinc-300" title={s.nama}>{s.nama}</span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ring-1 ${HEALTH_STYLE[s.state]}`}>{HEALTH_LABEL[s.state]}</span>
+                        </div>
+                        <div className="text-zinc-500">
+                          Tarikan terakhir: {formatWib(s.last_fetch_at)} WIB
+                          {s.last_fetch_count !== null && `, ${s.last_fetch_count} konten terkini`}
+                        </div>
+                        {s.last_error && <div className="text-rose-600 dark:text-rose-400">Galat: {s.last_error}</div>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {plat.note && <p className="mt-3 text-2xs leading-relaxed text-zinc-500 dark:text-zinc-400">{plat.note}</p>}
+
+                <div className="mt-auto flex items-center justify-between pt-4 text-2xs text-zinc-500">
+                  <span>Konten terbaru: {plat.last_data_at ? `${formatWib(plat.last_data_at)} WIB` : "belum ada"}</span>
+                  {plat.sources.length > 0 && (
+                    <button onClick={handleManualPoll} disabled={isRefreshing} className="font-semibold text-fuchsia-600 hover:text-fuchsia-700 disabled:opacity-50 dark:text-fuchsia-400">
+                      Tarik ulang
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -698,236 +812,270 @@ export default function SocialPulsePage() {
         </div>
       )}
 
-      {/* TAB 4: SOCIAL TREND TO RADAR ISSUE CORRELATION */}
+      {/* TAB: KORELASI */}
       {activeTab === "korelasi" && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              Matriks Korelasi Tren Media Sosial vs Tiket Isu RADAR ({scopeName})
-            </h2>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Topik Medsos yang Tertaut ke Isu RADAR ({scopeName})</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Menghubungkan suara dan keluhan viral warganet secara transparan dengan nomor referensi penanganan isu resmi.
+              Hanya topik 7 hari terakhir yang kontennya benar-benar tertaut ke sebuah isu, lewat pengelompokan isu atau eskalasi lonjakan.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {correlations.map((c, idx) => (
-              <div
-                key={idx}
-                className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-fuchsia-500/10 px-2.5 py-1 text-xs font-bold text-fuchsia-700 dark:text-fuchsia-300">
-                      Topik Media Sosial
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-2xs font-bold ${
-                        c.issue.level === "CRITICAL"
-                          ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
-                          : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                      }`}
-                    >
-                      {c.issue.level} (Skor: {c.issue.skor})
+          {correlations.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
+              Belum ada topik medsos yang tertaut ke isu RADAR untuk cakupan ini. Topik berstatus LONJAKAN TINGGI bisa dieskalasi dari tab
+              Topik Tren.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {correlations.map((c) => (
+                <div key={`${c.topic_key}-${c.issue.id}`} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="flex items-center justify-between gap-2">
+                    <VelocityBadge status={c.velocity_status} />
+                    <span className="text-2xs text-zinc-500">
+                      Isu {c.issue.level} · skor {c.issue.skor}
                     </span>
                   </div>
-
-                  <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-base">
-                    {c.social_topic}
-                  </h3>
-
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{c.social_topic}</h3>
                   <div className="flex flex-wrap items-center gap-2">
                     <MediaAvatarStack sources={c.platforms} max={4} size="sm" />
                     <span className="text-xs text-zinc-500">
-                      {c.mention_count} mentions warganet
+                      {c.linked_posts} dari {c.mention_count} konten tertaut ke isu
                     </span>
                   </div>
-
-                  {/* Connected RADAR Issue Card */}
                   <div className="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200 dark:bg-zinc-800/60 dark:ring-zinc-700">
-                    <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-                        Tiket Penanganan RADAR
-                      </span>
-                      <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
-                        {c.issue.kode_referensi}
-                      </span>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">Isu RADAR</span>
+                      <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{c.issue.kode_referensi}</span>
                     </div>
-                    <p className="mt-1 font-medium text-xs text-zinc-800 dark:text-zinc-200">
-                      {c.issue.judul}
-                    </p>
+                    <p className="mt-1 text-xs font-medium text-zinc-800 dark:text-zinc-200">{c.issue.judul}</p>
                     <div className="mt-2 flex items-center justify-between text-2xs text-zinc-500">
-                      <span>Status: <strong className="capitalize text-zinc-700 dark:text-zinc-300">{c.issue.status}</strong></span>
-                      <Link
-                        href="/kasus"
-                        className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                      >
-                        Buka Papan Kasus &rarr;
+                      <span>
+                        Status: <strong className="capitalize text-zinc-700 dark:text-zinc-300">{c.issue.status}</strong>
+                      </span>
+                      <Link href={`/isu/${c.issue.id}`} className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                        Buka isu &rarr;
                       </Link>
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedTopic && <TopicDetailModal topic={selectedTopic} scopeName={scopeName} windowLabel={windowLabel} onClose={() => setSelectedTopic(null)} />}
+    </div>
+  );
+}
+
+function TopicDetailModal({
+  topic,
+  scopeName,
+  windowLabel,
+  onClose,
+}: {
+  topic: SocialTrendingTopic;
+  scopeName: string;
+  windowLabel: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const v = topic.velocity;
+  const eng = topic.engagement;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="topic-detail-title"
+        onClick={(e) => e.stopPropagation()}
+        className="relative max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-zinc-900 dark:ring-1 dark:ring-white/10"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-zinc-200 pb-4 dark:border-zinc-800">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <VelocityBadge status={topic.velocity_status} />
+              <span className="text-xs text-zinc-500">
+                {topic.mention_count} konten di {scopeName}, {windowLabel} terakhir
+              </span>
+            </div>
+            <h3 id="topic-detail-title" className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+              {topic.topic}
+            </h3>
+            {topic.locations.length > 0 && <p className="text-xs text-zinc-500">Lokasi terdeteksi: {topic.locations.join(", ")}</p>}
+          </div>
+          <button onClick={onClose} aria-label="Tutup rincian" className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-5">
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { k: "Skor laju", val: `${topic.velocity_score}/100` },
+              { k: "Pertumbuhan", val: growthText(topic.growth_pct) },
+              { k: "Rasio / z-score", val: v.baseline_windows ? `${v.ratio}x / ${v.z_score}` : "-" },
+              { k: "Baseline", val: v.baseline_windows ? `${v.baseline_mean} per periode (${v.baseline_windows} periode)` : "Belum tersedia" },
+            ].map((s) => (
+              <div key={s.k} className="rounded-lg bg-zinc-50 p-2.5 dark:bg-zinc-800/60">
+                <dt className="text-2xs text-zinc-500">{s.k}</dt>
+                <dd className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{s.val}</dd>
               </div>
             ))}
-          </div>
-        </div>
-      )}
+          </dl>
 
-      {/* TOPIC DETAIL & NARRATIVE MODAL (WITH GEOGRAPHIC CONTEXT & CONFIDENCE) */}
-      {selectedTopic && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-zinc-900 dark:ring-1 dark:ring-white/10">
-            {/* Modal header */}
-            <div className="flex items-start justify-between border-b border-zinc-200 pb-4 dark:border-zinc-800">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-fuchsia-500/20 px-2 py-0.5 text-xs font-bold text-fuchsia-700 dark:text-fuchsia-300">
-                    #{selectedTopic.rank} Topik Tren
-                  </span>
-                  <span className="text-xs text-zinc-500">
-                    {selectedTopic.mention_count} percakapan terdata di {scopeName}
-                  </span>
-                </div>
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
-                  {selectedTopic.topic}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedTopic(null)}
-                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+          <VolumeTimeline
+            data={topic.timeline}
+            baselinePerBucket={topic.baseline_per_bucket}
+            title={`Volume per interval${topic.peak_at ? `, puncak ${formatWib(topic.peak_at)} WIB` : ""}`}
+          />
 
-            {/* Modal body: Mentions evidence and citizen quotes */}
-            <div className="mt-4 space-y-4">
-              <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Profil Kecepatan &amp; Sentimen Wilayah
-                </h4>
-                <div className="mt-2 grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-lg bg-white p-2.5 shadow-2xs dark:bg-zinc-800">
-                    <span className="text-2xs text-zinc-400">Status Laju</span>
-                    <p className="font-bold text-xs text-rose-600 dark:text-rose-400">
-                      {selectedTopic.velocity_status}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-white p-2.5 shadow-2xs dark:bg-zinc-800">
-                    <span className="text-2xs text-zinc-400">Pertumbuhan</span>
-                    <p className="font-bold text-xs text-emerald-600 dark:text-emerald-400">
-                      +{selectedTopic.growth_pct}%
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-white p-2.5 shadow-2xs dark:bg-zinc-800">
-                    <span className="text-2xs text-zinc-400">Sentimen Negatif</span>
-                    <p className="font-bold text-xs text-zinc-800 dark:text-zinc-200">
-                      {selectedTopic.sentiment_pct.negatif}%
-                    </p>
-                  </div>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Akun paling aktif</h4>
+              {topic.accounts.unique_accounts === 0 ? (
+                <p className="mt-2 text-xs text-zinc-500">Sumber tidak menyediakan nama akun untuk konten topik ini.</p>
+              ) : (
+                <>
+                  <ul className="mt-2 space-y-1.5">
+                    {topic.accounts.top_accounts.map((a) => (
+                      <li key={a.handle} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate font-semibold text-zinc-800 dark:text-zinc-200">{a.handle}</span>
+                        <span className="shrink-0 text-zinc-500">
+                          {a.posts} konten{a.followers !== null ? ` · ${formatCompact(a.followers)} pengikut` : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-2xs text-zinc-500">
+                    {topic.accounts.unique_accounts} akun, nama akun tersedia di {topic.accounts.author_coverage_pct}% konten. Akun teratas
+                    menyumbang {topic.accounts.top_account_share_pct}% konten.
+                  </p>
+                </>
+              )}
+            </section>
 
-              <div>
-                <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Postingan Warganet &amp; Cuitan Asli Terverifikasi</span>
-                  </div>
-                  <span className="text-3xs font-mono font-medium text-zinc-400">Bukti Lokasi &amp; Keyakinan Geografis Aktual (FR-GEO-07 &amp; FR-GEO-08)</span>
-                </h4>
-                <div className="space-y-3">
-                  {selectedTopic.sample_mentions.map((sm) => {
-                    const authorLabel = sm.penulis && sm.penulis !== sm.penerbit
-                      ? sm.penulis
-                      : sm.penerbit === sm.platform
-                      ? sm.platform
-                      : `${sm.penerbit} (${sm.platform})`;
-
-                    return (
-                      <div
-                        key={sm.id}
-                        className="rounded-xl border border-zinc-200 bg-white/70 p-3.5 dark:border-zinc-800 dark:bg-zinc-800/30 transition-all hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs"
-                      >
-                        <div className="flex items-center justify-between text-2xs text-zinc-500 mb-2">
-                          <div className="flex items-center gap-2">
-                            <RealBrandIcon name={sm.platform} className="w-4 h-4" />
-                            <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                              {authorLabel}
-                            </span>
-                            {sm.penulis && sm.penulis !== sm.penerbit && (
-                              <span className="rounded-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.2 text-3xs font-mono text-zinc-500">
-                                {sm.platform}
-                              </span>
-                            )}
-                          </div>
-                          {/* Geographic Context & Confidence Badges (FR-GEO-07 & FR-GEO-08) */}
-                          <div className="flex items-center gap-1.5">
-                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-bold text-3xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                              {sm.geo_context || "Lokasi Disebut"}
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 font-bold text-3xs ${
-                                sm.geo_confidence === "High"
-                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                                  : sm.geo_confidence === "Medium"
-                                  ? "bg-blue-500/15 text-blue-700 dark:text-blue-300"
-                                  : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                              }`}
-                            >
-                              Confidence: {sm.geo_confidence || "Medium"}
-                            </span>
-                          </div>
-                        </div>
-                        <h5 className="font-bold text-xs text-zinc-900 dark:text-zinc-100 leading-snug">
-                          {sm.judul}
-                        </h5>
-                        <p className="mt-1.5 text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                          &quot;{sm.isi}&quot;
-                        </p>
-                        <div className="mt-2.5 flex items-center justify-between text-2xs text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
-                          <span className="font-mono text-3xs">
-                            {new Date(sm.published_at).toLocaleDateString("id-ID", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })} WIB
-                          </span>
-                          {sm.url && (
-                            <a
-                              href={sm.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-bold text-xs text-fuchsia-600 hover:text-fuchsia-700 dark:text-fuchsia-400 dark:hover:text-fuchsia-300 hover:underline inline-flex items-center gap-1"
-                            >
-                              <span>Buka Sumber Asli</span>
-                              <span aria-hidden="true">&rarr;</span>
-                            </a>
-                          )}
-                        </div>
+            <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Interaksi</h4>
+              {eng.posts_with_data === 0 ? (
+                <p className="mt-2 text-xs text-zinc-500">Sumber konten topik ini tidak menyediakan jumlah like, repost, atau tayangan.</p>
+              ) : (
+                <>
+                  <dl className="mt-2 grid grid-cols-4 gap-2 text-center">
+                    {[
+                      ["Like", eng.likes],
+                      ["Repost", eng.shares],
+                      ["Balasan", eng.replies],
+                      ["Tayangan", eng.views],
+                    ].map(([label, val]) => (
+                      <div key={label as string}>
+                        <dt className="text-2xs text-zinc-500">{label}</dt>
+                        <dd className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100">{formatCompact(val as number | null)}</dd>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Modal footer */}
-            <div className="mt-6 flex justify-end border-t border-zinc-200 pt-4 dark:border-zinc-800">
-              <button
-                onClick={() => setSelectedTopic(null)}
-                className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
-              >
-                Tutup Rincian
-              </button>
-            </div>
+                    ))}
+                  </dl>
+                  <p className="mt-2 text-2xs text-zinc-500">Dari {eng.posts_with_data} konten yang datanya tersedia ({eng.coverage_pct}%).</p>
+                </>
+              )}
+            </section>
           </div>
+
+          {topic.coordination.clusters.length > 0 && (
+            <section
+              className={`rounded-xl p-4 ${
+                topic.coordination.flagged ? "border border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30" : "border border-zinc-200 dark:border-zinc-800"
+              }`}
+            >
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
+                {topic.coordination.flagged ? "Indikasi teks kembar dari banyak akun" : "Teks berulang"}
+              </h4>
+              <p className="mt-1 text-2xs text-zinc-600 dark:text-zinc-400">
+                {topic.coordination.duplicate_share_pct}% konten punya teks hampir identik dengan konten lain. Ini bisa berasal dari siaran resmi
+                yang dikutip ulang, jadi periksa sumbernya sebelum menyimpulkan.
+              </p>
+              <ul className="mt-2 space-y-2">
+                {topic.coordination.clusters.map((c, i) => (
+                  <li key={i} className="text-xs text-zinc-700 dark:text-zinc-300">
+                    <span className="font-semibold">
+                      {c.posts} konten, {c.distinct_accounts} akun, rentang {c.span_minutes} menit
+                    </span>
+                    {c.accounts.length > 0 && <span className="text-zinc-500"> ({c.accounts.join(", ")})</span>}
+                    <div className="mt-0.5 italic text-zinc-500">&quot;{c.sample_text}&quot;</div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section>
+            <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-zinc-500">Konten asli ({topic.sample_mentions.length} teratas)</h4>
+            <div className="space-y-3">
+              {topic.sample_mentions.map((sm) => (
+                <article key={sm.id} className="rounded-xl border border-zinc-200 p-3.5 dark:border-zinc-800">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-2xs text-zinc-500">
+                    <div className="flex items-center gap-2">
+                      <RealBrandIcon name={sm.platform} className="h-4 w-4" />
+                      <span className="font-bold text-zinc-900 dark:text-zinc-100">{sm.penulis ?? "Akun tidak diketahui"}</span>
+                      <span>{sm.platform}</span>
+                    </div>
+                    {sm.geo_context && (
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                        {sm.geo_context} · keyakinan {sm.geo_confidence ?? "-"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs leading-relaxed text-zinc-800 dark:text-zinc-200">{sm.isi}</p>
+                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-2 text-2xs text-zinc-500 dark:border-zinc-800">
+                    <span className="font-mono">
+                      {formatWib(sm.published_at)} WIB
+                      {sm.engagement && (sm.engagement.likes !== null || sm.engagement.views !== null) && (
+                        <>
+                          {" · "}
+                          {sm.engagement.likes !== null && `${formatCompact(sm.engagement.likes)} like`}
+                          {sm.engagement.shares !== null && `, ${formatCompact(sm.engagement.shares)} repost`}
+                          {sm.engagement.views !== null && `, ${formatCompact(sm.engagement.views)} tayangan`}
+                        </>
+                      )}
+                    </span>
+                    {sm.url && (
+                      <a href={sm.url} target="_blank" rel="noopener noreferrer" className="font-bold text-fuchsia-600 hover:underline dark:text-fuchsia-400">
+                        Buka sumber asli &rarr;
+                      </a>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {topic.correlated_issue && (
+            <p className="text-xs text-zinc-600 dark:text-zinc-300">
+              {topic.correlated_issue.linked_posts ?? 0} konten topik ini tertaut ke isu{" "}
+              <Link href={`/isu/${topic.correlated_issue.id}`} className="font-mono font-semibold text-blue-600 hover:underline dark:text-blue-400">
+                {topic.correlated_issue.kode_referensi}
+              </Link>{" "}
+              ({topic.correlated_issue.status}).
+            </p>
+          )}
         </div>
-      )}
+
+        <div className="mt-6 flex justify-end border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <button onClick={onClose} className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900">
+            Tutup
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

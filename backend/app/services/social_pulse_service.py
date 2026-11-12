@@ -1,234 +1,469 @@
-"""Service untuk analitik RADAR Social Pulse dengan Kapabilitas Geographic Scope Intelligence.
+"""Analitik RADAR Social Pulse dengan cakupan geografis.
 
-Mendukung pemantauan berbasis cakupan geografis dinamis (Nasional, Provinsi, Kab/Kota, Kecamatan, Kelurahan).
-100% dari data kanonik riil (RawItem + ItemAnalysis + Source) tanpa mock data tiruan.
-Menerapkan ekspansi query entitas lokal, klasifikasi konteks geografis (Direct, Explicit, Regional, Uncertain),
-dan tingkat keyakinan (High, Medium, Low, Unknown).
+Semua angka dihitung dari RawItem + ItemAnalysis + Source yang tersimpan. Konten dianggap
+media sosial bila kolom `platform` berisi salah satu SOCIAL_PLATFORMS (ditentukan dari domain
+asli konten saat ingest). Bila sebuah angka tidak bisa dihitung (misalnya engagement tidak
+disediakan sumber, atau baseline belum ada), nilainya dikembalikan sebagai null, bukan 0.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
 
-from backend.app.models import RawItem, ItemAnalysis, Source, Issue, IssueItem
+from backend.app.models import Issue, IssueItem, ItemAnalysis, MonitoringProfile, ProfileRule, RawItem, Source
 from backend.app.services.geo_hierarchy import (
-    classify_geographic_context,
-    get_scope_expansion_keywords,
-    search_geographic_scope,
-    PROVINCES_DATA,
     KABUPATEN_DATA,
     KECAMATAN_DATA,
     KELURAHAN_DATA,
+    PROVINCES_DATA,
+    classify_geographic_context,
+)
+from backend.app.services.social_platform import SOCIAL_PLATFORMS, platform_from_url
+from backend.app.services.social_taxonomy import (
+    AGENCIES,
+    CATEGORIES,
+    UNCATEGORIZED,
+    UNCATEGORIZED_LABEL,
+    agency_label,
+    category_label,
+    classify,
+)
+from backend.app.services.social_topics import (
+    SocialPost,
+    account_analysis,
+    cluster_posts,
+    detect_coordination,
+    engagement_summary,
+    extract_keys,
+    key_label,
+    top_hashtags,
+    top_phrases,
+    velocity,
 )
 
-# Pemetaan penerbit media sosial
-SOCIAL_PUBLISHER_KEYWORDS = {
-    "threads": "Threads",
-    "x.com": "X (Twitter)",
-    "twitter": "X (Twitter)",
-    "tiktok": "TikTok",
-    "youtube": "YouTube",
-    "media_sosial": "Media Sosial",
+# Panjang jendela (jam), jumlah jendela riwayat untuk baseline, dan pembagian timeline.
+WINDOW_HOURS = {"1h": 1, "6h": 6, "24h": 24, "7d": 168}
+BASELINE_WINDOWS = {"1h": 24, "6h": 28, "24h": 14, "7d": 4}
+TIMELINE_BUCKETS = {"1h": (12, 5), "6h": (12, 30), "24h": (24, 60), "7d": (28, 360)}
+
+# Volume minimum agar sebuah topik bisa berstatus lonjakan. Di bawah ini statusnya SINYAL LEMAH.
+MIN_SURGE_VOLUME = 3
+UNCLUSTERED_KEY = "k:Lainnya"
+RISING_STATUSES = ("LONJAKAN TINGGI", "MENINGKAT")
+
+PLATFORM_CATALOG = [
+    {"name": "X (Twitter)", "code": "x", "icon": "x"},
+    {"name": "TikTok", "code": "tiktok", "icon": "tiktok"},
+    {"name": "Threads", "code": "threads", "icon": "threads"},
+    {"name": "YouTube", "code": "youtube", "icon": "youtube"},
+    {"name": "Instagram", "code": "instagram", "icon": "instagram"},
+    {"name": "Facebook", "code": "facebook", "icon": "facebook"},
+    {"name": "Reddit", "code": "reddit", "icon": "reddit"},
+    {"name": "Telegram", "code": "telegram", "icon": "telegram"},
+]
+
+# Keterbatasan nyata metode pengumpulan per platform, ditampilkan ke analis.
+PLATFORM_NOTES = {
+    "Threads": "Penemuan via Google News umumnya hanya memuat halaman profil akun, bukan isi postingan.",
+    "Instagram": "Penemuan via Google News umumnya hanya memuat halaman profil atau keterangan singkat.",
+    "TikTok": "Judul dan keterangan video tersedia; jumlah tayangan tidak disediakan Google News.",
+    "YouTube": "Pencarian via yt-dlp memberi tayangan, like, komentar, dan pengikut kanal. Penemuan via Google News hanya memberi judul.",
+    "X (Twitter)": "Syndication timeline menyediakan like, repost, dan balasan; penemuan via Google News tidak.",
+    "Facebook": "Belum ada sumber terdaftar. Halaman publik memerlukan Meta Graph API.",
+    "Reddit": "RSS subreddit publik: isi postingan dan nama akun tersedia, jumlah upvote tidak.",
+    "Telegram": "Pratinjau kanal publik t.me/s: teks dan jumlah views tersedia. Grup privat tidak bisa dipantau.",
 }
 
-def _detect_platform(penerbit: str, url: str) -> str:
-    """Deteksi platform media sosial dari penerbit atau url kanonik."""
-    p_lower = (penerbit or "").lower()
-    u_lower = (url or "").lower()
+_SITE_RE = re.compile(r"site:([a-z0-9.\-]+)", re.IGNORECASE)
 
-    if "threads" in p_lower or "threads.net" in u_lower:
-        return "Threads"
-    if "twitter" in p_lower or "x (twitter)" in p_lower or "x.com" in u_lower or "twitter.com" in u_lower:
-        return "X (Twitter)"
-    if "tiktok" in p_lower or "tiktok.com" in u_lower:
-        return "TikTok"
-    if "youtube" in p_lower or "youtu.be" in u_lower or "youtube.com" in u_lower:
-        return "YouTube"
-    if "instagram" in p_lower or "instagram.com" in u_lower:
-        return "Instagram"
-    if "facebook" in p_lower or "fb.com" in u_lower:
-        return "Facebook"
-    return "Media Sosial Lainnya"
+
+@dataclass
+class _Dataset:
+    now: datetime
+    window_start: datetime
+    window_hours: int
+    current: List[SocialPost]
+    history: List[SocialPost]
+    covered_windows: List[int]  # indeks jendela riwayat yang sudah tercakup data (0 = jendela tepat sebelumnya)
+    coverage_since: Optional[datetime]
+    geo_meta: Dict[int, Dict[str, Any]]
+    issues_by_item: Dict[int, List[int]]
+    total_collected: int
+    excluded_count: int
+    uncertain_count: int
+    direct_count: int
+    history_window_index: Dict[int, int] = field(default_factory=dict)
+
+
+def _scope_display_name(scope_kode: str) -> str:
+    if scope_kode == "ID":
+        return "Seluruh Indonesia"
+    for kel in KELURAHAN_DATA:
+        if kel["kode"] == scope_kode:
+            return f"Kelurahan {kel['nama']}, Kec. {kel['kecamatan_nama']}"
+    for kec in KECAMATAN_DATA:
+        if kec["kode"] == scope_kode:
+            return f"Kecamatan {kec['nama']}, {kec['kabupaten_nama']}"
+    for kab in KABUPATEN_DATA:
+        if kab["kode"] == scope_kode:
+            return f"{kab['nama']}, {kab['provinsi_nama']}"
+    for prov in PROVINCES_DATA:
+        if prov["kode"] == scope_kode:
+            return f"Provinsi {prov['nama']}"
+    return scope_kode
 
 
 def _filter_items_by_scope(
-    items: List[RawItem],
+    items: Sequence[RawItem],
     scope_kode: str = "ID",
     scope_mode: str = "context",
     multi_codes: Optional[List[str]] = None,
 ) -> List[Tuple[RawItem, str, str, float]]:
-    """
-    Menyaring item berdasarkan cakupan wilayah geografis aktif (FR-GEO-04).
-    Mengembalikan tuple: (item, context_label, confidence_level, confidence_score)
-    """
+    """Saring item berdasarkan cakupan wilayah (FR-GEO-04). Mengembalikan (item, label konteks, tingkat keyakinan, skor)."""
     target_codes = [c.strip() for c in multi_codes if c.strip()] if multi_codes else [scope_kode]
     if not target_codes or target_codes == ["ID"]:
-        # Seluruh Indonesia lolos semua
         return [(it, "Cakupan Nasional", "High", 0.95) for it in items]
 
     filtered: List[Tuple[RawItem, str, str, float]] = []
-    seen_ids = set()
-
     for it in items:
         text = f"{it.judul} {it.isi}"
-        # Evaluasi terhadap semua kode wilayah target (multi-region support)
         for code in target_codes:
             is_relevant, ctx_label, conf_level, conf_score = classify_geographic_context(
-                text=text,
-                scope_kode=code,
-                scope_mode=scope_mode,
+                text=text, scope_kode=code, scope_mode=scope_mode
             )
-            if is_relevant and it.id not in seen_ids:
-                seen_ids.add(it.id)
+            if is_relevant:
                 filtered.append((it, ctx_label, conf_level, conf_score))
                 break
-
     return filtered
 
 
-def get_social_pulse_overview(
+def _active_rules(db: Session) -> List[ProfileRule]:
+    """Aturan versi terbaru dari setiap profil berstatus aktif."""
+    rules: List[ProfileRule] = []
+    for profile in db.query(MonitoringProfile).filter(MonitoringProfile.status == "aktif").all():
+        rule = (
+            db.query(ProfileRule)
+            .filter(ProfileRule.profile_id == profile.id)
+            .order_by(ProfileRule.versi.desc(), ProfileRule.id.desc())
+            .first()
+        )
+        if rule:
+            rules.append(rule)
+    return rules
+
+
+def _json_list(raw: Optional[str]) -> List[str]:
+    try:
+        value = json.loads(raw or "[]")
+    except (TypeError, ValueError):
+        return []
+    return [str(v).strip() for v in value if str(v).strip()] if isinstance(value, list) else []
+
+
+def _exclusion_phrases(db: Session) -> List[str]:
+    phrases: List[str] = []
+    for rule in _active_rules(db):
+        phrases.extend(p.lower() for p in _json_list(rule.pengecualian_json))
+    return sorted(set(phrases))
+
+
+def _social_coverage_since(db: Session) -> Optional[datetime]:
+    """Sejak kapan pengumpulan medsos benar-benar berjalan.
+
+    Memakai fetched_at, bukan published_at: feed bisa memuat beberapa postingan lama, tetapi
+    jendela waktu sebelum pengumpulan dimulai tidak tercakup secara utuh dan tidak boleh
+    dihitung sebagai jendela "nol konten" untuk baseline.
+    """
+    return db.query(func.min(RawItem.fetched_at)).filter(RawItem.platform.in_(SOCIAL_PLATFORMS)).scalar()
+
+
+def _load_dataset(
     db: Session,
     time_range: str = "24h",
     scope_kode: str = "ID",
     scope_mode: str = "context",
     multi_codes: Optional[List[str]] = None,
-) -> Dict[str, Any]:
-    """Kalkulasi KPI agregat media sosial yang difilter 100% oleh Geographic Scope (FR-GEO-04)."""
+    platform: Optional[str] = None,
+    category: Optional[str] = None,
+    agency: Optional[str] = None,
+) -> _Dataset:
+    """Muat konten medsos jendela aktif + riwayat baseline.
+
+    Filter kategori/instansi diterapkan ke jendela aktif dan riwayat sekaligus, sehingga
+    baseline sebuah topik dihitung dari himpunan konten yang sama.
+    """
+    hours = WINDOW_HOURS.get(time_range, 24)
+    n_windows = BASELINE_WINDOWS.get(time_range, 14)
     now = datetime.utcnow()
-    if time_range == "1h":
-        start_time = now - timedelta(hours=1)
-        prev_start = now - timedelta(hours=2)
-    elif time_range == "6h":
-        start_time = now - timedelta(hours=6)
-        prev_start = now - timedelta(hours=12)
-    elif time_range == "7d":
-        start_time = now - timedelta(days=7)
-        prev_start = now - timedelta(days=14)
-    else:  # default 24h
-        start_time = now - timedelta(hours=24)
-        prev_start = now - timedelta(hours=48)
+    window = timedelta(hours=hours)
+    window_start = now - window
+    history_start = window_start - window * n_windows
 
-    social_sources = db.query(Source).filter(Source.jenis == "media_sosial").all()
-    social_source_ids = [s.id for s in social_sources]
+    rows: List[Tuple[RawItem, Optional[ItemAnalysis]]] = (
+        db.query(RawItem, ItemAnalysis)
+        .outerjoin(ItemAnalysis, ItemAnalysis.item_id == RawItem.id)
+        .filter(RawItem.platform.in_(SOCIAL_PLATFORMS), RawItem.published_at >= history_start)
+        .order_by(RawItem.published_at.desc())
+        .all()
+    )
+    total_collected = sum(1 for it, _ in rows if it.published_at >= window_start)
 
-    query = (
-        db.query(RawItem)
-        .outerjoin(Source, RawItem.source_id == Source.id)
-        .filter(
-            or_(
-                RawItem.source_id.in_(social_source_ids) if social_source_ids else False,
-                Source.jenis == "media_sosial",
-                RawItem.penerbit.ilike("%threads%"),
-                RawItem.penerbit.ilike("%twitter%"),
-                RawItem.penerbit.ilike("%tiktok%"),
-                RawItem.penerbit.ilike("%youtube%"),
-            )
+    exclusions = _exclusion_phrases(db)
+    kept: List[Tuple[RawItem, Optional[ItemAnalysis]]] = []
+    excluded = 0
+    for it, ana in rows:
+        if platform and platform.lower() != "semua" and (it.platform or "").lower() != platform.lower():
+            continue
+        text_low = f"{it.judul} {it.isi}".lower()
+        is_promo = bool(ana and ana.topik == "Komersial")
+        if is_promo or any(ph in text_low for ph in exclusions):
+            if it.published_at >= window_start:
+                excluded += 1
+            continue
+        kept.append((it, ana))
+
+    analysis_by_id = {it.id: ana for it, ana in kept}
+    scoped = _filter_items_by_scope([it for it, _ in kept], scope_kode, scope_mode, multi_codes)
+
+    geo_meta: Dict[int, Dict[str, Any]] = {}
+    current: List[SocialPost] = []
+    history: List[SocialPost] = []
+    history_index: Dict[int, int] = {}
+    uncertain = direct = 0
+    for it, label, conf, score in scoped:
+        ana = analysis_by_id.get(it.id)
+        text = f"{it.judul} {it.isi}" if it.isi and it.isi not in it.judul else it.judul
+        post = SocialPost(
+            id=it.id,
+            text=text,
+            title=it.judul,
+            platform=it.platform or "",
+            published_at=it.published_at,
+            author=it.penulis,
+            sentiment=(ana.sentimen if ana else "netral") or "netral",
+            topic=ana.topik if ana else None,
+            location=ana.lokasi_kejadian if ana else None,
+            url=it.url_kanonik,
+            publisher=it.penerbit,
+            likes=it.eng_likes,
+            shares=it.eng_shares,
+            replies=it.eng_replies,
+            views=it.eng_views,
+            followers=it.author_followers,
         )
+        post.keys = extract_keys(text, post.topic)
+        post.categories, post.agencies = classify(text)
+        if category and category not in post.categories:
+            continue
+        if agency and agency not in post.agencies:
+            continue
+        if it.published_at >= window_start:
+            current.append(post)
+            geo_meta[it.id] = {"label": label, "confidence": conf, "score": score}
+            if conf in ("Low", "Unknown"):
+                uncertain += 1
+            if conf == "High":
+                direct += 1
+        else:
+            idx = int((window_start - it.published_at) / window)
+            if 0 <= idx < n_windows:
+                history.append(post)
+                history_index[it.id] = idx
+
+    coverage_since = _social_coverage_since(db)
+    covered = [
+        i for i in range(n_windows)
+        if coverage_since is not None and window_start - window * (i + 1) >= coverage_since - timedelta(minutes=1)
+    ]
+
+    ids = [p.id for p in current]
+    issues_by_item: Dict[int, List[int]] = defaultdict(list)
+    if ids:
+        for link in db.query(IssueItem).filter(IssueItem.item_id.in_(ids)).all():
+            issues_by_item[link.item_id].append(link.issue_id)
+
+    return _Dataset(
+        now=now,
+        window_start=window_start,
+        window_hours=hours,
+        current=current,
+        history=history,
+        covered_windows=covered,
+        coverage_since=coverage_since,
+        geo_meta=geo_meta,
+        issues_by_item=dict(issues_by_item),
+        total_collected=total_collected,
+        excluded_count=excluded,
+        uncertain_count=uncertain,
+        direct_count=direct,
+        history_window_index=history_index,
     )
 
-    all_current_items = query.filter(RawItem.published_at >= start_time).all()
-    all_prev_items = (
-        query.filter(
-            RawItem.published_at >= prev_start,
-            RawItem.published_at < start_time,
-        ).all()
-    )
 
-    # Terapkan Filter Geografis Nyata
-    scoped_current = _filter_items_by_scope(all_current_items, scope_kode, scope_mode, multi_codes)
-    scoped_prev = _filter_items_by_scope(all_prev_items, scope_kode, scope_mode, multi_codes)
+def _history_counts(ds: _Dataset, matcher) -> List[int]:
+    """Jumlah konten cocok per jendela riwayat, hanya untuk jendela yang sudah tercakup data."""
+    counts = Counter()
+    for p in ds.history:
+        if matcher(p):
+            counts[ds.history_window_index[p.id]] += 1
+    return [counts.get(i, 0) for i in ds.covered_windows]
 
-    current_items = [t[0] for t in scoped_current]
-    prev_items = [t[0] for t in scoped_prev]
 
-    total_mentions = len(current_items)
-    prev_mentions = len(prev_items)
-    mention_growth_pct = round(((total_mentions - prev_mentions) / max(prev_mentions, 1)) * 100, 1)
+def _timeline(ds: _Dataset, posts: Sequence[SocialPost], time_range: str) -> List[Dict[str, Any]]:
+    n_buckets, minutes = TIMELINE_BUCKETS.get(time_range, (24, 60))
+    size = timedelta(minutes=minutes)
+    start = ds.now - size * n_buckets
+    counts = [0] * n_buckets
+    for p in posts:
+        idx = int((p.published_at - start) / size)
+        if 0 <= idx < n_buckets:
+            counts[idx] += 1
+    return [{"t": (start + size * i).isoformat(), "count": c} for i, c in enumerate(counts)]
 
-    # Sentimen analisis
-    current_item_ids = [i.id for i in current_items]
-    sentiment_counts = {"positif": 0, "netral": 0, "negatif": 0, "campuran": 0, "tidak pasti": 0}
-    if current_item_ids:
-        analyses = db.query(ItemAnalysis).filter(ItemAnalysis.item_id.in_(current_item_ids)).all()
-        for a in analyses:
-            s = (a.sentimen or "netral").lower()
-            if s in sentiment_counts:
-                sentiment_counts[s] += 1
-            else:
-                sentiment_counts["netral"] += 1
 
-    negative_ratio_pct = round((sentiment_counts["negatif"] / max(total_mentions, 1)) * 100, 1)
-
-    # Platform aktif pada wilayah terpilih
-    platform_item_counts: Dict[str, int] = defaultdict(int)
-    for it in current_items:
-        plat = _detect_platform(it.penerbit, it.url_kanonik or "")
-        platform_item_counts[plat] += 1
-
-    active_platforms_count = len([p for p, count in platform_item_counts.items() if count > 0])
-
-    # Topik tren lokal
-    trends_data = get_social_trends(
-        db,
-        time_range=time_range,
-        scope_kode=scope_kode,
-        scope_mode=scope_mode,
-        multi_codes=multi_codes,
-        limit=10,
-    )
-    trending_count = len(trends_data)
-    emerging_count = len([t for t in trends_data if t.get("velocity_status") in ("LONJAKAN TINGGI", "MENINGKAT")])
-
-    # Resolusi nama cakupan
-    scope_display_name = "Seluruh Indonesia"
-    if scope_kode != "ID":
-        for kel in KELURAHAN_DATA:
-            if kel["kode"] == scope_kode:
-                scope_display_name = f"Kelurahan {kel['nama']}, Kec. {kel['kecamatan_nama']}"
-                break
-        if scope_display_name == "Seluruh Indonesia":
-            for kec in KECAMATAN_DATA:
-                if kec["kode"] == scope_kode:
-                    scope_display_name = f"Kecamatan {kec['nama']}, {kec['kabupaten_nama']}"
-                    break
-        if scope_display_name == "Seluruh Indonesia":
-            for kab in KABUPATEN_DATA:
-                if kab["kode"] == scope_kode:
-                    scope_display_name = f"{kab['nama']}, {kab['provinsi_nama']}"
-                    break
-        if scope_display_name == "Seluruh Indonesia":
-            for prov in PROVINCES_DATA:
-                if prov["kode"] == scope_kode:
-                    scope_display_name = f"Provinsi {prov['nama']}"
-                    break
-
+def _sentiment_pct(posts: Sequence[SocialPost]) -> Dict[str, float]:
+    counter = Counter(p.sentiment for p in posts)
+    total = max(len(posts), 1)
     return {
-        "time_range": time_range,
-        "scope_kode": scope_kode,
-        "scope_name": scope_display_name,
-        "scope_mode": scope_mode,
-        "total_mentions": total_mentions,
-        "mention_growth_pct": mention_growth_pct,
-        "trending_topics_count": trending_count,
-        "emerging_trends_count": emerging_count,
-        "negative_ratio_pct": negative_ratio_pct,
-        "sentiment_breakdown": sentiment_counts,
-        "active_platforms_count": max(active_platforms_count, 1 if total_mentions > 0 else 0),
-        "platform_distribution": dict(platform_item_counts),
-        "data_coverage": {
-            "total_collected": len(all_current_items),
-            "relevant_to_scope": total_mentions,
-            "uncertain_count": len([t for t in scoped_current if t[2] in ("Low", "Unknown")]),
-            "direct_count": len([t for t in scoped_current if t[2] == "High"]),
-        },
-        "last_updated": now.isoformat(),
+        "positif": round(counter["positif"] / total * 100, 1),
+        "netral": round((counter["netral"] + counter["tidak pasti"]) / total * 100, 1),
+        "negatif": round(counter["negatif"] / total * 100, 1),
+        "campuran": round(counter["campuran"] / total * 100, 1),
     }
+
+
+def _mention_payload(ds: _Dataset, p: SocialPost) -> Dict[str, Any]:
+    geo = ds.geo_meta.get(p.id, {})
+    return {
+        "id": p.id,
+        "judul": p.title,
+        "isi": p.text[:240] + ("..." if len(p.text) > 240 else ""),
+        "penerbit": p.publisher,
+        "penulis": p.author,  # null bila sumber tidak menyediakan nama akun
+        "platform": p.platform,
+        "url": p.url,
+        "published_at": p.published_at.isoformat(),
+        "sentimen": p.sentiment,
+        "geo_context": geo.get("label"),
+        "geo_confidence": geo.get("confidence"),
+        "engagement": {
+            "likes": p.likes,
+            "shares": p.shares,
+            "replies": p.replies,
+            "views": p.views,
+            "followers": p.followers,
+        },
+    }
+
+
+def _rank_mentions(posts: Sequence[SocialPost]) -> List[SocialPost]:
+    """Urutkan bukti: yang punya data engagement dulu, lalu interaksi, tayangan, dan waktu terbaru."""
+    return sorted(
+        posts,
+        key=lambda p: (
+            p.interactions is None and p.views is None,
+            -(p.interactions or 0),
+            -(p.views or 0),
+            -p.published_at.timestamp(),
+        ),
+    )
+
+
+def _dominant_issue(ds: _Dataset, posts: Sequence[SocialPost], issues: Dict[int, Issue]) -> Optional[Dict[str, Any]]:
+    counter: Counter = Counter()
+    for p in posts:
+        for iid in ds.issues_by_item.get(p.id, []):
+            counter[iid] += 1
+    for iid, linked in counter.most_common():
+        iss = issues.get(iid)
+        if iss is None:
+            continue
+        return {
+            "id": iss.id,
+            "kode_referensi": iss.kode_referensi,
+            "judul": iss.judul,
+            "level": iss.level,
+            "skor": iss.skor,
+            "status": iss.status,
+            "linked_posts": linked,
+        }
+    return None
+
+
+def _build_trends(db: Session, ds: _Dataset, time_range: str, sort: str = "laju") -> List[Dict[str, Any]]:
+    groups = [(k, posts) for k, posts in cluster_posts(ds.current) if k != UNCLUSTERED_KEY]
+    issue_ids = {iid for ids in ds.issues_by_item.values() for iid in ids}
+    issues = {i.id: i for i in db.query(Issue).filter(Issue.id.in_(issue_ids)).all()} if issue_ids else {}
+
+    trends: List[Dict[str, Any]] = []
+    for key, posts in groups:
+        hist = _history_counts(ds, lambda p, k=key: k in p.keys)
+        vel = velocity(len(posts), hist, MIN_SURGE_VOLUME)
+        platforms = [name for name, _ in Counter(p.platform for p in posts).most_common()]
+        timeline = _timeline(ds, posts, time_range)
+        peak = max(timeline, key=lambda b: b["count"]) if timeline else None
+        n_buckets = len(timeline) or 1
+        hashtags = top_hashtags(posts)
+        locations = [loc for loc, _ in Counter(p.location for p in posts if p.location).most_common(3)]
+        cat_counts = Counter(c for p in posts for c in p.categories if c != UNCATEGORIZED)
+        ag_counts = Counter(a for p in posts for a in p.agencies)
+
+        trends.append({
+            "topic_key": key,
+            "topic": key_label(key),
+            "topic_type": {"#": "hashtag", "p": "frasa", "k": "kategori"}.get(key[0], "lainnya"),
+            "hashtags": hashtags,
+            "related_phrases": top_phrases(posts, exclude=key),
+            "mention_count": len(posts),
+            "growth_pct": vel["growth_pct"],
+            "velocity_score": vel["score"],
+            "velocity_status": vel["status"],
+            "velocity": vel,
+            "platforms": platforms,
+            "sentiment_pct": _sentiment_pct(posts),
+            "locations": locations,
+            "categories": [{"id": c, "label": category_label(c), "count": n} for c, n in cat_counts.most_common(3)],
+            "agencies": [{"id": a, "label": agency_label(a), "count": n} for a, n in ag_counts.most_common(4)],
+            "correlated_issue": _dominant_issue(ds, posts, issues),
+            "first_detected": min(p.published_at for p in posts).isoformat(),
+            "last_seen": max(p.published_at for p in posts).isoformat(),
+            "timeline": timeline,
+            "baseline_per_bucket": round(vel["baseline_mean"] / n_buckets, 3) if vel["baseline_windows"] else None,
+            "peak_at": peak["t"] if peak and peak["count"] > 0 else None,
+            "engagement": engagement_summary(posts),
+            "accounts": account_analysis(posts),
+            "coordination": detect_coordination(posts),
+            "sample_mentions": [_mention_payload(ds, p) for p in _rank_mentions(posts)[:6]],
+            "post_ids": [p.id for p in posts],
+        })
+
+    _sort_trends(trends, sort)
+    return trends
+
+
+SORT_OPTIONS = ("laju", "terbaru", "volume", "negatif")
+
+
+def _sort_trends(trends: List[Dict[str, Any]], sort: str = "laju") -> None:
+    """Urutkan di tempat dan beri nomor peringkat. laju = skor laju, terbaru = konten terakhir paling baru."""
+    if sort == "terbaru":
+        trends.sort(key=lambda t: (t["last_seen"], t["mention_count"]), reverse=True)
+    elif sort == "volume":
+        trends.sort(key=lambda t: (-t["mention_count"], -t["velocity_score"], t["topic"]))
+    elif sort == "negatif":
+        trends.sort(key=lambda t: (-t["sentiment_pct"]["negatif"] * t["mention_count"], -t["mention_count"], t["topic"]))
+    else:
+        trends.sort(key=lambda t: (-t["velocity_score"], -t["mention_count"], t["topic"]))
+    for i, t in enumerate(trends, start=1):
+        t["rank"] = i
 
 
 def get_social_trends(
@@ -239,224 +474,228 @@ def get_social_trends(
     scope_mode: str = "context",
     multi_codes: Optional[List[str]] = None,
     limit: int = 15,
+    category: Optional[str] = None,
+    agency: Optional[str] = None,
+    sort: str = "laju",
 ) -> List[Dict[str, Any]]:
-    """Mengekstrak topik tren media sosial terfilter wilayah geografis dengan velocity & provenance."""
-    now = datetime.utcnow()
-    hours_back = 24
-    if time_range == "1h":
-        hours_back = 1
-    elif time_range == "6h":
-        hours_back = 6
-    elif time_range == "7d":
-        hours_back = 168
+    """Topik tren media sosial terfilter wilayah, kategori, dan instansi."""
+    ds = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, platform, category, agency)
+    return _build_trends(db, ds, time_range, sort)[:limit]
 
-    start_time = now - timedelta(hours=hours_back)
-    baseline_start = start_time - timedelta(hours=hours_back)
 
-    social_sources = db.query(Source).filter(Source.jenis == "media_sosial").all()
-    social_source_ids = [s.id for s in social_sources]
+def get_social_pulse_overview(
+    db: Session,
+    time_range: str = "24h",
+    scope_kode: str = "ID",
+    scope_mode: str = "context",
+    multi_codes: Optional[List[str]] = None,
+    category: Optional[str] = None,
+    agency: Optional[str] = None,
+) -> Dict[str, Any]:
+    """KPI agregat media sosial untuk cakupan wilayah aktif (FR-GEO-04)."""
+    ds = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, None, category, agency)
+    trends = _build_trends(db, ds, time_range)
+    posts = ds.current
 
-    query = (
-        db.query(RawItem)
-        .outerjoin(Source, RawItem.source_id == Source.id)
-        .filter(
-            or_(
-                RawItem.source_id.in_(social_source_ids) if social_source_ids else False,
-                Source.jenis == "media_sosial",
-                RawItem.penerbit.ilike("%threads%"),
-                RawItem.penerbit.ilike("%twitter%"),
-                RawItem.penerbit.ilike("%tiktok%"),
-                RawItem.penerbit.ilike("%youtube%"),
-            )
-        )
+    prev_covered = 0 in ds.covered_windows
+    prev_mentions = sum(1 for p in ds.history if ds.history_window_index[p.id] == 0) if prev_covered else None
+    growth = (
+        round((len(posts) - prev_mentions) / prev_mentions * 100, 1)
+        if prev_mentions else None
     )
 
-    all_items = query.filter(RawItem.published_at >= start_time).order_by(RawItem.published_at.desc()).all()
-    all_baseline = (
-        query.filter(
-            RawItem.published_at >= baseline_start,
-            RawItem.published_at < start_time,
-        ).all()
-    )
+    sentiment_counts = {"positif": 0, "netral": 0, "negatif": 0, "campuran": 0, "tidak pasti": 0}
+    for p in posts:
+        sentiment_counts[p.sentiment if p.sentiment in sentiment_counts else "netral"] += 1
 
-    # 1. Filter Platform jika ada
-    if platform and platform.lower() != "semua":
-        all_items = [i for i in all_items if _detect_platform(i.penerbit, i.url_kanonik or "").lower() == platform.lower()]
-        all_baseline = [i for i in all_baseline if _detect_platform(i.penerbit, i.url_kanonik or "").lower() == platform.lower()]
+    platform_counts = Counter(p.platform for p in posts)
+    clustered = [t for t in trends if t["mention_count"] >= 2]
+    accounts = account_analysis(posts)
 
-    # 2. Filter Cakupan Geografis
-    scoped_items = _filter_items_by_scope(all_items, scope_kode, scope_mode, multi_codes)
-    scoped_baseline = _filter_items_by_scope(all_baseline, scope_kode, scope_mode, multi_codes)
+    return {
+        "time_range": time_range,
+        "scope_kode": scope_kode,
+        "scope_name": _scope_display_name(scope_kode),
+        "scope_mode": scope_mode,
+        "total_mentions": len(posts),
+        "previous_mentions": prev_mentions,
+        "mention_growth_pct": growth,
+        "trending_topics_count": len(clustered),
+        "emerging_trends_count": sum(1 for t in trends if t["velocity_status"] in RISING_STATUSES),
+        "surging_trends_count": sum(1 for t in trends if t["velocity_status"] == "LONJAKAN TINGGI"),
+        "new_trends_count": sum(1 for t in trends if t["velocity_status"] == "BARU"),
+        "coordination_flags": sum(1 for t in trends if t["coordination"]["flagged"]),
+        "negative_ratio_pct": round(sentiment_counts["negatif"] / max(len(posts), 1) * 100, 1),
+        "sentiment_breakdown": sentiment_counts,
+        "active_platforms_count": len(platform_counts),
+        "platform_distribution": dict(platform_counts),
+        "unique_accounts": accounts["unique_accounts"],
+        "author_coverage_pct": accounts["author_coverage_pct"],
+        "engagement": engagement_summary(posts),
+        "timeline": _timeline(ds, posts, time_range),
+        "baseline": {
+            "windows_available": len(ds.covered_windows),
+            "windows_target": BASELINE_WINDOWS.get(time_range, 14),
+            "coverage_since": ds.coverage_since.isoformat() if ds.coverage_since else None,
+            "min_surge_volume": MIN_SURGE_VOLUME,
+        },
+        "data_coverage": {
+            "total_collected": ds.total_collected,
+            "relevant_to_scope": len(posts),
+            "uncertain_count": ds.uncertain_count,
+            "direct_count": ds.direct_count,
+            "excluded_count": ds.excluded_count,
+            "unclustered_count": next((len(g) for k, g in cluster_posts(posts) if k == UNCLUSTERED_KEY), 0),
+        },
+        "last_updated": ds.now.isoformat(),
+    }
 
-    items = [t[0] for t in scoped_items]
-    item_geo_meta = {t[0].id: {"label": t[1], "confidence": t[2], "score": t[3]} for t in scoped_items}
-    baseline_items = [t[0] for t in scoped_baseline]
 
-    if not items:
-        return []
+_HASHTAG_TEXT_RE = re.compile(r"#([a-z0-9_]+)")
 
-    # Map analisis & issue link
-    all_item_ids = [it.id for it in items] + [it.id for it in baseline_items]
-    analysis_map: Dict[int, ItemAnalysis] = {}
-    if all_item_ids:
-        for ana in db.query(ItemAnalysis).filter(ItemAnalysis.item_id.in_(all_item_ids)).all():
-            analysis_map[ana.item_id] = ana
 
-    issue_links = db.query(IssueItem).filter(IssueItem.item_id.in_(all_item_ids)).all()
-    item_to_issue_id = {link.item_id: link.issue_id for link in issue_links}
-    
-    issues_map: Dict[int, Issue] = {}
-    if item_to_issue_id:
-        for iss in db.query(Issue).filter(Issue.id.in_(set(item_to_issue_id.values()))).all():
-            issues_map[iss.id] = iss
+def _term_matcher(term: str):
+    """Cocokkan kata utuh, atau kata di dalam hashtag ("banjir" cocok dengan #BanjirBekasi)."""
+    low = term.lower()
+    word = re.compile(r"(?<![a-z0-9])" + re.escape(low) + r"(?![a-z0-9])")
+    compact = re.sub(r"[^a-z0-9]", "", low)
 
-    # Pengelompokan topik
-    topic_groups: Dict[str, List[RawItem]] = defaultdict(list)
-    baseline_topic_counts: Dict[str, int] = defaultdict(int)
+    def match(post: SocialPost) -> bool:
+        text = post.text.lower()
+        if word.search(text):
+            return True
+        return bool(compact) and any(compact in tag.replace("_", "") for tag in _HASHTAG_TEXT_RE.findall(text))
 
-    def _extract_topic_key(item: RawItem) -> str:
-        text = f"{item.judul} {item.isi}".lower()
-        hashtags = re.findall(r"#[a-z0-9_]+", text)
-        if hashtags:
-            return hashtags[0]
+    return match
 
-        ana = analysis_map.get(item.id)
-        if ana and ana.topik and ana.topik not in ("Umum", "Sosial & Warga"):
-            wilayah = ana.lokasi_kejadian or ""
-            if wilayah and wilayah not in ("Indonesia", "Jabodetabek"):
-                return f"{ana.topik} {wilayah}"
-            return ana.topik
 
-        if "banjir" in text or "genangan" in text:
-            return "Banjir & Genangan Air"
-        if "macet" in text or "lalu lintas" in text or "ka " in text or "kereta" in text:
-            return "Kemacetan & Transportasi Publik"
-        if "jalan rusak" in text or "lubang" in text:
-            return "Infrastruktur Jalan Rusak"
-        if "sampah" in text or "limbah" in text:
-            return "Pengelolaan Sampah & Kebersihan"
-        if "debu" in text or "truk tambang" in text:
-            return "Polusi Debu & Angkutan Industri"
-        if "gempa" in text or "bmkg" in text:
-            return "Peringatan Cuaca & Bencana Alam"
-        if "harga" in text or "sembako" in text or "beras" in text:
-            return "Harga Kebutuhan Pokok"
+def get_social_watchlist(
+    db: Session,
+    time_range: str = "24h",
+    scope_kode: str = "ID",
+    scope_mode: str = "context",
+    multi_codes: Optional[List[str]] = None,
+    extra_terms: Optional[List[str]] = None,
+    category: Optional[str] = None,
+    agency: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Pantauan kata kunci profil (kata kunci + sinonim) dan kata kunci tambahan di media sosial."""
+    terms: Dict[str, Dict[str, Any]] = {}
+    for rule in _active_rules(db):
+        profile = db.get(MonitoringProfile, rule.profile_id)
+        for kind, raw in (("kata kunci", rule.keyword_json), ("sinonim", rule.sinonim_json)):
+            for term in _json_list(raw):
+                terms.setdefault(term.lower(), {"term": term, "kind": kind, "profiles": set()})["profiles"].add(profile.nama if profile else "-")
+    for term in extra_terms or []:
+        term = term.strip()
+        if len(term) >= 2:
+            terms.setdefault(term.lower(), {"term": term, "kind": "tambahan", "profiles": set()})
 
-        words = [w for w in re.sub(r"[^a-zA-Z0-9\s]", "", item.judul).split() if len(w) > 3]
-        return " ".join(words[:3]).title() if words else "Isu Perhatian Publik"
-
-    for it in items:
-        key = _extract_topic_key(it)
-        topic_groups[key].append(it)
-
-    for it in baseline_items:
-        key = _extract_topic_key(it)
-        baseline_topic_counts[key] += 1
-
-    trends: List[Dict[str, Any]] = []
-    rank = 1
-    sorted_groups = sorted(topic_groups.items(), key=lambda kv: len(kv[1]), reverse=True)
-
-    for topic_name, group_items in sorted_groups[:limit]:
-        current_volume = len(group_items)
-        baseline_vol = max(baseline_topic_counts.get(topic_name, 1), 1)
-        growth_pct = round(((current_volume - baseline_vol) / baseline_vol) * 100, 1)
-
-        multiplier = current_volume / baseline_vol
-        velocity_score = min(round((multiplier * 28.0) + min(current_volume * 2.0, 30.0), 1), 99.5)
-
-        if velocity_score >= 80 or growth_pct >= 150:
-            velocity_status = "LONJAKAN TINGGI"
-            status_color = "rose"
-        elif velocity_score >= 50 or growth_pct >= 40:
-            velocity_status = "MENINGKAT"
-            status_color = "amber"
-        elif growth_pct >= -10:
-            velocity_status = "STABIL"
-            status_color = "sky"
-        else:
-            velocity_status = "MENURUN"
-            status_color = "slate"
-
-        platforms_found: List[str] = []
-        for gi in group_items:
-            p = _detect_platform(gi.penerbit, gi.url_kanonik or "")
-            if p not in platforms_found:
-                platforms_found.append(p)
-
-        sent_counter = Counter()
-        for gi in group_items:
-            ana = analysis_map.get(gi.id)
-            sent_counter[ana.sentimen if ana else "netral"] += 1
-
-        total_group_sent = sum(sent_counter.values()) or 1
-        sent_pct = {
-            "positif": round((sent_counter["positif"] / total_group_sent) * 100, 1),
-            "netral": round((sent_counter["netral"] / total_group_sent) * 100, 1),
-            "negatif": round((sent_counter["negatif"] / total_group_sent) * 100, 1),
-        }
-
-        all_hashtags = []
-        for gi in group_items:
-            found_ht = re.findall(r"#[a-zA-Z0-9_]+", f"{gi.judul} {gi.isi}")
-            all_hashtags.extend(found_ht)
-        top_hashtags = [ht for ht, _ in Counter(all_hashtags).most_common(3)]
-        if not top_hashtags:
-            clean_tag = re.sub(r"[^a-zA-Z0-9]", "", topic_name)
-            if clean_tag:
-                top_hashtags = [f"#{clean_tag[:18]}"]
-
-        correlated_issue: Optional[Dict[str, Any]] = None
-        for gi in group_items:
-            iss_id = item_to_issue_id.get(gi.id)
-            if iss_id and iss_id in issues_map:
-                iss = issues_map[iss_id]
-                correlated_issue = {
-                    "id": iss.id,
-                    "kode_referensi": iss.kode_referensi,
-                    "judul": iss.judul,
-                    "level": iss.level,
-                    "skor": iss.skor,
-                    "status": iss.status,
-                }
-                break
-
-        first_detected = min(gi.published_at for gi in group_items)
-        sample_mentions = [
-            {
-                "id": gi.id,
-                "judul": gi.judul,
-                "isi": gi.isi[:240] + ("..." if len(gi.isi) > 240 else ""),
-                "penerbit": gi.penerbit,
-                "penulis": gi.penulis or ("@" + gi.penerbit.lower().replace(" ", "_")),
-                "platform": _detect_platform(gi.penerbit, gi.url_kanonik or ""),
-                "url": gi.url_kanonik,
-                "published_at": gi.published_at.isoformat(),
-                "sentimen": (analysis_map.get(gi.id).sentimen if analysis_map.get(gi.id) else "netral"),
-                "geo_context": item_geo_meta.get(gi.id, {}).get("label", "Lokasi Disebut"),
-                "geo_confidence": item_geo_meta.get(gi.id, {}).get("confidence", "Medium"),
-            }
-            for gi in group_items[:6]
-        ]
-
-        trends.append({
-            "rank": rank,
-            "topic": topic_name,
-            "hashtags": top_hashtags,
-            "mention_count": current_volume,
-            "growth_pct": growth_pct,
-            "velocity_score": velocity_score,
-            "velocity_status": velocity_status,
-            "status_color": status_color,
-            "platforms": platforms_found,
-            "sentiment_pct": sent_pct,
-            "correlated_issue": correlated_issue,
-            "first_detected": first_detected.isoformat(),
-            "sample_mentions": sample_mentions,
+    ds = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, None, category, agency)
+    results: List[Dict[str, Any]] = []
+    for meta in terms.values():
+        matcher = _term_matcher(meta["term"])
+        matched = [p for p in ds.current if matcher(p)]
+        hist = _history_counts(ds, matcher)
+        vel = velocity(len(matched), hist, MIN_SURGE_VOLUME)
+        results.append({
+            "term": meta["term"],
+            "kind": meta["kind"],
+            "profiles": sorted(meta["profiles"]),
+            "mention_count": len(matched),
+            "velocity_status": vel["status"] if matched or hist else "TIDAK ADA",
+            "velocity_score": vel["score"],
+            "growth_pct": vel["growth_pct"],
+            "velocity": vel,
+            "sentiment_pct": _sentiment_pct(matched),
+            "platforms": [n for n, _ in Counter(p.platform for p in matched).most_common()],
+            "timeline": _timeline(ds, matched, time_range),
+            "engagement": engagement_summary(matched),
+            "top_mentions": [_mention_payload(ds, p) for p in _rank_mentions(matched)[:3]],
         })
-        rank += 1
 
-    return trends
+    results.sort(key=lambda r: (-r["velocity_score"], -r["mention_count"], r["term"]))
+    return {
+        "time_range": time_range,
+        "scope_kode": scope_kode,
+        "scope_name": _scope_display_name(scope_kode),
+        "total_terms": len(results),
+        "active_terms": sum(1 for r in results if r["mention_count"] > 0),
+        "rising_terms": sum(1 for r in results if r["velocity_status"] in RISING_STATUSES),
+        "terms": results,
+    }
+
+
+def source_platforms(source: Source) -> List[str]:
+    """Platform yang ditargetkan sebuah sumber: dari domain URL atau dari operator `site:` di query."""
+    plats: List[str] = []
+    direct = platform_from_url(source.url)
+    if direct:
+        plats.append(direct)
+    for site in _SITE_RE.findall(source.url or ""):
+        plat = platform_from_url(f"https://{site}")
+        if plat and plat not in plats:
+            plats.append(plat)
+    return plats
+
+
+def _source_method(source: Source) -> str:
+    url = (source.url or "").lower()
+    if "news.google.com" in url:
+        return "Penemuan via Google News (site:)"
+    if "syndication.twitter.com" in url:
+        return "Syndication timeline publik"
+    if "bsky.app" in url:
+        return "API publik AT Protocol"
+    if "reddit.com" in url:
+        return "RSS subreddit publik"
+    if "youtube.com/results" in url:
+        return "Pencarian YouTube (yt-dlp)"
+    if "t.me/s/" in url:
+        return "Pratinjau kanal publik Telegram"
+    if "gdeltproject.org" in url:
+        return "GDELT DOC API"
+    return "Feed publik"
+
+
+def _source_health(source: Source, now: datetime) -> Dict[str, Any]:
+    """Status sumber dari hasil tarikan terakhir yang tercatat, bukan dari konfigurasi."""
+    if source.status_izin != "aktif":
+        state = "nonaktif"
+    elif source.last_fetch_at is None:
+        state = "belum_ditarik"
+    elif source.last_fetch_status == "gagal":
+        state = "gagal"
+    elif not source.last_fetch_count:
+        state = "kosong"
+    elif source.last_success_at and now - source.last_success_at > timedelta(minutes=max(source.frekuensi_menit, 5) * 3):
+        state = "terlambat"
+    else:
+        state = "aktif"
+    return {
+        "id": source.id,
+        "nama": source.nama,
+        "method": _source_method(source),
+        "state": state,
+        "status_izin": source.status_izin,
+        "last_fetch_at": source.last_fetch_at.isoformat() if source.last_fetch_at else None,
+        "last_success_at": source.last_success_at.isoformat() if source.last_success_at else None,
+        "last_fetch_count": source.last_fetch_count,
+        "last_error": source.last_fetch_error,
+        "frekuensi_menit": source.frekuensi_menit,
+    }
+
+
+_STATE_RANK = {"aktif": 0, "terlambat": 1, "kosong": 2, "gagal": 3, "belum_ditarik": 4, "nonaktif": 5}
+_STATE_LABEL = {
+    "aktif": "Aktif",
+    "terlambat": "Terlambat",
+    "kosong": "Tanpa Konten Terkini",
+    "gagal": "Gagal",
+    "belum_ditarik": "Belum Ditarik",
+    "nonaktif": "Nonaktif",
+    "tanpa_sumber": "Belum Ada Sumber",
+}
 
 
 def get_platform_metrics(
@@ -464,63 +703,49 @@ def get_platform_metrics(
     scope_kode: str = "ID",
     scope_mode: str = "context",
     multi_codes: Optional[List[str]] = None,
+    time_range: str = "7d",
 ) -> List[Dict[str, Any]]:
-    """Status konektivitas dan metrik per platform terfilter cakupan geografis."""
-    platforms = [
-        {"name": "Threads", "code": "threads", "icon": "threads", "official_status": "Aktif", "type": "Meta Threads API / Syndication"},
-        {"name": "X (Twitter)", "code": "x", "icon": "x", "official_status": "Aktif", "type": "Syndication Timeline & Feed"},
-        {"name": "YouTube", "code": "youtube", "icon": "youtube", "official_status": "Aktif", "type": "YouTube Data Feed"},
-        {"name": "TikTok", "code": "tiktok", "icon": "tiktok", "official_status": "Aktif", "type": "Video Content Discovery"},
-        {"name": "Instagram", "code": "instagram", "icon": "instagram", "official_status": "Menunggu Token", "type": "Meta Graph API (Hashtags)"},
-        {"name": "Facebook", "code": "facebook", "icon": "facebook", "official_status": "Menunggu Token", "type": "Meta Graph API (Public Pages)"},
-    ]
+    """Kesehatan konektor per platform (dari hasil tarikan nyata) dan metrik percakapan terfilter wilayah."""
+    now = datetime.utcnow()
+    sources_by_platform: Dict[str, List[Source]] = defaultdict(list)
+    for src in db.query(Source).all():
+        for plat in source_platforms(src):
+            sources_by_platform[plat].append(src)
 
-    all_raw = db.query(RawItem).all()
-    scoped_raw = [t[0] for t in _filter_items_by_scope(all_raw, scope_kode, scope_mode, multi_codes)]
-    analysis_dict = {a.item_id: a for a in db.query(ItemAnalysis).all()}
+    ds = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes)
+    posts_by_platform: Dict[str, List[SocialPost]] = defaultdict(list)
+    for p in ds.current:
+        posts_by_platform[p.platform].append(p)
 
-    platform_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
-        "volume": 0,
-        "negative_count": 0,
-        "positive_count": 0,
-        "last_post_at": None,
-    })
-
-    for it in scoped_raw:
-        plat = _detect_platform(it.penerbit, it.url_kanonik or "")
-        stats = platform_stats[plat]
-        stats["volume"] += 1
-        if not stats["last_post_at"] or it.published_at > stats["last_post_at"]:
-            stats["last_post_at"] = it.published_at
-
-        ana = analysis_dict.get(it.id)
-        if ana:
-            if ana.sentimen == "negatif":
-                stats["negative_count"] += 1
-            elif ana.sentimen == "positif":
-                stats["positive_count"] += 1
-
-    results = []
-    for p in platforms:
-        stats = platform_stats.get(p["name"], {
-            "volume": 0,
-            "negative_count": 0,
-            "positive_count": 0,
-            "last_post_at": None,
-        })
-        vol = stats["volume"]
-        neg_pct = round((stats["negative_count"] / max(vol, 1)) * 100, 1) if vol > 0 else 0.0
-        pos_pct = round((stats["positive_count"] / max(vol, 1)) * 100, 1) if vol > 0 else 0.0
-
+    results: List[Dict[str, Any]] = []
+    for meta in PLATFORM_CATALOG:
+        name = meta["name"]
+        health = [_source_health(s, now) for s in sources_by_platform.get(name, [])]
+        if health:
+            best = min(health, key=lambda h: _STATE_RANK[h["state"]])["state"]
+        else:
+            best = "tanpa_sumber"
+        posts = posts_by_platform.get(name, [])
+        sentiment = Counter(p.sentiment for p in posts)
+        vol = len(posts)
+        last_success = max((h["last_success_at"] for h in health if h["last_success_at"]), default=None)
         results.append({
-            **p,
+            **meta,
+            "type": ", ".join(sorted({h["method"] for h in health})) or "Belum ada sumber",
+            "official_status": _STATE_LABEL[best],
+            "health_state": best,
+            "is_connected": best == "aktif",
+            "sources": health,
+            "note": PLATFORM_NOTES.get(name),
+            "time_range": time_range,
             "mention_count": vol,
-            "negative_sentiment_pct": neg_pct,
-            "positive_sentiment_pct": pos_pct,
-            "last_data_at": stats["last_post_at"].isoformat() if stats["last_post_at"] else None,
-            "is_connected": p["official_status"] == "Aktif",
+            "negative_sentiment_pct": round(sentiment["negatif"] / vol * 100, 1) if vol else 0.0,
+            "positive_sentiment_pct": round(sentiment["positif"] / vol * 100, 1) if vol else 0.0,
+            "last_data_at": max(p.published_at for p in posts).isoformat() if posts else None,
+            "last_success_at": last_success,
+            "engagement": engagement_summary(posts),
+            "author_coverage_pct": account_analysis(posts)["author_coverage_pct"] if posts else 0.0,
         })
-
     return results
 
 
@@ -530,60 +755,26 @@ def get_social_correlations(
     scope_mode: str = "context",
     multi_codes: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
-    """Daftar korelasi isu aktif RADAR yang terfilter cakupan geografis terpilih."""
+    """Topik media sosial 7 hari terakhir yang kontennya benar-benar tertaut ke isu RADAR."""
     trends = get_social_trends(
-        db,
-        time_range="7d",
-        scope_kode=scope_kode,
-        scope_mode=scope_mode,
-        multi_codes=multi_codes,
-        limit=20,
+        db, time_range="7d", scope_kode=scope_kode, scope_mode=scope_mode, multi_codes=multi_codes, limit=50
     )
-    correlations = []
-
-    for t in trends:
-        if t.get("correlated_issue"):
-            correlations.append({
-                "social_topic": t["topic"],
-                "hashtags": t["hashtags"],
-                "mention_count": t["mention_count"],
-                "velocity_score": t["velocity_score"],
-                "velocity_status": t["velocity_status"],
-                "platforms": t["platforms"],
-                "issue": t["correlated_issue"],
-                "first_detected": t["first_detected"],
-            })
-
-    # Jika korelasi eksplisit masih sedikit, ambil dari isu aktif yang cocok dengan wilayah
-    if len(correlations) < 3:
-        active_issues = db.query(Issue).filter(Issue.status != "selesai").order_by(Issue.skor.desc()).limit(8).all()
-        exp = get_scope_expansion_keywords(scope_kode)
-        for iss in active_issues:
-            if any(c["issue"]["kode_referensi"] == iss.kode_referensi for c in correlations):
-                continue
-            
-            # Cek kecocokan isu dengan wilayah jika bukan nasional
-            is_match = (scope_kode == "ID") or any(pk in iss.wilayah.lower() or pk in iss.judul.lower() for pk in exp["primary"])
-            if is_match or len(correlations) < 2:
-                correlations.append({
-                    "social_topic": iss.judul,
-                    "hashtags": [f"#{re.sub(r'[^a-zA-Z0-9]', '', iss.kategori)}", f"#{re.sub(r'[^a-zA-Z0-9]', '', iss.wilayah)}"],
-                    "mention_count": max(iss.current_volume, 6),
-                    "velocity_score": round(min(iss.skor, 96.0), 1),
-                    "velocity_status": "LONJAKAN TINGGI" if iss.skor >= 80 else "MENINGKAT",
-                    "platforms": ["X (Twitter)", "Threads", "TikTok", "YouTube"],
-                    "issue": {
-                        "id": iss.id,
-                        "kode_referensi": iss.kode_referensi,
-                        "judul": iss.judul,
-                        "level": iss.level,
-                        "skor": iss.skor,
-                        "status": iss.status,
-                    },
-                    "first_detected": iss.first_seen.isoformat(),
-                })
-
-    return correlations
+    return [
+        {
+            "social_topic": t["topic"],
+            "topic_key": t["topic_key"],
+            "hashtags": t["hashtags"],
+            "mention_count": t["mention_count"],
+            "linked_posts": t["correlated_issue"]["linked_posts"],
+            "velocity_score": t["velocity_score"],
+            "velocity_status": t["velocity_status"],
+            "platforms": t["platforms"],
+            "issue": t["correlated_issue"],
+            "first_detected": t["first_detected"],
+        }
+        for t in trends
+        if t["correlated_issue"]
+    ]
 
 
 def get_social_geographic_comparison(
@@ -591,26 +782,118 @@ def get_social_geographic_comparison(
     scope_codes: List[str],
     time_range: str = "24h",
 ) -> List[Dict[str, Any]]:
-    """Membandingkan indikator intelijen sosial antar beberapa wilayah sekaligus (FR-GEO-06)."""
+    """Membandingkan indikator intelijen sosial antarwilayah (FR-GEO-06)."""
     comparison: List[Dict[str, Any]] = []
-
-    for code in scope_codes:
-        code = code.strip()
+    for code in (c.strip() for c in scope_codes):
         if not code:
             continue
-        overview = get_social_pulse_overview(db, time_range=time_range, scope_kode=code, scope_mode="context")
-        top_trends = get_social_trends(db, time_range=time_range, scope_kode=code, scope_mode="context", limit=1)
-        top_topic = top_trends[0]["topic"] if top_trends else "Tidak Ada Tren Signifikan"
-
+        ds = _load_dataset(db, time_range, code, "context")
+        trends = _build_trends(db, ds, time_range)
+        posts = ds.current
+        prev = sum(1 for p in ds.history if ds.history_window_index[p.id] == 0) if 0 in ds.covered_windows else None
+        neg = sum(1 for p in posts if p.sentiment == "negatif")
         comparison.append({
             "scope_kode": code,
-            "region_name": overview["scope_name"],
-            "total_mentions": overview["total_mentions"],
-            "growth_pct": overview["mention_growth_pct"],
-            "trending_topics_count": overview["trending_topics_count"],
-            "emerging_trends_count": overview["emerging_trends_count"],
-            "negative_sentiment_pct": overview["negative_ratio_pct"],
-            "top_topic": top_topic,
+            "region_name": _scope_display_name(code),
+            "total_mentions": len(posts),
+            "growth_pct": round((len(posts) - prev) / prev * 100, 1) if prev else None,
+            "trending_topics_count": sum(1 for t in trends if t["mention_count"] >= 2),
+            "emerging_trends_count": sum(1 for t in trends if t["velocity_status"] in RISING_STATUSES),
+            "negative_sentiment_pct": round(neg / len(posts) * 100, 1) if posts else 0.0,
+            "top_topic": trends[0]["topic"] if trends else None,
+        })
+    return comparison
+
+
+def get_social_facets(
+    db: Session,
+    time_range: str = "24h",
+    scope_kode: str = "ID",
+    scope_mode: str = "context",
+    multi_codes: Optional[List[str]] = None,
+    platform: Optional[str] = None,
+    category: Optional[str] = None,
+    agency: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Jumlah konten per kategori dan per instansi untuk pill filter.
+
+    Faset silang: jumlah kategori dihitung dengan filter instansi aktif (tanpa filter
+    kategori), dan sebaliknya, sehingga angka di setiap pill sama dengan hasil bila diklik.
+    """
+    ds_cat = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, platform, None, agency)
+    ds_ag = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, platform, category, None)
+    cat_counts = Counter(c for p in ds_cat.current for c in p.categories)
+    ag_counts = Counter(a for p in ds_ag.current for a in p.agencies)
+    neg_by_agency = Counter(a for p in ds_ag.current if p.sentiment == "negatif" for a in p.agencies)
+
+    categories = [{"id": c.id, "label": c.label, "count": cat_counts.get(c.id, 0)} for c in CATEGORIES]
+    categories.append({"id": UNCATEGORIZED, "label": UNCATEGORIZED_LABEL, "count": cat_counts.get(UNCATEGORIZED, 0)})
+    agencies = [
+        {"id": a.id, "label": a.label, "group": a.group, "count": ag_counts.get(a.id, 0), "negative": neg_by_agency.get(a.id, 0)}
+        for a in AGENCIES
+    ]
+    return {
+        "time_range": time_range,
+        "total": len(ds_cat.current),
+        "categories": categories,
+        "agencies": agencies,
+    }
+
+
+def get_agency_board(
+    db: Session,
+    time_range: str = "24h",
+    scope_kode: str = "ID",
+    scope_mode: str = "context",
+    multi_codes: Optional[List[str]] = None,
+    category: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Papan instansi: seberapa sering tiap instansi disebut, lajunya, dan nada percakapannya."""
+    ds = _load_dataset(db, time_range, scope_kode, scope_mode, multi_codes, None, category, None)
+    by_agency: Dict[str, List[SocialPost]] = defaultdict(list)
+    for p in ds.current:
+        for a in p.agencies:
+            by_agency[a].append(p)
+    total_mentions = sum(len(v) for v in by_agency.values())
+
+    rows: List[Dict[str, Any]] = []
+    for ag in AGENCIES:
+        posts = by_agency.get(ag.id, [])
+        hist = _history_counts(ds, lambda p, aid=ag.id: aid in p.agencies)
+        if not posts and not any(hist):
+            continue
+        vel = velocity(len(posts), hist, MIN_SURGE_VOLUME)
+        sentiment = _sentiment_pct(posts)
+        negatives = [p for p in posts if p.sentiment == "negatif"]
+        topics = [key_label(k) for k, g in cluster_posts(posts) if k != UNCLUSTERED_KEY][:3]
+        cat_counts = Counter(c for p in posts for c in p.categories if c != UNCATEGORIZED)
+        rows.append({
+            "id": ag.id,
+            "label": ag.label,
+            "group": ag.group,
+            "mention_count": len(posts),
+            "share_of_voice_pct": round(len(posts) / total_mentions * 100, 1) if total_mentions else 0.0,
+            "negative_count": len(negatives),
+            "sentiment_pct": sentiment,
+            "velocity_status": vel["status"] if posts else "TIDAK ADA",
+            "velocity_score": vel["score"],
+            "growth_pct": vel["growth_pct"],
+            "velocity": vel,
+            "timeline": _timeline(ds, posts, time_range),
+            "platforms": [n for n, _ in Counter(p.platform for p in posts).most_common()],
+            "top_topics": topics,
+            "categories": [{"id": c, "label": category_label(c), "count": n} for c, n in cat_counts.most_common(3)],
+            "top_negative": [_mention_payload(ds, p) for p in _rank_mentions(negatives)[:3]],
+            "latest": [_mention_payload(ds, p) for p in sorted(posts, key=lambda p: p.published_at, reverse=True)[:3]],
+            "engagement": engagement_summary(posts),
         })
 
-    return comparison
+    rows.sort(key=lambda r: (-r["negative_count"], -r["velocity_score"], -r["mention_count"], r["label"]))
+    return {
+        "time_range": time_range,
+        "scope_kode": scope_kode,
+        "scope_name": _scope_display_name(scope_kode),
+        "total_posts": len(ds.current),
+        "posts_mentioning_agency": sum(1 for p in ds.current if p.agencies),
+        "agencies": rows,
+    }

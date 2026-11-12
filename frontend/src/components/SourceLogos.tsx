@@ -23,6 +23,14 @@ export function getBrandInfo(platform?: string, penerbit?: string): BrandInfo {
     };
   }
 
+  // Instagram & Facebook: belum ada logo resmi di /public/logos, tampil sebagai inisial.
+  if (norm.includes("instagram")) {
+    return { name: "Instagram", logo: "", fallbackText: "IG" };
+  }
+  if (norm.includes("facebook")) {
+    return { name: "Facebook", logo: "", fallbackText: "FB" };
+  }
+
   // 2. TikTok
   if (norm.includes("tiktok")) {
     return {
@@ -104,12 +112,21 @@ export function getBrandInfo(platform?: string, penerbit?: string): BrandInfo {
     };
   }
 
-  // Fallback umum media berita
+  // Fallback: inisial nama, jangan meminjam logo media lain.
+  const label = platform || penerbit || "Media Berita";
   return {
-    name: platform || penerbit || "Media Berita",
-    logo: "/logos/detikcom.png",
-    fallbackText: "BERITA",
+    name: label,
+    logo: "",
+    fallbackText: label.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase() || "?",
   };
+}
+
+function BrandInitials({ text }: { text: string }) {
+  return (
+    <span className="flex h-full w-full items-center justify-center bg-zinc-200 text-[8px] font-bold uppercase text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100">
+      {text.slice(0, 2)}
+    </span>
+  );
 }
 
 /**
@@ -144,15 +161,19 @@ export function SourceLogoBadge({
       <div
         className={`${containerSizeClass} rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white dark:bg-zinc-900 ring-1 ring-zinc-300 dark:ring-zinc-700 shadow-2xs`}
       >
-        <img
-          src={brand.logo}
-          alt={brand.name}
-          className="w-full h-full object-cover rounded-full"
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
+        {brand.logo ? (
+          <img
+            src={brand.logo}
+            alt={brand.name}
+            className="w-full h-full object-cover rounded-full"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <BrandInitials text={brand.fallbackText} />
+        )}
       </div>
 
       {showLabel && (
@@ -167,6 +188,15 @@ export function SourceLogoBadge({
 /**
  * Sub-komponen icon lingkaran resmi satuan untuk filter button atau navigasi
  */
+function normalizeBrandKey(name: string): string {
+  const n = (name || "").toLowerCase();
+  if (n === "x" || n.startsWith("x (") || n.includes("twitter")) return "x";
+  if (n.includes("tiktok")) return "tiktok";
+  if (n.includes("threads")) return "threads";
+  if (n.includes("youtube") || n === "yt") return "youtube";
+  return n;
+}
+
 export function RealBrandIcon({
   name,
   className = "w-4 h-4",
@@ -187,7 +217,21 @@ export function RealBrandIcon({
     dishub: "/logos/dishub.png",
   };
 
-  const src = mapping[name.toLowerCase()] || "/logos/x.png";
+  const key = normalizeBrandKey(name);
+  const src = mapping[key];
+
+  if (!src) {
+    // Tanpa logo resmi di /public/logos: tampilkan inisial, jangan meminjam logo platform lain.
+    return (
+      <div
+        className={`${className} rounded-full shrink-0 flex items-center justify-center bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100 ring-2 ring-white dark:ring-zinc-950 text-[9px] font-bold uppercase`}
+        title={name}
+        aria-label={name}
+      >
+        {name.replace(/[^A-Za-z]/g, "").slice(0, 2) || "?"}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -242,15 +286,19 @@ export function MediaAvatarStack({
             className={`relative z-[${10 - idx}] ${sizeClass} rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white dark:bg-zinc-900 ring-2 ring-white dark:ring-zinc-950 shadow-xs transition-transform hover:scale-125 hover:z-30`}
             title={brand.name}
           >
-            <img
-              src={brand.logo}
-              alt={brand.name}
-              className="w-full h-full object-cover rounded-full"
-              loading="lazy"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
+            {brand.logo ? (
+              <img
+                src={brand.logo}
+                alt={brand.name}
+                className="w-full h-full object-cover rounded-full"
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <BrandInitials text={brand.fallbackText} />
+            )}
           </div>
         );
       })}

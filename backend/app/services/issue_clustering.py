@@ -10,6 +10,7 @@ from backend.app.models import (
 from backend.app.services.ai_analyzer import generate_issue_summary
 from backend.app.services.risk_scorer import compute_risk_score
 from backend.app.services.dedup import is_near_duplicate
+from backend.app.services.social_platform import is_social
 
 def cluster_and_sync_issues(db: Session) -> Dict[str, Any]:
     """
@@ -67,6 +68,10 @@ def cluster_and_sync_issues(db: Session) -> Dict[str, Any]:
             matched_issue.current_volume += 1
             matched_issue.last_updated = datetime.utcnow()
             clustered_count += 1
+        elif is_social(item.platform):
+            # Satu postingan medsos tidak dijadikan isu sendiri. Isu dari medsos dibuat oleh
+            # social_escalation saat sebuah topik benar-benar melonjak.
+            continue
         else:
             # Create a new real Issue from this item
             issue_count = db.query(Issue).count() + 1

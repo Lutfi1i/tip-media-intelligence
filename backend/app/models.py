@@ -48,6 +48,12 @@ class Source(Base):
     kredibilitas = Column(Float, default=0.85)  # 0.0 to 1.0
     status_izin = Column(String(50), default="aktif")  # aktif, ditinjau, dibatasi
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Hasil tarikan terakhir, dipakai untuk status kesehatan platform di Social Pulse.
+    last_fetch_at = Column(DateTime, nullable=True)
+    last_fetch_status = Column(String(20), nullable=True)  # ok, gagal, dilewati
+    last_fetch_error = Column(String(512), nullable=True)
+    last_fetch_count = Column(Integer, nullable=True)
+    last_success_at = Column(DateTime, nullable=True)
 
     raw_items = relationship("RawItem", back_populates="source")
 
@@ -62,8 +68,17 @@ class RawItem(Base):
     isi = Column(Text, nullable=False)
     penerbit = Column(String(255), default="Media Online")
     penulis = Column(String(255), nullable=True)
-    published_at = Column(DateTime, default=datetime.utcnow)
+    published_at = Column(DateTime, default=datetime.utcnow, index=True)
     fetched_at = Column(DateTime, default=datetime.utcnow)
+    # Platform asal ditentukan dari domain asli konten, bukan dari nama feed.
+    # Nilai: "X (Twitter)", "TikTok", "Threads", "YouTube", "Instagram", "Facebook", "Bluesky", atau "berita".
+    platform = Column(String(50), nullable=True, index=True)
+    # Engagement hanya terisi bila sumber menyediakannya; NULL berarti tidak diketahui, bukan nol.
+    eng_likes = Column(Integer, nullable=True)
+    eng_shares = Column(Integer, nullable=True)
+    eng_replies = Column(Integer, nullable=True)
+    eng_views = Column(Integer, nullable=True)
+    author_followers = Column(Integer, nullable=True)
 
     source = relationship("Source", back_populates="raw_items")
     analysis = relationship("ItemAnalysis", back_populates="raw_item", uselist=False, cascade="all, delete-orphan")
@@ -109,6 +124,8 @@ class Issue(Base):
     repost_count = Column(Integer, default=0)
     first_seen = Column(DateTime, default=datetime.utcnow)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Terisi bila isu dieskalasi dari lonjakan topik media sosial, agar lonjakan berikutnya memperbarui isu yang sama.
+    social_topic_key = Column(String(255), nullable=True, index=True)
 
     profile = relationship("MonitoringProfile", back_populates="issues")
     items = relationship("IssueItem", back_populates="issue", cascade="all, delete-orphan")

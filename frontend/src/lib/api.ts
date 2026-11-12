@@ -421,15 +421,54 @@ export async function fetchRegionalDetail(kodeWilayah: string) {
 // RADAR SOCIAL PULSE INTELLIGENCE INTERFACES
 // ==========================================
 
+export type SocialVelocityStatus =
+  | "LONJAKAN TINGGI"
+  | "MENINGKAT"
+  | "BARU"
+  | "STABIL"
+  | "MENURUN"
+  | "SINYAL LEMAH";
+
+export interface SocialTimelineBucket {
+  t: string;
+  count: number;
+}
+
+/** Angka engagement bernilai null bila sumber tidak menyediakannya (bukan nol). */
+export interface SocialEngagementSummary {
+  posts_with_data: number;
+  coverage_pct: number;
+  likes: number | null;
+  shares: number | null;
+  replies: number | null;
+  views: number | null;
+  interactions: number | null;
+}
+
+export interface SocialVelocity {
+  status: SocialVelocityStatus;
+  score: number;
+  growth_pct: number | null;
+  ratio: number;
+  z_score: number;
+  baseline_mean: number;
+  baseline_std: number;
+  baseline_windows: number;
+}
+
 export interface SocialPulseOverview {
   time_range: string;
   scope_kode: string;
   scope_name: string;
   scope_mode: "context" | "strict" | "regional";
   total_mentions: number;
-  mention_growth_pct: number;
+  previous_mentions: number | null;
+  mention_growth_pct: number | null;
   trending_topics_count: number;
   emerging_trends_count: number;
+  surging_trends_count: number;
+  new_trends_count: number;
+  coordination_flags: number;
   negative_ratio_pct: number;
   sentiment_breakdown: {
     positif: number;
@@ -440,11 +479,23 @@ export interface SocialPulseOverview {
   };
   active_platforms_count: number;
   platform_distribution: Record<string, number>;
+  unique_accounts: number;
+  author_coverage_pct: number;
+  engagement: SocialEngagementSummary;
+  timeline: SocialTimelineBucket[];
+  baseline: {
+    windows_available: number;
+    windows_target: number;
+    coverage_since: string | null;
+    min_surge_volume: number;
+  };
   data_coverage?: {
     total_collected: number;
     relevant_to_scope: number;
     uncertain_count: number;
     direct_count: number;
+    excluded_count?: number;
+    unclustered_count?: number;
   };
   last_updated: string;
 }
@@ -453,14 +504,21 @@ export interface SocialSampleMention {
   id: number;
   judul: string;
   isi: string;
-  penerbit: string;
-  penulis?: string;
+  penerbit: string | null;
+  penulis: string | null;
   platform: string;
-  url: string;
+  url: string | null;
   published_at: string;
   sentimen: string;
-  geo_context?: string;
-  geo_confidence?: "High" | "Medium" | "Low" | "Unknown";
+  geo_context?: string | null;
+  geo_confidence?: "High" | "Medium" | "Low" | "Unknown" | null;
+  engagement?: {
+    likes: number | null;
+    shares: number | null;
+    replies: number | null;
+    views: number | null;
+    followers: number | null;
+  };
 }
 
 export interface CorrelatedIssueSummary {
@@ -470,26 +528,145 @@ export interface CorrelatedIssueSummary {
   level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
   skor: number;
   status: string;
+  linked_posts?: number;
+}
+
+export interface SocialAccountSummary {
+  handle: string;
+  posts: number;
+  platforms: string[];
+  followers: number | null;
+  interactions: number | null;
+}
+
+export interface SocialCoordinationCluster {
+  posts: number;
+  distinct_accounts: number;
+  span_minutes: number;
+  flagged: boolean;
+  sample_text: string;
+  accounts: string[];
+}
+
+export interface SocialFacetRef {
+  id: string;
+  label: string;
+  count: number;
+}
+
+export interface SocialFilters {
+  category?: string;
+  agency?: string;
+}
+
+export type SocialSort = "laju" | "terbaru" | "volume" | "negatif";
+
+function appendFilters(params: URLSearchParams, filters?: SocialFilters) {
+  if (filters?.category) params.append("category", filters.category);
+  if (filters?.agency) params.append("agency", filters.agency);
+}
+
+export interface SocialFacets {
+  time_range: string;
+  total: number;
+  categories: SocialFacetRef[];
+  agencies: (SocialFacetRef & { group: string; negative: number })[];
+}
+
+export interface SocialAgencyRow {
+  id: string;
+  label: string;
+  group: string;
+  mention_count: number;
+  share_of_voice_pct: number;
+  negative_count: number;
+  sentiment_pct: { positif: number; netral: number; negatif: number; campuran?: number };
+  velocity_status: SocialVelocityStatus | "TIDAK ADA";
+  velocity_score: number;
+  growth_pct: number | null;
+  velocity: SocialVelocity;
+  timeline: SocialTimelineBucket[];
+  platforms: string[];
+  top_topics: string[];
+  categories: SocialFacetRef[];
+  top_negative: SocialSampleMention[];
+  latest: SocialSampleMention[];
+  engagement: SocialEngagementSummary;
+}
+
+export interface SocialAgencyBoard {
+  time_range: string;
+  scope_kode: string;
+  scope_name: string;
+  total_posts: number;
+  posts_mentioning_agency: number;
+  agencies: SocialAgencyRow[];
 }
 
 export interface SocialTrendingTopic {
   rank: number;
+  categories: SocialFacetRef[];
+  agencies: SocialFacetRef[];
+  topic_key: string;
   topic: string;
+  topic_type: "hashtag" | "frasa" | "kategori" | "lainnya";
   hashtags: string[];
+  related_phrases: string[];
   mention_count: number;
-  growth_pct: number;
+  growth_pct: number | null;
   velocity_score: number;
-  velocity_status: "LONJAKAN TINGGI" | "MENINGKAT" | "STABIL" | "MENURUN";
-  status_color: "rose" | "amber" | "sky" | "slate";
+  velocity_status: SocialVelocityStatus;
+  velocity: SocialVelocity;
   platforms: string[];
   sentiment_pct: {
     positif: number;
     netral: number;
     negatif: number;
+    campuran?: number;
   };
+  locations: string[];
   correlated_issue: CorrelatedIssueSummary | null;
   first_detected: string;
+  last_seen: string;
+  timeline: SocialTimelineBucket[];
+  baseline_per_bucket: number | null;
+  peak_at: string | null;
+  engagement: SocialEngagementSummary;
+  accounts: {
+    unique_accounts: number;
+    author_coverage_pct: number;
+    top_accounts: SocialAccountSummary[];
+    top_account_share_pct: number | null;
+    concentration_hhi: number | null;
+  };
+  coordination: {
+    flagged: boolean;
+    duplicate_share_pct: number;
+    clusters: SocialCoordinationCluster[];
+  };
   sample_mentions: SocialSampleMention[];
+}
+
+export type SocialHealthState =
+  | "aktif"
+  | "terlambat"
+  | "kosong"
+  | "gagal"
+  | "belum_ditarik"
+  | "nonaktif"
+  | "tanpa_sumber";
+
+export interface SocialSourceHealth {
+  id: number;
+  nama: string;
+  method: string;
+  state: SocialHealthState;
+  status_izin: string;
+  last_fetch_at: string | null;
+  last_success_at: string | null;
+  last_fetch_count: number | null;
+  last_error: string | null;
+  frekuensi_menit: number;
 }
 
 export interface SocialPlatformMetric {
@@ -497,24 +674,66 @@ export interface SocialPlatformMetric {
   code: string;
   icon: string;
   official_status: string;
+  health_state: SocialHealthState;
   type: string;
-  color: string;
+  is_connected: boolean;
+  sources: SocialSourceHealth[];
+  note: string | null;
+  time_range: string;
   mention_count: number;
   negative_sentiment_pct: number;
   positive_sentiment_pct: number;
   last_data_at: string | null;
-  is_connected: boolean;
+  last_success_at: string | null;
+  engagement: SocialEngagementSummary;
+  author_coverage_pct: number;
 }
 
 export interface SocialCorrelation {
   social_topic: string;
+  topic_key: string;
   hashtags: string[];
   mention_count: number;
+  linked_posts: number;
   velocity_score: number;
-  velocity_status: string;
+  velocity_status: SocialVelocityStatus;
   platforms: string[];
   issue: CorrelatedIssueSummary;
   first_detected: string;
+}
+
+export interface SocialWatchTerm {
+  term: string;
+  kind: "kata kunci" | "sinonim" | "tambahan";
+  profiles: string[];
+  mention_count: number;
+  velocity_status: SocialVelocityStatus | "TIDAK ADA";
+  velocity_score: number;
+  growth_pct: number | null;
+  velocity: SocialVelocity;
+  sentiment_pct: { positif: number; netral: number; negatif: number; campuran?: number };
+  platforms: string[];
+  timeline: SocialTimelineBucket[];
+  engagement: SocialEngagementSummary;
+  top_mentions: SocialSampleMention[];
+}
+
+export interface SocialWatchlist {
+  time_range: string;
+  scope_kode: string;
+  scope_name: string;
+  total_terms: number;
+  active_terms: number;
+  rising_terms: number;
+  terms: SocialWatchTerm[];
+}
+
+export interface SocialEscalationResult {
+  time_range: string;
+  evaluated_topics: number;
+  created: string[];
+  updated: string[];
+  skipped: { topic: string; reason: string }[];
 }
 
 export interface GeoSearchResult {
@@ -535,18 +754,19 @@ export interface GeoComparisonItem {
   scope_kode: string;
   region_name: string;
   total_mentions: number;
-  growth_pct: number;
+  growth_pct: number | null;
   trending_topics_count: number;
   emerging_trends_count: number;
   negative_sentiment_pct: number;
-  top_topic: string;
+  top_topic: string | null;
 }
 
 export async function fetchSocialPulseOverview(
   timeRange: string = "24h",
   scopeKode: string = "ID",
   scopeMode: string = "context",
-  multiCodes?: string
+  multiCodes?: string,
+  filters?: SocialFilters
 ): Promise<SocialPulseOverview> {
   const params = new URLSearchParams({
     time_range: timeRange,
@@ -554,6 +774,7 @@ export async function fetchSocialPulseOverview(
     scope_mode: scopeMode,
   });
   if (multiCodes) params.append("multi_codes", multiCodes);
+  appendFilters(params, filters);
 
   const res = await fetch(`${API_BASE_URL}/social-pulse/overview?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil overview Social Pulse");
@@ -566,7 +787,9 @@ export async function fetchSocialTrends(
   limit: number = 15,
   scopeKode: string = "ID",
   scopeMode: string = "context",
-  multiCodes?: string
+  multiCodes?: string,
+  filters?: SocialFilters,
+  sort: SocialSort = "laju"
 ): Promise<SocialTrendingTopic[]> {
   const params = new URLSearchParams();
   if (platform && platform !== "Semua") params.append("platform", platform);
@@ -574,7 +797,9 @@ export async function fetchSocialTrends(
   params.append("limit", limit.toString());
   params.append("scope_kode", scopeKode);
   params.append("scope_mode", scopeMode);
+  params.append("sort", sort);
   if (multiCodes) params.append("multi_codes", multiCodes);
+  appendFilters(params, filters);
 
   const res = await fetch(`${API_BASE_URL}/social-pulse/trends?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil tren Social Pulse");
@@ -584,11 +809,13 @@ export async function fetchSocialTrends(
 export async function fetchSocialPlatforms(
   scopeKode: string = "ID",
   scopeMode: string = "context",
-  multiCodes?: string
+  multiCodes?: string,
+  timeRange: string = "7d"
 ): Promise<SocialPlatformMetric[]> {
   const params = new URLSearchParams({
     scope_kode: scopeKode,
     scope_mode: scopeMode,
+    time_range: timeRange,
   });
   if (multiCodes) params.append("multi_codes", multiCodes);
 
@@ -610,6 +837,66 @@ export async function fetchSocialCorrelations(
 
   const res = await fetch(`${API_BASE_URL}/social-pulse/correlations?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil korelasi isu Social Pulse");
+  return res.json();
+}
+
+export async function fetchSocialWatchlist(
+  timeRange: string = "24h",
+  scopeKode: string = "ID",
+  scopeMode: string = "context",
+  multiCodes?: string,
+  extraTerms?: string[],
+  filters?: SocialFilters
+): Promise<SocialWatchlist> {
+  const params = new URLSearchParams({
+    time_range: timeRange,
+    scope_kode: scopeKode,
+    scope_mode: scopeMode,
+  });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+  if (extraTerms && extraTerms.length > 0) params.append("terms", extraTerms.join(","));
+  appendFilters(params, filters);
+
+  const res = await fetch(`${API_BASE_URL}/social-pulse/watchlist?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil watchlist kata kunci");
+  return res.json();
+}
+
+export async function fetchSocialFacets(
+  timeRange: string,
+  scopeKode: string,
+  scopeMode: string,
+  multiCodes?: string,
+  platform?: string,
+  filters?: SocialFilters
+): Promise<SocialFacets> {
+  const params = new URLSearchParams({ time_range: timeRange, scope_kode: scopeKode, scope_mode: scopeMode });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+  if (platform && platform !== "Semua") params.append("platform", platform);
+  appendFilters(params, filters);
+  const res = await fetch(`${API_BASE_URL}/social-pulse/facets?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil faset kategori dan instansi");
+  return res.json();
+}
+
+export async function fetchAgencyBoard(
+  timeRange: string,
+  scopeKode: string,
+  scopeMode: string,
+  multiCodes?: string,
+  category?: string
+): Promise<SocialAgencyBoard> {
+  const params = new URLSearchParams({ time_range: timeRange, scope_kode: scopeKode, scope_mode: scopeMode });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+  if (category) params.append("category", category);
+  const res = await fetch(`${API_BASE_URL}/social-pulse/agencies?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil papan instansi");
+  return res.json();
+}
+
+export async function escalateSocialSurges(timeRange: string = "6h"): Promise<SocialEscalationResult> {
+  const res = await fetch(`${API_BASE_URL}/social-pulse/escalate?time_range=${timeRange}`, { method: "POST" });
+  if (!res.ok) throw new Error("Gagal mengeskalasi lonjakan media sosial");
   return res.json();
 }
 

@@ -1,13 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.config import settings
-from backend.app.database import engine, Base
+from backend.app.database import engine
+from backend.app.schema_sync import ensure_schema
 from backend.app.seed_data import seed_database
+from backend.app.services import scheduler
 from backend.app.routers import (
     profiles, sources, issues, alerts, cases, reports, dashboard, audit, geo, social_pulse
 )
 
-Base.metadata.create_all(bind=engine)
+ensure_schema(engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -26,6 +28,12 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     seed_database()
+    scheduler.start(settings.AUTO_COLLECT_MINUTES)
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.stop()
 
 # Register Routers
 app.include_router(dashboard.router, prefix=settings.API_V1_STR)

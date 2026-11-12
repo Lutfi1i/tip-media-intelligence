@@ -7,9 +7,30 @@ from backend.app.models import Source, RawItem, ItemAnalysis, MonitoringProfile,
 from backend.app.services.dedup import compute_content_hash, is_near_duplicate
 from backend.app.services.ai_analyzer import analyze_sentiment, analyze_topic, extract_locations
 from backend.app.services.jev_triage import evaluate_binary_triage
+from backend.app.services.social_platform import legacy_platform
 
 # Versi nyata mesin analisis (leksikon + aturan gazetir + jev triage), bukan model transformer.
 MODEL_VERSION = "leksikon-id-gazetir-v2-jev"
+
+_ENG_FIELDS = {
+    "likes": "eng_likes",
+    "shares": "eng_shares",
+    "replies": "eng_replies",
+    "views": "eng_views",
+    "followers": "author_followers",
+}
+
+
+def _refresh_engagement(item: RawItem, engagement: Dict[str, Optional[int]]) -> bool:
+    """Perbarui angka engagement item yang ditarik ulang. Nilai NULL dari sumber tidak menimpa angka lama."""
+    changed = False
+    for key, column in _ENG_FIELDS.items():
+        value = engagement.get(key)
+        if value is not None and getattr(item, column) != value:
+            setattr(item, column, value)
+            changed = True
+    return changed
+
 
 def can_fetch_source(source: Source) -> bool:
     """Check if source is legally permitted and active."""
@@ -23,13 +44,19 @@ def ingest_content_item(
     body: str,
     penerbit: str = "Media Online",
     penulis: Optional[str] = None,
-    published_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None,
+    platform: Optional[str] = None,
+    engagement: Optional[Dict[str, Optional[int]]] = None,
 ) -> Dict[str, Any]:
     """
     Ingest a single content piece:
     - Deduplication: exact hash & near duplicate check
     - AI classification: sentiment, topic, location
     - Save raw_item and item_analysis
+
+    `platform` adalah platform asal (lihat social_platform.resolve_platform). Bila kosong,
+    ditebak dari URL dan penerbit. `engagement` berisi likes/shares/replies/views/followers
+    bila sumber menyediakannya; kunci yang tidak ada disimpan sebagai NULL.
     """
     if published_at is None:
         published_at = datetime.utcnow()
@@ -39,6 +66,8 @@ def ingest_content_item(
     # 1. Exact hash duplicate check
     existing = db.query(RawItem).filter(RawItem.hash == content_hash).first()
     if existing:
+        if engagement and url and existing.url_kanonik == url and _refresh_engagement(existing, engagement):
+            db.commit()
         return {
             "status": "duplicate_exact",
             "item_id": existing.id,
@@ -49,6 +78,8 @@ def ingest_content_item(
     if url:
         existing_url = db.query(RawItem).filter(RawItem.url_kanonik == url).first()
         if existing_url:
+            if engagement and _refresh_engagement(existing_url, engagement):
+                db.commit()
             return {
                 "status": "duplicate_exact",
                 "item_id": existing_url.id,
@@ -65,6 +96,7 @@ def ingest_content_item(
             break
 
     # 3. Create RawItem
+    eng = engagement or {}
     raw_item = RawItem(
         source_id=source_id,
         url_kanonik=url,
@@ -74,7 +106,13 @@ def ingest_content_item(
         penerbit=penerbit,
         penulis=penulis,
         published_at=published_at,
-        fetched_at=datetime.utcnow()
+        fetched_at=datetime.utcnow(),
+        platform=platform or legacy_platform(penerbit, url, title),
+        eng_likes=eng.get("likes"),
+        eng_shares=eng.get("shares"),
+        eng_replies=eng.get("replies"),
+        eng_views=eng.get("views"),
+        author_followers=eng.get("followers"),
     )
     db.add(raw_item)
     db.commit()
