@@ -5,6 +5,7 @@ serta kapabilitas Geographic Scope Intelligence (FR-GEO-01 s/d FR-GEO-09).
 
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
@@ -23,6 +24,7 @@ from backend.app.services.social_pulse_service import (
     resolve_period,
 )
 from backend.app.services.social_taxonomy import catalog as social_catalog
+from backend.app.services.social_notes import NOTE_STATUSES, add_note, list_notes
 from backend.app.services.social_escalation import escalate_social_surges
 from backend.app.services.geo_hierarchy import (
     search_geographic_scope,
@@ -163,6 +165,30 @@ def read_social_watchlist(
         category=category,
         agency=agency,
     )
+
+
+class TopicNoteIn(BaseModel):
+    topic_key: str = Field(..., min_length=1, max_length=255)
+    topic_label: str = Field("", max_length=255)
+    status: str
+    catatan: Optional[str] = Field(None, max_length=2000)
+    aktor: str = Field(..., min_length=1, max_length=120)
+    peran: str = Field("Analis", max_length=50)
+
+
+@router.get("/notes")
+def read_topic_notes(topic_key: str = Query(..., min_length=1), db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Riwayat catatan analis untuk satu topik, terbaru dulu, beserta daftar status yang tersedia."""
+    return {"statuses": NOTE_STATUSES, "notes": list_notes(db, topic_key)}
+
+
+@router.post("/notes")
+def create_topic_note(payload: TopicNoteIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Tambah catatan/status pada topik medsos. Tercatat juga di audit trail."""
+    try:
+        return add_note(db, payload.topic_key, payload.topic_label, payload.status, payload.aktor, payload.catatan, payload.peran)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/brief")

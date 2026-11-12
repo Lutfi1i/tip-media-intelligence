@@ -565,6 +565,19 @@ export interface SocialCoordinationCluster {
   accounts: string[];
 }
 
+export interface SocialTopicNote {
+  id: number;
+  topic_key: string;
+  topic_label: string;
+  status: string;
+  status_label: string;
+  catatan: string | null;
+  aktor: string;
+  peran: string;
+  created_at: string;
+  count?: number;
+}
+
 export interface SocialEmotionShare {
   id: string;
   label: string;
@@ -633,6 +646,7 @@ export interface SocialTrendingTopic {
   categories: SocialFacetRef[];
   agencies: SocialFacetRef[];
   emotions: SocialEmotionShare[];
+  analyst_note: SocialTopicNote | null;
   topic_key: string;
   topic: string;
   topic_type: "hashtag" | "frasa" | "kategori" | "lainnya";
@@ -932,6 +946,34 @@ export async function fetchSocialBrief(
   appendFilters(params, filters);
   const res = await fetch(`${API_BASE_URL}/social-pulse/brief?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil ringkasan situasi");
+  return res.json();
+}
+
+export async function fetchSocialTopicNotes(
+  topicKey: string
+): Promise<{ statuses: Record<string, string>; notes: SocialTopicNote[] }> {
+  const res = await fetch(`${API_BASE_URL}/social-pulse/notes?topic_key=${encodeURIComponent(topicKey)}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil catatan analis");
+  return res.json();
+}
+
+export async function addSocialTopicNote(payload: {
+  topic_key: string;
+  topic_label: string;
+  status: string;
+  catatan?: string;
+  aktor: string;
+  peran?: string;
+}): Promise<SocialTopicNote> {
+  const res = await fetch(`${API_BASE_URL}/social-pulse/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(typeof body?.detail === "string" ? body.detail : "Catatan gagal disimpan");
+  }
   return res.json();
 }
 

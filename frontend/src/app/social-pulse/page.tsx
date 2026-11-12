@@ -28,6 +28,7 @@ import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
 import { SocialBriefCard } from "@/components/SocialBriefCard";
+import { NOTE_STATUS_STYLE, SocialTopicNotes } from "@/components/SocialTopicNotes";
 import { MediaAvatarStack, RealBrandIcon } from "@/components/SourceLogos";
 import { GeographicScopeSelector } from "@/components/GeographicScopeSelector";
 import { GeographicComparisonTable } from "@/components/GeographicComparisonTable";
@@ -639,6 +640,14 @@ export default function SocialPulsePage() {
                                     {ht}
                                   </span>
                                 ))}
+                                {item.analyst_note && (
+                                  <span
+                                    className={`rounded-md px-1.5 py-0.5 text-2xs font-bold ${NOTE_STATUS_STYLE[item.analyst_note.status] ?? ""}`}
+                                    title={`${item.analyst_note.aktor}, ${formatWib(item.analyst_note.created_at)} WIB${item.analyst_note.catatan ? `: ${item.analyst_note.catatan}` : ""}`}
+                                  >
+                                    {item.analyst_note.status_label}
+                                  </span>
+                                )}
                                 {item.coordination.flagged && (
                                   <span
                                     className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-700 dark:text-amber-300"
@@ -911,7 +920,15 @@ export default function SocialPulsePage() {
         </div>
       )}
 
-      {selectedTopic && <TopicDetailModal topic={selectedTopic} scopeName={scopeName} windowLabel={windowLabel} onClose={() => setSelectedTopic(null)} />}
+      {selectedTopic && (
+        <TopicDetailModal
+          topic={selectedTopic}
+          scopeName={scopeName}
+          windowLabel={windowLabel}
+          onClose={() => setSelectedTopic(null)}
+          onNoteSaved={loadData}
+        />
+      )}
     </div>
   );
 }
@@ -921,11 +938,13 @@ function TopicDetailModal({
   scopeName,
   windowLabel,
   onClose,
+  onNoteSaved,
 }: {
   topic: SocialTrendingTopic;
   scopeName: string;
   windowLabel: string;
   onClose: () => void;
+  onNoteSaved: () => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -1043,6 +1062,8 @@ function TopicDetailModal({
               )}
             </section>
           </div>
+
+          <SocialTopicNotes topicKey={topic.topic_key} topicLabel={topic.topic} onSaved={onNoteSaved} />
 
           {topic.coordination.clusters.length > 0 && (
             <section

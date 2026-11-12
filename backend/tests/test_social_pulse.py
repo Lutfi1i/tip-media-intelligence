@@ -565,3 +565,26 @@ def test_overview_and_trends_include_emotions(db):
     assert isinstance(ov["emotion_breakdown"], list)
     t = get_social_trends(db, time_range="24h")[0]
     assert "emotions" in t and "emosi" in t["sample_mentions"][0]
+
+
+# ---------- catatan analis ----------
+
+from backend.app.models import AuditLog  # noqa: E402
+from backend.app.services.social_notes import add_note, list_notes  # noqa: E402
+
+
+def test_topic_notes_history_latest_status_and_audit(db):
+    now = datetime.utcnow()
+    _seed(db, now)
+    add_note(db, "#banjirbekasi", "#banjirbekasi", "dipantau", "Rina", "Pantau tiap jam")
+    add_note(db, "#banjirbekasi", "#banjirbekasi", "ditangani", "Budi", "Dinas SDA sudah turun")
+    notes = list_notes(db, "#banjirbekasi")
+    assert [n["status"] for n in notes] == ["ditangani", "dipantau"]
+    trend = next(t for t in get_social_trends(db, time_range="24h") if t["topic_key"] == "#banjirbekasi")
+    assert trend["analyst_note"]["status"] == "ditangani" and trend["analyst_note"]["count"] == 2
+    assert db.query(AuditLog).filter(AuditLog.aksi == "CATATAN_TOPIK_MEDSOS").count() == 2
+
+    with pytest.raises(ValueError):
+        add_note(db, "#x", "#x", "tidak_ada", "Rina")
+    with pytest.raises(ValueError):
+        add_note(db, "#x", "#x", "dipantau", "  ")

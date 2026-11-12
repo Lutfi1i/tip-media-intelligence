@@ -28,6 +28,7 @@ from backend.app.services.geo_hierarchy import (
     classify_geographic_context,
 )
 from backend.app.services.social_platform import SOCIAL_PLATFORMS, platform_from_url
+from backend.app.services.social_notes import latest_notes
 from backend.app.services.social_emotion import EMOTION_LABELS, classify_emotions, emotion_breakdown
 from backend.app.services.social_taxonomy import (
     AGENCIES,
@@ -531,6 +532,9 @@ def _build_trends(db: Session, ds: _Dataset, time_range: str, sort: str = "laju"
             "post_ids": [p.id for p in posts],
         })
 
+    notes = latest_notes(db, (t["topic_key"] for t in trends))
+    for t in trends:
+        t["analyst_note"] = notes.get(t["topic_key"])
     _sort_trends(trends, sort)
     return trends
 

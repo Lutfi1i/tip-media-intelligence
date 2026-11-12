@@ -228,3 +228,17 @@ class Region(Base):
     sentiment_negative_pct = Column(Float, default=0.0)
     top_issue = Column(String(255), nullable=True)
     confidence = Column(Float, default=0.85)
+
+
+class SocialTopicNote(Base):
+    """Catatan dan status analis untuk sebuah topik medsos (riwayat lengkap, status terbaru = catatan terakhir)."""
+    __tablename__ = "social_topic_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    topic_key = Column(String(255), nullable=False, index=True)
+    topic_label = Column(String(255), nullable=False)
+    status = Column(String(30), nullable=False)  # dipantau, sudah_dicek, hoaks, ditangani, bukan_isu
+    catatan = Column(Text, nullable=True)
+    aktor = Column(String(120), nullable=False)
+    peran = Column(String(50), default="Analis")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
