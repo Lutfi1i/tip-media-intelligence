@@ -330,6 +330,43 @@ def engagement_summary(posts: Sequence[SocialPost]) -> Dict[str, object]:
     }
 
 
+def propagation(posts: Sequence[SocialPost]) -> Dict[str, object]:
+    """Urutan platform menurut konten pertama yang memuat topik ini.
+
+    Waktu memakai `published_at` yang dicatat sumber. Konten yang terlambat dikumpulkan
+    tidak mengubah urutan, tetapi platform tanpa sumber aktif tidak akan pernah muncul,
+    jadi platform pertama di sini adalah yang pertama terpantau, belum tentu asal sebenarnya.
+    """
+    by_platform: Dict[str, List[SocialPost]] = {}
+    for p in posts:
+        by_platform.setdefault(p.platform, []).append(p)
+
+    firsts = sorted(
+        ((name, min(group, key=lambda p: (p.published_at, p.id)), len(group)) for name, group in by_platform.items()),
+        key=lambda row: (row[1].published_at, row[1].id),
+    )
+    if not firsts:
+        return {"origin": None, "span_minutes": None, "steps": []}
+
+    origin_at = firsts[0][1].published_at
+    steps = [
+        {
+            "platform": name,
+            "first_at": first.published_at.isoformat(),
+            "lag_minutes": round((first.published_at - origin_at).total_seconds() / 60),
+            "posts": count,
+            "first_author": first.author,
+            "first_url": first.url,
+        }
+        for name, first, count in firsts
+    ]
+    return {
+        "origin": steps[0]["platform"],
+        "span_minutes": steps[-1]["lag_minutes"],
+        "steps": steps,
+    }
+
+
 def velocity(current: int, history: Sequence[int], min_volume: int, multiplier: float = 3.0) -> Dict[str, object]:
     """Status laju sebuah topik dibanding riwayat jendela waktu yang sama panjang.
 

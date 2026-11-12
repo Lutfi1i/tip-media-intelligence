@@ -30,6 +30,7 @@ import {
   SocialHeatmap as SocialHeatmapData,
 } from "@/lib/api";
 import { SocialHeatmap } from "@/components/SocialHeatmap";
+import { SocialWatchedAccounts } from "@/components/SocialWatchedAccounts";
 import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
@@ -43,7 +44,7 @@ import { GeographicComparisonTable } from "@/components/GeographicComparisonTabl
 import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
 import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
 
-type Tab = "tren" | "alert" | "instansi" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type Tab = "tren" | "alert" | "instansi" | "akun" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
 
@@ -173,7 +174,7 @@ export default function SocialPulsePage() {
     if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
     if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
     const tab = q.get("tab");
-    if (tab && ["tren", "alert", "instansi", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    if (tab && ["tren", "alert", "instansi", "akun", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
     const wilayah = q.get("wilayah");
     if (wilayah) {
       setScopeKode(wilayah);
@@ -351,6 +352,7 @@ export default function SocialPulsePage() {
     { id: "tren", label: `Topik Tren (${trends.length})` },
     { id: "alert", label: unreadAlerts ? `Aturan Alert (${unreadAlerts} baru)` : "Aturan Alert" },
     { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
+    { id: "akun", label: "Akun Pantauan" },
     { id: "peta", label: "Peta Panas" },
     { id: "bandingkan", label: "Bandingkan Periode" },
     { id: "watchlist", label: `Watchlist (${watchlist?.active_terms ?? 0}/${watchlist?.total_terms ?? 0})` },
@@ -846,6 +848,10 @@ export default function SocialPulsePage() {
             setActiveTab("tren");
           }}
         />
+      )}
+
+      {activeTab === "akun" && (
+        <SocialWatchedAccounts timeRange={timeRange} scopeKode={scopeKode} scopeMode={scopeMode} multiCodes={multiParam} />
       )}
 
       {activeTab === "peta" && (

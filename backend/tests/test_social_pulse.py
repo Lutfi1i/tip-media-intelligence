@@ -25,6 +25,7 @@ from backend.app.services.social_topics import (
     cluster_posts,
     detect_coordination,
     extract_keys,
+    propagation,
     velocity,
 )
 
@@ -130,6 +131,28 @@ def test_account_concentration_and_coordination():
     # Teks kembar dari satu akun saja bukan indikasi koordinasi.
     solo = [_post(i, text, i * 5, "@a") for i in range(1, 4)]
     assert detect_coordination(solo)["flagged"] is False
+
+
+def test_propagation_orders_platforms_by_first_post():
+    posts = [
+        _post(1, "banjir kemang", 30, "@x1", platform="X (Twitter)"),
+        _post(2, "banjir kemang", 200, "@tt1", platform="TikTok", url="https://tiktok.com/@tt1/video/1"),
+        _post(3, "banjir kemang", 120, "@tt2", platform="TikTok"),
+        _post(4, "banjir kemang", 90, "@x2", platform="X (Twitter)"),
+        _post(5, "banjir kemang", 10, None, platform="YouTube"),
+    ]
+    prop = propagation(posts)
+    assert prop["origin"] == "TikTok"
+    assert [s["platform"] for s in prop["steps"]] == ["TikTok", "X (Twitter)", "YouTube"]
+    assert [s["lag_minutes"] for s in prop["steps"]] == [0, 110, 190]
+    assert [s["posts"] for s in prop["steps"]] == [2, 2, 1]
+    assert prop["steps"][0]["first_author"] == "@tt1"
+    assert prop["steps"][0]["first_url"] == "https://tiktok.com/@tt1/video/1"
+    assert prop["span_minutes"] == 190
+
+    single = propagation([_post(1, "banjir", 5, platform="TikTok")])
+    assert single["origin"] == "TikTok" and single["span_minutes"] == 0
+    assert propagation([]) == {"origin": None, "span_minutes": None, "steps": []}
 
 
 # ---------- service on a real (sqlite) database ----------
@@ -806,3 +829,50 @@ def test_region_category_heatmap(db):
     assert rows_by["Bekasi"]["total"] == 2 and rows_by["Bekasi"]["cells"]["bencana"] == {"count": 2, "negative": 2}
     assert rows_by["Jakarta Selatan"]["cells"]["kuliner"]["count"] == 1
     assert hm["max_cell"] == 2 and hm["columns"][0]["id"] == "bencana"
+
+
+# ---------- akun pantauan ----------
+
+from backend.app.services.social_accounts import add_account, get_account_activity, normalize_handle  # noqa: E402
+
+
+def test_normalize_handle():
+    assert normalize_handle("@CNNIndonesia ") == "cnnindonesia"
+    assert normalize_handle("https://x.com/TMCPoldaMetro?lang=id") == "tmcpoldametro"
+    assert normalize_handle("https://www.instagram.com/dkijakarta/") == "dkijakarta"
+
+
+def test_watched_account_activity_and_suggestions(db):
+    now = datetime.utcnow()
+    src = Source(nama="s", jenis="media_sosial", url="https://x.com/s")
+    db.add(src)
+    db.flush()
+    rows = [
+        ("Info lalin pagi ini lancar", "@TMCPoldaMetro", "netral"),
+        ("Rekayasa lalin di Sudirman", "@TMCPoldaMetro", "netral"),
+        ("@tmcpoldametro macet parah kok diam saja", "@warga1", "negatif"),
+        ("Halo @TMCPoldaMetro terima kasih infonya", "@warga2", "positif"),
+        ("Seblak enak di Bogor", "@kulinerbogor", "positif"),
+        ("Seblak level 5 di Bogor", "@kulinerbogor", "positif"),
+    ]
+    for i, (text, author, sent) in enumerate(rows):
+        it = RawItem(source_id=src.id, url_kanonik=f"w{i}", hash=f"w{i}", judul=text, isi=text, penulis=author,
+                     published_at=now - timedelta(hours=1, minutes=i), fetched_at=now - timedelta(days=2), platform="X (Twitter)")
+        db.add(it)
+        db.flush()
+        db.add(ItemAnalysis(item_id=it.id, sentimen=sent, topik="Umum"))
+    db.commit()
+
+    add_account(db, "@TMCPoldaMetro", "TMC Polda Metro Jaya", "instansi", None, "Rina")
+    with pytest.raises(ValueError, match="sudah dipantau"):
+        add_account(db, "tmcpoldametro", None, "instansi", None, "Rina")
+    with pytest.raises(ValueError, match="handle tidak valid"):
+        add_account(db, "@a b", None, "instansi", None, "Rina")
+
+    act = get_account_activity(db, time_range="24h")
+    tmc = act["accounts"][0]
+    assert tmc["posts"] == 2 and tmc["mentions"] == 2
+    assert tmc["mention_sentiment"]["negatif"] == 50.0
+    assert tmc["latest_posts"][0]["judul"] == "Info lalin pagi ini lancar"
+    suggested = [s["handle_norm"] for s in act["suggestions"]]
+    assert "kulinerbogor" in suggested and "tmcpoldametro" not in suggested

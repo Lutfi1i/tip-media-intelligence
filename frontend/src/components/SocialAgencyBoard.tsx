@@ -18,7 +18,7 @@ function MentionList({ title, items }: { title: string; items: SocialSampleMenti
               <div className="text-2xs text-zinc-500">
                 <span className="font-mono">{formatWib(m.published_at)} WIB</span> · {m.penulis ?? m.platform}
               </div>
-              <div className="text-zinc-800 dark:text-zinc-200">{m.judul}</div>
+              <div className="text-zinc-800 [overflow-wrap:anywhere] dark:text-zinc-200">{m.judul}</div>
               {m.url && (
                 <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-2xs font-semibold text-fuchsia-600 hover:underline dark:text-fuchsia-400">
                   Buka sumber

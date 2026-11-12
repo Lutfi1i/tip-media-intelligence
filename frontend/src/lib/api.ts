@@ -1157,6 +1157,49 @@ export async function fetchSocialHeatmap(
   return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/heatmap?${params.toString()}`, { cache: "no-store" }), "Gagal memuat peta panas");
 }
 
+export interface SocialWatchedAccountRow {
+  id: number;
+  handle: string;
+  label: string | null;
+  kelompok: string;
+  kelompok_label: string;
+  catatan: string | null;
+  dibuat_oleh: string;
+  created_at: string | null;
+  posts: number;
+  mentions: number;
+  mention_sentiment: { positif: number; netral: number; negatif: number } | null;
+  platforms: string[];
+  last_post_at: string | null;
+  timeline: SocialTimelineBucket[];
+  latest_posts: SocialSampleMention[];
+  top_mentions: SocialSampleMention[];
+}
+
+export interface SocialWatchedAccounts {
+  period: SocialPeriod;
+  groups: Record<string, string>;
+  accounts: SocialWatchedAccountRow[];
+  suggestions: (SocialAccountSummary & { handle_norm: string })[];
+}
+
+export async function fetchSocialWatchedAccounts(timeRange: string, scopeKode: string, scopeMode: string, multiCodes?: string): Promise<SocialWatchedAccounts> {
+  const params = new URLSearchParams({ time_range: timeRange, scope_kode: scopeKode, scope_mode: scopeMode });
+  if (multiCodes) params.append("multi_codes", multiCodes);
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/watched-accounts?${params.toString()}`, { cache: "no-store" }), "Gagal memuat akun pantauan");
+}
+
+export async function addSocialWatchedAccount(payload: { handle: string; label?: string; kelompok: string; catatan?: string; dibuat_oleh: string }) {
+  return jsonOrError(
+    await fetch(`${API_BASE_URL}/social-pulse/watched-accounts`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+    "Akun gagal ditambahkan"
+  );
+}
+
+export async function deleteSocialWatchedAccount(id: number) {
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/watched-accounts/${id}`, { method: "DELETE" }), "Akun gagal dihapus");
+}
+
 export async function escalateSocialSurges(timeRange: string = "6h"): Promise<SocialEscalationResult> {
   const res = await fetch(`${API_BASE_URL}/social-pulse/escalate?time_range=${timeRange}`, { method: "POST" });
   if (!res.ok) throw new Error("Gagal mengeskalasi lonjakan media sosial");

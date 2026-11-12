@@ -48,6 +48,7 @@ from backend.app.services.social_topics import (
     engagement_summary,
     extract_keys,
     key_label,
+    propagation,
     top_hashtags,
     top_phrases,
     velocity,
@@ -530,6 +531,7 @@ def _build_trends(db: Session, ds: _Dataset, time_range: str, sort: str = "laju"
             "engagement": engagement_summary(posts),
             "accounts": account_analysis(posts),
             "coordination": detect_coordination(posts),
+            "propagation": propagation(posts),
             "sample_mentions": [_mention_payload(ds, p) for p in _rank_mentions(posts)[:6]],
             "post_ids": [p.id for p in posts],
         })

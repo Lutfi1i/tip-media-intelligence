@@ -281,3 +281,16 @@ class SocialAlertEvent(Base):
     sample_json = Column(Text, default="[]")
     status = Column(String(20), default="baru")      # baru, dilihat
     dilihat_oleh = Column(String(120), nullable=True)
+
+
+class SocialWatchedAccount(Base):
+    """Akun medsos yang dipantau khusus (pejabat, instansi, media, warga berpengaruh)."""
+    __tablename__ = "social_watched_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    handle = Column(String(120), nullable=False, unique=True, index=True)  # huruf kecil tanpa "@"
+    label = Column(String(150), nullable=True)
+    kelompok = Column(String(30), default="lainnya")  # pejabat, instansi, media, warga, lainnya
+    catatan = Column(Text, nullable=True)
+    dibuat_oleh = Column(String(120), default="Analis")
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -27,6 +27,7 @@ from backend.app.services.social_pulse_service import (
 )
 from backend.app.services.social_taxonomy import catalog as social_catalog
 from backend.app.services.social_notes import NOTE_STATUSES, add_note, list_notes
+from backend.app.services.social_accounts import add_account, get_account_activity, remove_account
 from backend.app.services.social_alert_rules import (
     METRICS as ALERT_METRICS,
     WINDOWS as ALERT_WINDOWS,
@@ -363,6 +364,42 @@ def read_region_category_heatmap(
     """Matriks kota/kabupaten x kategori untuk melihat kategori yang ramai di setiap wilayah."""
     codes_list = [c.strip() for c in multi_codes.split(",")] if multi_codes else None
     return get_region_category_heatmap(db, time_range, scope_kode, scope_mode, codes_list, platform, agency)
+
+
+class WatchedAccountIn(BaseModel):
+    handle: str = Field(..., max_length=200)
+    label: Optional[str] = Field(None, max_length=150)
+    kelompok: str = "lainnya"
+    catatan: Optional[str] = Field(None, max_length=1000)
+    dibuat_oleh: str = Field("Analis", max_length=120)
+
+
+@router.get("/watched-accounts")
+def read_watched_accounts(
+    time_range: str = Depends(period_param),
+    scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
+    scope_mode: str = Query("context", description="Mode filter: context, strict, regional"),
+    multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Aktivitas akun pantauan pada periode aktif, plus saran akun aktif yang belum dipantau."""
+    codes_list = [c.strip() for c in multi_codes.split(",")] if multi_codes else None
+    return get_account_activity(db, time_range, scope_kode, scope_mode, codes_list)
+
+
+@router.post("/watched-accounts")
+def create_watched_account(payload: WatchedAccountIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    try:
+        return add_account(db, payload.handle, payload.label, payload.kelompok, payload.catatan, payload.dibuat_oleh)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.delete("/watched-accounts/{account_id}")
+def delete_watched_account(account_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    if not remove_account(db, account_id):
+        raise HTTPException(status_code=404, detail="akun pantauan tidak ditemukan")
+    return {"deleted": account_id}
 
 
 @router.get("/brief")
