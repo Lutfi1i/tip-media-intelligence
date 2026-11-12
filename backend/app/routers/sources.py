@@ -9,6 +9,7 @@ from backend.app.services.audit import record_audit
 from backend.app.services.collector import collect_all
 from backend.app.services.issue_clustering import cluster_and_sync_issues
 from backend.app.services.social_escalation import escalate_social_surges
+from backend.app.services.social_alert_rules import evaluate_rules
 
 router = APIRouter(prefix="/sources", tags=["Sources Registry"])
 
@@ -27,6 +28,7 @@ def poll_sources(force: bool = True, db: Session = Depends(get_db)):
     clustering = cluster_and_sync_issues(db)
     hasil["clustering"] = clustering
     hasil["eskalasi_medsos"] = escalate_social_surges(db)
+    hasil["alert_medsos"] = evaluate_rules(db)
     record_audit(
         db,
         aktor="sistem",

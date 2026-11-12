@@ -11,6 +11,7 @@ import {
   fetchSocialFacets,
   fetchAgencyBoard,
   fetchSocialBrief,
+  fetchSocialAlertEvents,
   escalateSocialSurges,
   generateSocialReport,
   getReportViewUrl,
@@ -31,6 +32,7 @@ import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
 import { SocialPeriodPicker } from "@/components/SocialPeriodPicker";
 import { SocialBriefCard } from "@/components/SocialBriefCard";
 import { SocialPeriodComparison } from "@/components/SocialPeriodComparison";
+import { SocialAlertRules } from "@/components/SocialAlertRules";
 import { NOTE_STATUS_STYLE, SocialTopicNotes } from "@/components/SocialTopicNotes";
 import { MediaAvatarStack, RealBrandIcon } from "@/components/SourceLogos";
 import { GeographicScopeSelector } from "@/components/GeographicScopeSelector";
@@ -38,7 +40,7 @@ import { GeographicComparisonTable } from "@/components/GeographicComparisonTabl
 import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
 import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
 
-type Tab = "tren" | "instansi" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type Tab = "tren" | "alert" | "instansi" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
 
@@ -125,6 +127,12 @@ export default function SocialPulsePage() {
   const [facets, setFacets] = useState<SocialFacets | null>(null);
   const [agencyBoard, setAgencyBoard] = useState<AgencyBoardData | null>(null);
   const [brief, setBrief] = useState<SocialBrief | null>(null);
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const refreshUnread = useCallback(() => {
+    fetchSocialAlertEvents("baru", 1)
+      .then((r) => setUnreadAlerts(r.unread))
+      .catch(() => undefined);
+  }, []);
 
   const [scopeKode, setScopeKode] = useState<string>("ID");
   const [scopeName, setScopeName] = useState<string>("Seluruh Indonesia");
@@ -161,7 +169,7 @@ export default function SocialPulsePage() {
     if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
     if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
     const tab = q.get("tab");
-    if (tab && ["tren", "instansi", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    if (tab && ["tren", "alert", "instansi", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
     const wilayah = q.get("wilayah");
     if (wilayah) {
       setScopeKode(wilayah);
@@ -193,6 +201,7 @@ export default function SocialPulsePage() {
         fetchSocialBrief(timeRange, scopeKode, scopeMode, multiParam, filters),
       ]);
       setBrief(brData);
+      refreshUnread();
       setFacets(fcData);
       setAgencyBoard(agData);
       setOverview(ovData);
@@ -207,7 +216,7 @@ export default function SocialPulsePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, selectedPlatform, scopeKode, scopeMode, multiParam, extraTerms, category, agency, sort]);
+  }, [timeRange, selectedPlatform, scopeKode, scopeMode, multiParam, extraTerms, category, agency, sort, refreshUnread]);
 
   useEffect(() => {
     if (ready) loadData();
@@ -334,6 +343,7 @@ export default function SocialPulsePage() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "tren", label: `Topik Tren (${trends.length})` },
+    { id: "alert", label: unreadAlerts ? `Aturan Alert (${unreadAlerts} baru)` : "Aturan Alert" },
     { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
     { id: "bandingkan", label: "Bandingkan Periode" },
     { id: "watchlist", label: `Watchlist (${watchlist?.active_terms ?? 0}/${watchlist?.total_terms ?? 0})` },
@@ -457,6 +467,17 @@ export default function SocialPulsePage() {
           sudah punya data
           {baseline.coverage_since ? ` (pengumpulan medsos sejak ${formatWib(baseline.coverage_since)} WIB)` : ""}. Topik tanpa pembanding
           berstatus BARU dan belum dieskalasi otomatis. Hasil akan makin akurat setelah penarikan berkala berjalan beberapa periode.
+        </div>
+      )}
+
+      {unreadAlerts > 0 && activeTab !== "alert" && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+          <span>
+            <strong>{unreadAlerts} alert medsos baru</strong> dari aturan yang Anda buat.
+          </span>
+          <button onClick={() => setActiveTab("alert")} className="text-xs font-semibold underline">
+            Lihat alert
+          </button>
         </div>
       )}
 
@@ -806,6 +827,8 @@ export default function SocialPulsePage() {
           </div>
         </div>
       )}
+
+      {activeTab === "alert" && <SocialAlertRules facets={facets} scopeKode={scopeKode} onEventsChanged={refreshUnread} />}
 
       {activeTab === "instansi" && (
         <SocialAgencyBoard

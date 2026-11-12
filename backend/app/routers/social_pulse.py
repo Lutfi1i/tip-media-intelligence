@@ -26,6 +26,17 @@ from backend.app.services.social_pulse_service import (
 )
 from backend.app.services.social_taxonomy import catalog as social_catalog
 from backend.app.services.social_notes import NOTE_STATUSES, add_note, list_notes
+from backend.app.services.social_alert_rules import (
+    METRICS as ALERT_METRICS,
+    WINDOWS as ALERT_WINDOWS,
+    evaluate_rules,
+    event_payload,
+    measure_rule,
+    rule_payload,
+    validate_rule,
+)
+from backend.app.services.audit import record_audit
+from backend.app.models import SocialAlertEvent, SocialAlertRule
 from backend.app.services.social_escalation import escalate_social_surges
 from backend.app.services.geo_hierarchy import (
     search_geographic_scope,
@@ -213,6 +224,129 @@ def read_period_comparison(
             raise HTTPException(status_code=422, detail=f"periode pembanding: {exc}")
     codes_list = [c.strip() for c in multi_codes.split(",")] if multi_codes else None
     return get_period_comparison(db, time_range, compare_key, scope_kode, scope_mode, codes_list, platform)
+
+
+class AlertRuleIn(BaseModel):
+    nama: str = Field(..., max_length=150)
+    aktif: bool = True
+    term: Optional[str] = Field(None, max_length=150)
+    category: Optional[str] = None
+    agency: Optional[str] = None
+    platform: Optional[str] = None
+    scope_kode: str = "ID"
+    metric: str
+    threshold: float
+    window: str = "1h"
+    cooldown_menit: int = 60
+    dibuat_oleh: str = Field("Analis", max_length=120)
+
+
+def _get_rule(db: Session, rule_id: int) -> SocialAlertRule:
+    rule = db.get(SocialAlertRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="aturan tidak ditemukan")
+    return rule
+
+
+@router.get("/alert-rules")
+def list_alert_rules(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Daftar aturan alert beserta pilihan metrik dan jendela."""
+    rules = db.query(SocialAlertRule).order_by(SocialAlertRule.created_at.desc()).all()
+    return {"metrics": ALERT_METRICS, "windows": list(ALERT_WINDOWS), "rules": [rule_payload(r) for r in rules]}
+
+
+@router.post("/alert-rules")
+def create_alert_rule(payload: AlertRuleIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    try:
+        data = validate_rule(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    rule = SocialAlertRule(**data)
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    record_audit(db, aktor=rule.dibuat_oleh, peran="Analis", aksi="BUAT_ATURAN_ALERT_MEDSOS",
+                 objek=f"social-alert-rule:{rule.id}", detail=rule_payload(rule))
+    return rule_payload(rule)
+
+
+@router.put("/alert-rules/{rule_id}")
+def update_alert_rule(rule_id: int, payload: AlertRuleIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    rule = _get_rule(db, rule_id)
+    try:
+        data = validate_rule(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    for k, v in data.items():
+        setattr(rule, k, v)
+    db.commit()
+    record_audit(db, aktor=data["dibuat_oleh"], peran="Analis", aksi="UBAH_ATURAN_ALERT_MEDSOS",
+                 objek=f"social-alert-rule:{rule.id}", detail=rule_payload(rule))
+    return rule_payload(rule)
+
+
+@router.delete("/alert-rules/{rule_id}")
+def delete_alert_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    rule = _get_rule(db, rule_id)
+    snapshot = rule_payload(rule)
+    db.query(SocialAlertEvent).filter(SocialAlertEvent.rule_id == rule.id).delete()
+    db.delete(rule)
+    db.commit()
+    record_audit(db, aktor="Analis", peran="Analis", aksi="HAPUS_ATURAN_ALERT_MEDSOS",
+                 objek=f"social-alert-rule:{rule_id}", detail=snapshot)
+    return {"deleted": rule_id}
+
+
+@router.post("/alert-rules/{rule_id}/test")
+def test_alert_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Hitung nilai aturan saat ini tanpa mencatat kejadian, untuk mengecek ambang."""
+    rule = _get_rule(db, rule_id)
+    m = measure_rule(db, rule)
+    return {
+        "value": m["value"],
+        "threshold": rule.threshold,
+        "would_trigger": m["value"] >= rule.threshold,
+        "volume": m["volume"],
+        "negatif": m["negatif"],
+        "baseline_ready": m["baseline_ready"],
+    }
+
+
+@router.post("/alert-rules/evaluate")
+def run_alert_rules(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Evaluasi semua aturan aktif sekarang (juga berjalan otomatis setelah tarik data)."""
+    return evaluate_rules(db)
+
+
+@router.get("/alert-events")
+def list_alert_events(
+    status: Optional[str] = Query(None, description="baru atau dilihat"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    q = db.query(SocialAlertEvent)
+    if status:
+        q = q.filter(SocialAlertEvent.status == status)
+    events = q.order_by(SocialAlertEvent.triggered_at.desc(), SocialAlertEvent.id.desc()).limit(limit).all()
+    unread = db.query(SocialAlertEvent).filter(SocialAlertEvent.status == "baru").count()
+    return {"unread": unread, "events": [event_payload(e) for e in events]}
+
+
+class AckIn(BaseModel):
+    aktor: str = Field("Analis", max_length=120)
+
+
+@router.post("/alert-events/{event_id}/ack")
+def ack_alert_event(event_id: int, payload: AckIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    event = db.get(SocialAlertEvent, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="kejadian alert tidak ditemukan")
+    event.status = "dilihat"
+    event.dilihat_oleh = (payload.aktor or "Analis").strip()[:120] or "Analis"
+    db.commit()
+    record_audit(db, aktor=event.dilihat_oleh, peran="Analis", aksi="LIHAT_ALERT_MEDSOS",
+                 objek=f"social-alert-event:{event.id}")
+    return event_payload(event)
 
 
 @router.get("/brief")

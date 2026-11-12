@@ -16,6 +16,7 @@ from backend.app.database import SessionLocal
 from backend.app.services.collector import collect_all
 from backend.app.services.issue_clustering import cluster_and_sync_issues
 from backend.app.services.social_escalation import escalate_social_surges
+from backend.app.services.social_alert_rules import evaluate_rules
 
 logger = logging.getLogger("tip_scheduler")
 
@@ -29,6 +30,9 @@ def run_cycle() -> None:
         hasil = collect_all(db, force=False)
         cluster_and_sync_issues(db)
         eskalasi = escalate_social_surges(db)
+        alerts = evaluate_rules(db)
+        if alerts["triggered"]:
+            logger.info("Aturan alert medsos terpicu: %d", len(alerts["triggered"]))
         logger.info(
             "Siklus otomatis: %s baru, %s gagal, eskalasi %s baru / %s diperbarui",
             hasil["total_baru"], hasil["total_gagal"], len(eskalasi["created"]), len(eskalasi["updated"]),

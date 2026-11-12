@@ -242,3 +242,42 @@ class SocialTopicNote(Base):
     aktor = Column(String(120), nullable=False)
     peran = Column(String(50), default="Analis")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class SocialAlertRule(Base):
+    """Aturan alert medsos buatan analis, mis. "PLN negatif >= 5 dalam 1 jam"."""
+    __tablename__ = "social_alert_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nama = Column(String(150), nullable=False)
+    aktif = Column(Boolean, default=True)
+    term = Column(String(150), nullable=True)        # kata kunci opsional (cocok juga di dalam hashtag)
+    category = Column(String(50), nullable=True)     # id kategori social_taxonomy
+    agency = Column(String(50), nullable=True)       # id instansi social_taxonomy
+    platform = Column(String(50), nullable=True)
+    scope_kode = Column(String(20), default="ID")
+    metric = Column(String(20), nullable=False)      # volume, negatif, lonjakan
+    threshold = Column(Float, nullable=False)
+    window = Column(String(10), default="1h")        # 1h, 6h, 24h
+    cooldown_menit = Column(Integer, default=60)
+    dibuat_oleh = Column(String(120), default="Analis")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_triggered_at = Column(DateTime, nullable=True)
+
+
+class SocialAlertEvent(Base):
+    """Satu kejadian aturan alert terpenuhi."""
+    __tablename__ = "social_alert_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    rule_id = Column(Integer, ForeignKey("social_alert_rules.id"), nullable=False, index=True)
+    rule_nama = Column(String(150), nullable=False)
+    triggered_at = Column(DateTime, default=datetime.utcnow, index=True)
+    metric = Column(String(20), nullable=False)
+    value = Column(Float, nullable=False)
+    threshold = Column(Float, nullable=False)
+    window = Column(String(10), nullable=False)
+    ringkasan = Column(Text, nullable=False)
+    sample_json = Column(Text, default="[]")
+    status = Column(String(20), default="baru")      # baru, dilihat
+    dilihat_oleh = Column(String(120), nullable=True)

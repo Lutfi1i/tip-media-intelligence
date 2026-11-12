@@ -673,3 +673,97 @@ def test_social_report_template_autoescapes():
              "period_b": {"label": "q"}, "note": None, "categories": []},
     )
     assert "<img src=x" not in html and "&lt;img src=x onerror=alert(1)&gt;" in html
+
+
+# ---------- aturan alert kustom ----------
+
+from backend.app.models import SocialAlertEvent, SocialAlertRule  # noqa: E402
+from backend.app.services.social_alert_rules import evaluate_rules, validate_rule  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "data, msg",
+    [
+        ({"nama": "", "metric": "volume", "threshold": 1}, "nama"),
+        ({"nama": "x", "metric": "apa", "threshold": 1}, "metrik"),
+        ({"nama": "x", "metric": "volume", "threshold": 0}, "lebih dari 0"),
+        ({"nama": "x", "metric": "lonjakan", "threshold": 0.5}, "minimal 1"),
+        ({"nama": "x", "metric": "volume", "threshold": 1, "window": "3h"}, "jendela"),
+        ({"nama": "x", "metric": "volume", "threshold": 1, "agency": "nasa"}, "instansi"),
+    ],
+)
+def test_validate_rule_rejects(data, msg):
+    with pytest.raises(ValueError, match=msg):
+        validate_rule(data)
+
+
+def test_rules_trigger_with_cooldown(db):
+    now = datetime.utcnow()
+    _seed_mixed(db, now)  # 3 konten PLN dalam 24 jam, 2 negatif
+    db.add_all([
+        SocialAlertRule(**validate_rule({"nama": "PLN negatif", "agency": "pln", "metric": "negatif", "threshold": 2, "window": "24h"})),
+        SocialAlertRule(**validate_rule({"nama": "PLN banyak", "agency": "pln", "metric": "volume", "threshold": 10, "window": "24h"})),
+        SocialAlertRule(**validate_rule({"nama": "Kuliner", "term": "seblak", "metric": "volume", "threshold": 1, "window": "24h"})),
+    ])
+    db.commit()
+
+    first = evaluate_rules(db, now=now)
+    names = sorted(e["rule_nama"] for e in first["triggered"])
+    assert names == ["Kuliner", "PLN negatif"]
+    pln_event = next(e for e in first["triggered"] if e["rule_nama"] == "PLN negatif")
+    assert pln_event["value"] == 2 and len(pln_event["samples"]) == 2
+    assert all(s["sentimen"] == "negatif" for s in pln_event["samples"])
+
+    # Masih dalam jeda 60 menit: tidak memicu ulang.
+    assert evaluate_rules(db, now=now + timedelta(minutes=30))["triggered"] == []
+    later = evaluate_rules(db, now=now + timedelta(minutes=61))
+    assert sorted(e["rule_nama"] for e in later["triggered"]) == ["Kuliner", "PLN negatif"]
+
+
+def test_surge_rule_needs_baseline(db):
+    now = datetime.utcnow()
+    src = Source(nama="s", jenis="media_sosial", url="https://x.com/s")
+    db.add(src)
+    db.flush()
+    for i in range(5):
+        db.add(RawItem(source_id=src.id, url_kanonik=f"sr{i}", hash=f"sr{i}", judul="banjir kemang", isi="banjir kemang",
+                       published_at=now - timedelta(minutes=10 + i), fetched_at=now - timedelta(minutes=5), platform="X (Twitter)"))
+    db.add(SocialAlertRule(**validate_rule({"nama": "Banjir naik", "term": "banjir", "metric": "lonjakan", "threshold": 3, "window": "1h"})))
+    db.commit()
+    # Pengumpulan baru dimulai 5 menit lalu: belum ada baseline, jadi lonjakan tidak dinilai.
+    assert evaluate_rules(db, now=now)["triggered"] == []
+
+
+def test_alert_rules_api_flow(db):
+    from fastapi.testclient import TestClient
+    from backend.app.database import get_db
+    from backend.app.main import app
+
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        client = TestClient(app)
+        _seed_mixed(db, datetime.utcnow())
+        bad = client.post("/api/v1/social-pulse/alert-rules", json={"nama": "x", "metric": "volume", "threshold": -1})
+        assert bad.status_code == 422 and "lebih dari 0" in bad.json()["detail"]
+
+        rule = client.post("/api/v1/social-pulse/alert-rules", json={
+            "nama": "PLN negatif", "agency": "pln", "metric": "negatif", "threshold": 2, "window": "24h"}).json()
+        assert "instansi PLN" in rule["deskripsi"]
+        test = client.post(f"/api/v1/social-pulse/alert-rules/{rule['id']}/test").json()
+        assert test["would_trigger"] is True and db.query(SocialAlertEvent).count() == 0
+
+        run = client.post("/api/v1/social-pulse/alert-rules/evaluate").json()
+        assert len(run["triggered"]) == 1
+        events = client.get("/api/v1/social-pulse/alert-events").json()
+        assert events["unread"] == 1
+        ack = client.post(f"/api/v1/social-pulse/alert-events/{events['events'][0]['id']}/ack", json={"aktor": "Rina"}).json()
+        assert ack["status"] == "dilihat" and ack["dilihat_oleh"] == "Rina"
+        assert client.get("/api/v1/social-pulse/alert-events").json()["unread"] == 0
+
+        client.put(f"/api/v1/social-pulse/alert-rules/{rule['id']}", json={**{k: rule[k] for k in (
+            "nama", "agency", "metric", "threshold", "window", "cooldown_menit")}, "aktif": False})
+        assert db.get(SocialAlertRule, rule["id"]).aktif is False
+        assert client.delete(f"/api/v1/social-pulse/alert-rules/{rule['id']}").json() == {"deleted": rule["id"]}
+        assert db.query(SocialAlertEvent).count() == 0
+    finally:
+        app.dependency_overrides.clear()

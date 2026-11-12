@@ -1044,6 +1044,94 @@ export async function fetchPeriodComparison(
   return res.json();
 }
 
+export interface SocialAlertRuleInput {
+  nama: string;
+  term?: string | null;
+  category?: string | null;
+  agency?: string | null;
+  platform?: string | null;
+  scope_kode: string;
+  metric: string;
+  threshold: number;
+  window: string;
+  cooldown_menit: number;
+  aktif: boolean;
+  dibuat_oleh: string;
+}
+
+export interface SocialAlertRule extends SocialAlertRuleInput {
+  id: number;
+  created_at: string | null;
+  last_triggered_at: string | null;
+  deskripsi: string;
+}
+
+export interface SocialAlertEvent {
+  id: number;
+  rule_id: number;
+  rule_nama: string;
+  triggered_at: string;
+  metric: string;
+  value: number;
+  threshold: number;
+  window: string;
+  ringkasan: string;
+  samples: SocialSampleMention[];
+  status: "baru" | "dilihat";
+  dilihat_oleh: string | null;
+}
+
+async function jsonOrError<T>(res: Response, fallback: string): Promise<T> {
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(typeof body?.detail === "string" ? body.detail : fallback);
+  }
+  return res.json();
+}
+
+export async function fetchSocialAlertRules(): Promise<{ metrics: Record<string, string>; windows: string[]; rules: SocialAlertRule[] }> {
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/alert-rules`, { cache: "no-store" }), "Gagal mengambil aturan alert");
+}
+
+export async function createSocialAlertRule(rule: SocialAlertRuleInput): Promise<SocialAlertRule> {
+  return jsonOrError(
+    await fetch(`${API_BASE_URL}/social-pulse/alert-rules`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rule) }),
+    "Aturan gagal dibuat"
+  );
+}
+
+export async function updateSocialAlertRule(id: number, rule: SocialAlertRuleInput): Promise<SocialAlertRule> {
+  return jsonOrError(
+    await fetch(`${API_BASE_URL}/social-pulse/alert-rules/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rule) }),
+    "Aturan gagal diubah"
+  );
+}
+
+export async function deleteSocialAlertRule(id: number): Promise<{ deleted: number }> {
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/alert-rules/${id}`, { method: "DELETE" }), "Aturan gagal dihapus");
+}
+
+export async function testSocialAlertRule(id: number): Promise<{ value: number; threshold: number; would_trigger: boolean; volume: number; negatif: number; baseline_ready: boolean }> {
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/alert-rules/${id}/test`, { method: "POST" }), "Aturan gagal diuji");
+}
+
+export async function evaluateSocialAlertRules(): Promise<{ checked: number; triggered: SocialAlertEvent[] }> {
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/alert-rules/evaluate`, { method: "POST" }), "Aturan gagal dicek");
+}
+
+export async function fetchSocialAlertEvents(status?: string, limit = 50): Promise<{ unread: number; events: SocialAlertEvent[] }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.append("status", status);
+  return jsonOrError(await fetch(`${API_BASE_URL}/social-pulse/alert-events?${params.toString()}`, { cache: "no-store" }), "Gagal mengambil riwayat alert");
+}
+
+export async function ackSocialAlertEvent(id: number, aktor: string): Promise<SocialAlertEvent> {
+  return jsonOrError(
+    await fetch(`${API_BASE_URL}/social-pulse/alert-events/${id}/ack`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aktor }) }),
+    "Gagal menandai alert"
+  );
+}
+
 export async function escalateSocialSurges(timeRange: string = "6h"): Promise<SocialEscalationResult> {
   const res = await fetch(`${API_BASE_URL}/social-pulse/escalate?time_range=${timeRange}`, { method: "POST" });
   if (!res.ok) throw new Error("Gagal mengeskalasi lonjakan media sosial");
