@@ -1356,3 +1356,43 @@ export async function fetchGeoComparison(codes: string = "32.01.01,32.01.02,32.0
   if (!res.ok) throw new Error("Gagal memuat perbandingan wilayah");
   return res.json();
 }
+
+export interface HashtagPair {
+  a: string;
+  b: string;
+  posts: number;
+  accounts: number;
+  jaccard: number;
+}
+
+export interface HashtagGroup {
+  tags: string[];
+  posts: number;
+  accounts: number;
+  platforms: string[];
+}
+
+export interface HashtagCooccurrence {
+  time_range: string;
+  total_posts: number;
+  posts_with_hashtag: number;
+  groups: HashtagGroup[];
+  pairs: HashtagPair[];
+}
+
+export async function fetchHashtagCooccurrence(opts: {
+  timeRange: string;
+  scopeKode: string;
+  scopeMode: string;
+  multiCodes?: string;
+  platform?: string;
+  filters?: SocialFilters;
+}): Promise<HashtagCooccurrence> {
+  const params = new URLSearchParams({ time_range: opts.timeRange, scope_kode: opts.scopeKode, scope_mode: opts.scopeMode });
+  if (opts.multiCodes) params.append("multi_codes", opts.multiCodes);
+  if (opts.platform && opts.platform !== "Semua") params.append("platform", opts.platform);
+  appendFilters(params, opts.filters);
+  const res = await fetch(`${API_BASE_URL}/social-pulse/hashtag-cooccurrence?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal memuat hashtag yang muncul bersama");
+  return res.json();
+}

@@ -31,6 +31,7 @@ from backend.app.services.social_notes import NOTE_STATUSES, add_note, list_note
 from backend.app.services.social_accounts import add_account, get_account_activity, remove_account
 from backend.app.services.social_search import SEARCH_SORTS, export_social_content_csv, search_social_content
 from backend.app.services.social_spread import get_spread_trace
+from backend.app.services.social_cooccurrence import get_hashtag_cooccurrence
 from backend.app.services.social_alert_rules import (
     METRICS as ALERT_METRICS,
     WINDOWS as ALERT_WINDOWS,
@@ -550,3 +551,30 @@ def read_geographic_comparison(
     """Membandingkan indikator intelijen sosial antarwilayah (FR-GEO-06)."""
     codes_list = [c.strip() for c in codes.split(",") if c.strip()]
     return get_social_geographic_comparison(db, scope_codes=codes_list, time_range=time_range)
+
+
+@router.get("/hashtag-cooccurrence")
+def read_hashtag_cooccurrence(
+    time_range: str = Depends(period_param),
+    scope_kode: str = Query("ID"),
+    scope_mode: str = Query("context"),
+    multi_codes: Optional[str] = Query(None, description="Kode multi-wilayah dipisah koma"),
+    platform: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    agency: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Pasangan hashtag yang dipakai bersama oleh minimal dua akun, dan kelompok hashtag yang terikat kuat."""
+    codes_list = [c.strip() for c in multi_codes.split(",")] if multi_codes else None
+    return get_hashtag_cooccurrence(
+        db,
+        time_range=time_range,
+        scope_kode=scope_kode,
+        scope_mode=scope_mode,
+        multi_codes=codes_list,
+        platform=None if platform in (None, "", "Semua") else platform,
+        category=category,
+        agency=agency,
+        limit=limit,
+    )
