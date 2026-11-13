@@ -51,8 +51,8 @@ export function HealthIndexDial({
     <div className="panel p-5 relative overflow-hidden flex flex-col justify-between h-full bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
       <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-zinc-900 dark:bg-white animate-pulse" />
-          <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-zinc-500 dark:text-zinc-400">
+          <span className="w-2 h-2 rounded-full bg-zinc-900 dark:bg-white" />
+          <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-zinc-600 dark:text-zinc-300">
             INDEX STABILITAS &amp; KESIAPSIAGAAN
           </h3>
         </div>
@@ -108,7 +108,7 @@ export function HealthIndexDial({
             <span className="text-3xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
               {safeScore.toFixed(0)}
             </span>
-            <span className="text-[10px] font-mono uppercase text-zinc-400">
+            <span className="text-xs font-mono uppercase text-zinc-600 dark:text-zinc-300">
               DARI 100
             </span>
           </div>

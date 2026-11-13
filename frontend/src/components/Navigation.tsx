@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { pollSources } from "@/lib/api";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { AuthUser, fetchCurrentUser, pollSources } from "@/lib/api";
 import { BrandMark } from "./RadarUi";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -17,6 +17,7 @@ const navSections = [
         href: "/",
         pathDisplay: "radar.tipmedia.id/dashboard",
         iconColor: "text-sky-500",
+        icon3dGradient: "from-sky-400 via-sky-500 to-blue-700 shadow-sky-500/35",
         activeClass: "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25",
         hoverClass: "hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400",
         badge: "LIVE",
@@ -32,6 +33,7 @@ const navSections = [
         href: "/peta",
         pathDisplay: "radar.tipmedia.id/peta-sebaran",
         iconColor: "text-emerald-500",
+        icon3dGradient: "from-emerald-400 via-emerald-500 to-teal-700 shadow-emerald-500/35",
         activeClass: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25",
         hoverClass: "hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400",
         badge: "PIXEL",
@@ -47,6 +49,7 @@ const navSections = [
         href: "/monitoring",
         pathDisplay: "radar.tipmedia.id/listening-rules",
         iconColor: "text-purple-500",
+        icon3dGradient: "from-purple-400 via-purple-500 to-indigo-700 shadow-purple-500/35",
         activeClass: "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/25",
         hoverClass: "hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400",
         badge: "RULES",
@@ -62,6 +65,7 @@ const navSections = [
         href: "/social-pulse",
         pathDisplay: "radar.tipmedia.id/social-pulse",
         iconColor: "text-fuchsia-500",
+        icon3dGradient: "from-fuchsia-400 via-fuchsia-500 to-pink-700 shadow-fuchsia-500/35",
         activeClass: "bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-md shadow-fuchsia-500/25",
         hoverClass: "hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:hover:text-fuchsia-400",
         badge: "PULSE",
@@ -83,6 +87,7 @@ const navSections = [
         href: "/isu",
         pathDisplay: "radar.tipmedia.id/antrean-isu",
         iconColor: "text-amber-500",
+        icon3dGradient: "from-amber-400 via-amber-500 to-orange-700 shadow-amber-500/35",
         activeClass: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/25",
         hoverClass: "hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400",
         badge: "ANOMALI",
@@ -98,6 +103,7 @@ const navSections = [
         href: "/kasus",
         pathDisplay: "radar.tipmedia.id/penanganan-kasus",
         iconColor: "text-rose-500",
+        icon3dGradient: "from-rose-400 via-rose-500 to-red-700 shadow-rose-500/35",
         activeClass: "bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-md shadow-rose-500/25",
         hoverClass: "hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400",
         badge: "SLA",
@@ -113,6 +119,7 @@ const navSections = [
         href: "/laporan",
         pathDisplay: "radar.tipmedia.id/briefing-pimpinan",
         iconColor: "text-cyan-500",
+        icon3dGradient: "from-cyan-400 via-sky-500 to-blue-700 shadow-cyan-500/35",
         activeClass: "bg-gradient-to-r from-cyan-500 to-blue-700 text-white shadow-md shadow-cyan-500/25",
         hoverClass: "hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400",
         badge: "BRIEF",
@@ -134,6 +141,7 @@ const navSections = [
         href: "/audit",
         pathDisplay: "radar.tipmedia.id/integritas-log",
         iconColor: "text-teal-500",
+        icon3dGradient: "from-teal-400 via-emerald-500 to-teal-700 shadow-teal-500/35",
         activeClass: "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/25",
         hoverClass: "hover:bg-teal-500/10 hover:text-teal-600 dark:hover:text-teal-400",
         badge: "AUDIT",
@@ -141,6 +149,22 @@ const navSections = [
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Pengguna & RBAC",
+        href: "/pengguna",
+        pathDisplay: "radar.tipmedia.id/pengguna-rbac",
+        iconColor: "text-indigo-500",
+        icon3dGradient: "from-indigo-400 via-indigo-500 to-violet-700 shadow-indigo-500/35",
+        activeClass: "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/25",
+        hoverClass: "hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400",
+        badge: "RBAC",
+        badgeColor: "bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
         ),
       },
@@ -152,9 +176,29 @@ const allItems = navSections.flatMap((s) => s.items);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [role, setRole] = useState("Pimpinan");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (pathname === "/login") return;
+    fetchCurrentUser().then((res) => {
+      setAuthUser(res.user);
+      if (res.auth_required && !res.authenticated) {
+        router.replace("/login");
+      }
+    });
+  }, [pathname, router]);
+
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("tip_token");
+    }
+    setAuthUser(null);
+    router.push("/login");
+  };
 
   const activeNav =
     allItems.find((i) => (i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))) ||
@@ -201,12 +245,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </Link>
-
-          <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">|</span>
-
-          <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400 truncate hidden md:inline">
-            {activeNav.pathDisplay}
-          </span>
         </div>
 
         <div className="flex items-center space-x-2.5">
@@ -245,8 +283,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <ThemeToggle />
 
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          {authUser ? (
+            <button
+              onClick={handleLogout}
+              className="px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800"
+              title={`Masuk sebagai ${authUser.email} (${authUser.role})`}
+            >
+              {authUser.nama} &bull; Keluar
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800"
+            >
+              Masuk
+            </Link>
+          )}
+
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span className="hidden sm:inline">Feed Live</span>
             <span className="sm:hidden">Live</span>
           </span>
@@ -265,19 +320,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Left Fixed Sidebar (Desktop) - Sesuai Gambar 1 */}
         <aside className="hidden md:flex md:w-60 lg:w-64 fixed left-0 top-14 bottom-0 bg-white dark:bg-[#07090E] border-r border-zinc-200 dark:border-zinc-800/80 flex-col justify-between shrink-0 select-none z-30 overflow-y-auto">
           <div className="p-4 space-y-6">
-            <div className="px-3 pt-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
-                <p className="text-[10px] font-mono font-black tracking-widest uppercase text-sky-600 dark:text-sky-400">
-                  PUSAT KOMANDO
-                </p>
-              </div>
-              <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 mt-1">
-                DKI Jakarta &amp; Bodetabek
-              </p>
-            </div>
-
-            <nav className="space-y-6" aria-label="Menu Pusat Komando">
+            <nav className="space-y-6" aria-label="Menu Navigasi">
               {navSections.map((sec) => (
                 <div key={sec.group} className="space-y-1.5">
                   <div className="px-3 flex items-center justify-between">
@@ -302,24 +345,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
-                            <span className={isActive ? "text-white" : item.iconColor}>
-                              {item.icon}
+                            <span
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white transition-transform duration-150 group-hover:-translate-y-0.5 ${
+                                isActive
+                                  ? "bg-white/20 ring-1 ring-white/35 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),inset_0_-2px_3px_rgba(0,0,0,0.22),0_2px_6px_rgba(0,0,0,0.18)]"
+                                  : `bg-gradient-to-br ${item.icon3dGradient} ring-1 ring-white/30 dark:ring-white/15 shadow-[0_4px_10px_-2px_rgba(0,0,0,0.25),inset_0_1px_1px_rgba(255,255,255,0.55),inset_0_-2px_3px_rgba(0,0,0,0.28)]`
+                              }`}
+                            >
+                              <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]">{item.icon}</span>
                             </span>
                             <span className={isActive ? "font-bold text-white" : "font-semibold"}>
                               {item.label}
                             </span>
                           </div>
-                          {item.badge && (
-                            <span
-                              className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                isActive
-                                  ? "bg-white/20 text-white"
-                                  : item.badgeColor
-                              }`}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
                         </Link>
                       );
                     })}
@@ -327,23 +365,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               ))}
             </nav>
-          </div>
-
-          <div className="p-4 border-t border-zinc-200 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 text-xs space-y-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-zinc-500 font-mono">Radar Status</span>
-              <span className="font-mono text-emerald-500 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                ONLINE
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-zinc-500 font-mono">Kemendagri</span>
-              <span className="font-mono text-sky-500 font-bold">14 Wilayah Aktif</span>
-            </div>
-            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
-              PT Technosoft Indo Prima
-            </div>
           </div>
         </aside>
 
@@ -367,7 +388,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
-                <span className={isActive ? "text-white" : item.iconColor}>
+                <span
+                  className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 text-white ${
+                    isActive
+                      ? "bg-white/20 ring-1 ring-white/35 shadow-[inset_0_1px_1px_rgba(255,255,255,0.55),inset_0_-1px_2px_rgba(0,0,0,0.2)]"
+                      : `bg-gradient-to-br ${item.icon3dGradient} ring-1 ring-white/25 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.22),inset_0_1px_1px_rgba(255,255,255,0.5),inset_0_-1px_2px_rgba(0,0,0,0.25)]`
+                  }`}
+                >
                   {item.icon}
                 </span>
                 <span>{item.label}</span>

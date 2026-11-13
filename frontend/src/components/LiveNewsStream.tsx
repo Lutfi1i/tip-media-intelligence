@@ -2,6 +2,7 @@
 
 import React from "react";
 import { LiveArticle } from "@/lib/api";
+import { fmtTime } from "@/lib/format";
 import { SentimentBadge, SourceBadge } from "./RadarUi";
 import { ExternalLink, Clock, MapPin, CheckCircle2 } from "lucide-react";
 
@@ -22,31 +23,19 @@ export function LiveNewsStream({ articles = [] }: LiveNewsStreamProps) {
     <div className="panel p-5 relative overflow-hidden bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
       <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-4">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-zinc-500 dark:text-zinc-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-zinc-600 dark:text-zinc-300">
             STREAMING BERITA &amp; LAPORAN NYATA (LIVE LISTENING)
           </h3>
         </div>
-        <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+        <span className="text-xs font-mono text-zinc-600 dark:text-zinc-300">
           TERBARU 24 JAM
         </span>
       </div>
 
       <div className="divide-y divide-zinc-200 dark:divide-zinc-800/80 max-h-[500px] overflow-y-auto pr-1">
         {articles.map((item) => {
-          let timeDisplay = "Terkini";
-          if (item.published_at) {
-            try {
-              const dt = new Date(item.published_at);
-              timeDisplay = dt.toLocaleTimeString("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Asia/Jakarta",
-              }) + " WIB";
-            } catch {
-              timeDisplay = "Baru saja";
-            }
-          }
+          const timeDisplay = item.published_at ? fmtTime(item.published_at) : "Terkini";
 
           return (
             <div

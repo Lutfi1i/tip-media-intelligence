@@ -1,15 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.config import settings
-from backend.app.database import engine
+from backend.app.database import SessionLocal, engine
 from backend.app.schema_sync import ensure_schema
 from backend.app.seed_data import seed_database
 from backend.app.services import scheduler
+from backend.app.services.audit import ensure_audit_append_only
+from backend.app.services.auth import ensure_default_admin
 from backend.app.routers import (
-    profiles, sources, issues, alerts, cases, reports, dashboard, audit, geo, social_pulse
+    profiles, sources, issues, alerts, cases, reports, dashboard, audit, geo, social_pulse, auth, users
 )
 
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=0.2)
+    except Exception:
+        pass
+
 ensure_schema(engine)
+ensure_audit_append_only(engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -28,6 +38,11 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     seed_database()
+    db = SessionLocal()
+    try:
+        ensure_default_admin(db)
+    finally:
+        db.close()
     scheduler.start(settings.AUTO_COLLECT_MINUTES)
 
 
@@ -46,6 +61,14 @@ app.include_router(reports.router, prefix=settings.API_V1_STR)
 app.include_router(audit.router, prefix=settings.API_V1_STR)
 app.include_router(geo.router, prefix=settings.API_V1_STR)
 app.include_router(social_pulse.router, prefix=settings.API_V1_STR)
+app.include_router(auth.router, prefix=settings.API_V1_STR)
+app.include_router(users.router, prefix=settings.API_V1_STR)
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+except Exception:
+    pass
 
 @app.get("/")
 def root():

@@ -12,9 +12,12 @@ from __future__ import annotations
 import html
 import json
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
 
 import feedparser
 import httpx
@@ -36,6 +39,33 @@ USER_AGENT = "TIPMediaIntelligence/1.0 (media monitoring; kontak: operator@tip.l
 HTTP_TIMEOUT = 25.0
 MAX_ENTRIES_PER_SOURCE = 25
 MAX_ITEM_AGE = timedelta(days=60)
+
+_ROBOTS_CACHE: Dict[str, Tuple[float, Optional[RobotFileParser]]] = {}
+
+
+def is_allowed_by_robots(url: str) -> bool:
+    """Patuhi robots.txt per domain dengan cache 24 jam (FR-05)."""
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return True
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    now = time.time()
+    cached = _ROBOTS_CACHE.get(base)
+    if cached and (now - cached[0]) < 86400:
+        rp = cached[1]
+        return True if rp is None else rp.can_fetch(USER_AGENT, url)
+
+    rp = RobotFileParser()
+    try:
+        resp = httpx.get(f"{base}/robots.txt", timeout=5.0, headers={"User-Agent": USER_AGENT})
+        if resp.status_code == 200:
+            rp.parse(resp.text.splitlines())
+            _ROBOTS_CACHE[base] = (now, rp)
+            return rp.can_fetch(USER_AGENT, url)
+    except Exception:
+        pass
+    _ROBOTS_CACHE[base] = (now, None)
+    return True
 
 _HANDLE_RE = re.compile(r"\(@([A-Za-z0-9_.]{2,40})\)")
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -301,15 +331,29 @@ def fetch_source_entries(
     if "syndication.twitter.com" in url.lower():
         return _entries_from_twitter_syndication(url, limit)
 
-    try:
-        with httpx.Client(
-            timeout=HTTP_TIMEOUT,
-            follow_redirects=True,
-            headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/xml, text/xml, application/json, */*"},
-        ) as client:
-            response = client.get(url)
-    except httpx.HTTPError as exc:
-        return [], f"gagal koneksi: {type(exc).__name__}: {exc}"
+    if not is_allowed_by_robots(url):
+        return [], "diblokir oleh robots.txt"
+
+    response = None
+    last_err = None
+    for attempt in range(3):
+        try:
+            with httpx.Client(
+                timeout=HTTP_TIMEOUT,
+                follow_redirects=True,
+                headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/xml, text/xml, application/json, */*"},
+            ) as client:
+                response = client.get(url)
+            if response.status_code < 500:
+                break
+            last_err = f"HTTP {response.status_code}"
+        except httpx.HTTPError as exc:
+            last_err = f"gagal koneksi: {type(exc).__name__}: {exc}"
+        if attempt < 2:
+            time.sleep(0.5 * (2 ** attempt))
+
+    if response is None:
+        return [], last_err or "gagal koneksi"
 
     if response.status_code >= 400:
         return [], f"HTTP {response.status_code}"

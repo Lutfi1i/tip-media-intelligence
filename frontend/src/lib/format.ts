@@ -1,4 +1,12 @@
-const TZ = "Asia/Jakarta";
+export type IndoZone = "WIB" | "WITA" | "WIT";
+
+export const INDO_TIMEZONES: Record<IndoZone, string> = {
+  WIB: "Asia/Jakarta",
+  WITA: "Asia/Makassar",
+  WIT: "Asia/Jayapura",
+};
+
+const TZ = INDO_TIMEZONES.WIB;
 
 /** Angka dengan pemisah ribuan lokal (id-ID). Null/undefined -> "-". */
 export function fmtNum(value: number | null | undefined, digits = 0): string {
@@ -22,7 +30,7 @@ export function fmtSignedPct(value: number | null | undefined, digits = 0): stri
   return `${sign}${fmtNum(Math.abs(value), digits)}%`;
 }
 
-function parse(iso?: string | null): Date | null {
+export function parseUtc(iso?: string | null): Date | null {
   if (!iso) return null;
   // Backend mengirim naive UTC (tanpa sufiks zona). Tempelkan "Z" agar tidak
   // digeser dua kali oleh Date parser di browser WIB.
@@ -31,47 +39,48 @@ function parse(iso?: string | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export function fmtDateTime(iso?: string | null): string {
-  const d = parse(iso);
+export function fmtDateTime(iso?: string | null, zone: IndoZone = "WIB"): string {
+  const d = parseUtc(iso);
   if (!d) return "-";
+  const tz = INDO_TIMEZONES[zone] || TZ;
   return `${d.toLocaleString("id-ID", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    timeZone: TZ,
+    timeZone: tz,
   })}, ${d.toLocaleString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: TZ,
+    timeZone: tz,
     hour12: false,
-  })} WIB`;
+  })} ${zone}`;
 }
 
-export function fmtDate(iso?: string | null): string {
-  const d = parse(iso);
+export function fmtDate(iso?: string | null, zone: IndoZone = "WIB"): string {
+  const d = parseUtc(iso);
   if (!d) return "-";
   return d.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    timeZone: TZ,
+    timeZone: INDO_TIMEZONES[zone] || TZ,
   });
 }
 
-export function fmtTime(iso?: string | null): string {
-  const d = parse(iso);
+export function fmtTime(iso?: string | null, zone: IndoZone = "WIB"): string {
+  const d = parseUtc(iso);
   if (!d) return "-";
   return `${d.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: TZ,
+    timeZone: INDO_TIMEZONES[zone] || TZ,
     hour12: false,
-  })} WIB`;
+  })} ${zone}`;
 }
 
 /** "baru saja", "12 menit lalu", "3 jam lalu", "2 hari lalu". */
 export function fmtRelative(iso?: string | null): string {
-  const d = parse(iso);
+  const d = parseUtc(iso);
   if (!d) return "-";
   const diff = Date.now() - d.getTime();
   if (diff < 0) return fmtTime(d.toISOString());
@@ -86,7 +95,7 @@ export function fmtRelative(iso?: string | null): string {
 }
 
 export function isOverdue(iso?: string | null): boolean {
-  const d = parse(iso);
+  const d = parseUtc(iso);
   return !!d && d.getTime() < Date.now();
 }
 

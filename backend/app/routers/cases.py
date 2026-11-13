@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
 import json
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.models import Case, Issue
+from backend.app.models import Case, CaseEvidence, Issue
 from backend.app.schemas import CaseOut, CaseUpdate
 from backend.app.services.audit import record_audit
+from backend.app.services.storage import get_object, put_object
 
 router = APIRouter(prefix="/cases", tags=["Case Management"])
 
@@ -110,4 +111,63 @@ def update_case(case_id: int, payload: CaseUpdate, db: Session = Depends(get_db)
         riwayat=riwayat,
         created_at=case.created_at,
         updated_at=case.updated_at
+    )
+
+
+@router.post("/{case_id}/evidence")
+async def upload_case_evidence(
+    case_id: int,
+    file: UploadFile = File(...),
+    uploaded_by: str = Form("PIC Petugas"),
+    db: Session = Depends(get_db),
+):
+    """FR-18: Unggah lampiran bukti tindak lanjut kasus ke MinIO/S3 atau storage lokal."""
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Kasus tidak ditemukan")
+
+    raw_bytes = await file.read()
+    safe_name = (file.filename or "bukti.bin").replace("/", "_").replace("\\", "_")
+    s3_key = f"cases/{case_id}/{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{safe_name}"
+    put_object(s3_key, raw_bytes, content_type=file.content_type or "application/octet-stream")
+
+    ev = CaseEvidence(
+        case_id=case_id,
+        filename=safe_name,
+        s3_key=s3_key,
+        content_type=file.content_type or "application/octet-stream",
+        size_bytes=len(raw_bytes),
+        uploaded_by=uploaded_by,
+    )
+    db.add(ev)
+    db.commit()
+    db.refresh(ev)
+
+    bukti = json.loads(case.bukti_json or "[]")
+    bukti.append({
+        "evidence_id": ev.id,
+        "waktu": ev.created_at.isoformat(),
+        "catatan": f"Lampiran: {safe_name}",
+        "url": f"/api/v1/cases/{case_id}/evidence/{ev.id}/download",
+        "oleh": uploaded_by,
+    })
+    case.bukti_json = json.dumps(bukti)
+    db.commit()
+
+    record_audit(db, aktor=uploaded_by, peran="PIC", aksi="UPLOAD_BUKTI_KASUS", objek=f"case:{case_id}", detail={"filename": safe_name})
+    return {"id": ev.id, "filename": safe_name, "download_url": f"/api/v1/cases/{case_id}/evidence/{ev.id}/download"}
+
+
+@router.get("/{case_id}/evidence/{evidence_id}/download")
+def download_case_evidence(case_id: int, evidence_id: int, db: Session = Depends(get_db)):
+    ev = db.query(CaseEvidence).filter(CaseEvidence.id == evidence_id, CaseEvidence.case_id == case_id).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Lampiran bukti tidak ditemukan")
+    data = get_object(ev.s3_key)
+    if data is None:
+        raise HTTPException(status_code=404, detail="File bukti tidak ditemukan di storage")
+    return Response(
+        content=data,
+        media_type=ev.content_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{ev.filename}"'},
     )

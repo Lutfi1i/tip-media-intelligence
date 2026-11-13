@@ -14,11 +14,31 @@ class MonitoringProfile(Base):
     unit = Column(String(255), default="Pusat Analisis Krisis")
     status = Column(String(50), default="aktif")  # aktif, nonaktif
     versi = Column(Integer, default=1)
+    dibuat_oleh = Column(String(120), nullable=True, default="Sistem")
+    diubah_oleh = Column(String(120), nullable=True, default="Sistem")
+    effective_from = Column(DateTime, nullable=True, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     rules = relationship("ProfileRule", back_populates="profile", cascade="all, delete-orphan")
+    versions = relationship("MonitoringProfileVersion", back_populates="profile", cascade="all, delete-orphan")
     issues = relationship("Issue", back_populates="profile")
+
+
+class MonitoringProfileVersion(Base):
+    """Riwayat perubahan versi profil monitoring (FR-02)."""
+    __tablename__ = "monitoring_profile_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("monitoring_profiles.id"), nullable=False, index=True)
+    versi = Column(Integer, nullable=False)
+    diubah_oleh = Column(String(120), nullable=False, default="Admin")
+    effective_from = Column(DateTime, default=datetime.utcnow)
+    catatan_perubahan = Column(String(512), nullable=True)
+    rules_snapshot_json = Column(Text, default="{}")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    profile = relationship("MonitoringProfile", back_populates="versions")
 
 class ProfileRule(Base):
     __tablename__ = "profile_rules"
@@ -64,6 +84,7 @@ class RawItem(Base):
     source_id = Column(Integer, ForeignKey("sources.id"), nullable=True)
     url_kanonik = Column(String(512), unique=True, index=True)
     hash = Column(String(64), index=True)
+    simhash = Column(String(32), nullable=True, index=True)
     judul = Column(String(512), nullable=False)
     isi = Column(Text, nullable=False)
     penerbit = Column(String(255), default="Media Online")
@@ -294,3 +315,36 @@ class SocialWatchedAccount(Base):
     catatan = Column(Text, nullable=True)
     dibuat_oleh = Column(String(120), default="Analis")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class User(Base):
+    """Pengguna sistem dengan peran RBAC dan cakupan wilayah Kemendagri (FR-22, NFR-07/08)."""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    nama = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default="analis")  # admin, analis, verifikator, eksekutif
+    wilayah_scope_json = Column(Text, default='["ID"]')  # ["ID"] = nasional, atau ["31", "31.74"]
+    mfa_secret = Column(String(64), nullable=True)
+    mfa_enabled = Column(Boolean, default=False)
+    keycloak_sub = Column(String(128), nullable=True, unique=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login_at = Column(DateTime, nullable=True)
+
+
+class CaseEvidence(Base):
+    """Lampiran bukti tindak lanjut kasus (FR-18) disimpan di MinIO/S3 atau storage lokal."""
+    __tablename__ = "case_evidences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    s3_key = Column(String(512), nullable=False)
+    content_type = Column(String(120), default="application/octet-stream")
+    size_bytes = Column(Integer, default=0)
+    uploaded_by = Column(String(120), default="Analis")
+    created_at = Column(DateTime, default=datetime.utcnow)
+

@@ -6,7 +6,7 @@ import json
 from backend.app.database import get_db
 from backend.app.models import Report
 from backend.app.schemas import ReportOut
-from backend.app.services.report_generator import generate_report_document
+from backend.app.services.report_generator import generate_report_document, get_report_pdf_bytes
 from backend.app.services.audit import record_audit
 from backend.app.services.social_report import generate_social_report
 from backend.app.routers.social_pulse import period_param
@@ -98,3 +98,18 @@ def view_report_html(report_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Isi laporan HTML tidak tersedia")
 
     return Response(content=html_content, media_type="text/html")
+
+
+@router.get("/{report_id}/pdf")
+def download_report_pdf(report_id: int, db: Session = Depends(get_db)):
+    """Unduh laporan eksekutif dalam format PDF (FR-20)."""
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Laporan tidak ditemukan")
+    pdf_bytes = get_report_pdf_bytes(report)
+    filename = f"laporan_{report.jenis}_{report.id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

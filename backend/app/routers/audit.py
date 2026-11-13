@@ -28,32 +28,59 @@ def get_audit_logs(limit: int = 50, db: Session = Depends(get_db)):
 
 @router.get("/ai-evaluation")
 def get_ai_evaluation(db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """FR-24: Rekap akurasi AI dari koreksi analis (precision per label)."""
+    """FR-24: Rekap akurasi AI nyata dari koreksi analis (precision per label)."""
     reviews = db.query(Review).all()
     total_reviews = len(reviews)
     if total_reviews == 0:
         return {
             "total_reviews": 0,
-            "sentiment_precision": 0.88,
-            "topic_precision": 0.92,
-            "location_precision": 0.85,
-            "overall_accuracy": 0.88,
-            "status": "Target NFR-12 (>= 80%) terpenuhi."
+            "verified_count": 0,
+            "corrected_count": 0,
+            "rejected_count": 0,
+            "sentiment_precision": None,
+            "topic_precision": None,
+            "location_precision": None,
+            "overall_accuracy": None,
+            "status": "Belum ada data verifikasi/koreksi analis.",
         }
 
-    verified_count = len([r for r in reviews if r.keputusan == "verifikasi"])
-    corrected_count = len([r for r in reviews if r.keputusan == "koreksi"])
-    rejected_count = len([r for r in reviews if r.keputusan == "tolak"])
+    verified_count = sum(1 for r in reviews if r.keputusan == "verifikasi")
+    corrected_reviews = [r for r in reviews if r.keputusan == "koreksi"]
+    rejected_count = sum(1 for r in reviews if r.keputusan == "tolak")
 
-    precision = round(verified_count / max(1, verified_count + corrected_count), 2)
+    sent_err = 0
+    topic_err = 0
+    loc_err = 0
+    for r in corrected_reviews:
+        try:
+            corr = json.loads(r.koreksi_label_json or "{}")
+        except Exception:
+            corr = {}
+        if corr.get("sentimen"):
+            sent_err += 1
+        if corr.get("kategori") or corr.get("topik"):
+            topic_err += 1
+        if corr.get("wilayah") or corr.get("lokasi"):
+            loc_err += 1
+
+    denom = max(1, verified_count + len(corrected_reviews))
+    sent_prec = round(max(0.0, (denom - sent_err) / denom), 3)
+    topic_prec = round(max(0.0, (denom - topic_err) / denom), 3)
+    loc_prec = round(max(0.0, (denom - loc_err) / denom), 3)
+    overall = round((sent_prec + topic_prec + loc_prec) / 3, 3)
+
     return {
         "total_reviews": total_reviews,
         "verified_count": verified_count,
-        "corrected_count": corrected_count,
+        "corrected_count": len(corrected_reviews),
         "rejected_count": rejected_count,
-        "sentiment_precision": max(0.82, precision),
-        "topic_precision": 0.91,
-        "location_precision": 0.86,
-        "overall_accuracy": round((max(0.82, precision) + 0.91 + 0.86) / 3, 2),
-        "status": "Target NFR-12 (>= 80% presisi) terpenuhi."
+        "sentiment_precision": sent_prec,
+        "topic_precision": topic_prec,
+        "location_precision": loc_prec,
+        "overall_accuracy": overall,
+        "status": (
+            "Target NFR-12 (>= 80% presisi) terpenuhi."
+            if overall >= 0.80
+            else "Presisi di bawah 80%, perlu penyesuaian aturan atau model."
+        ),
     }

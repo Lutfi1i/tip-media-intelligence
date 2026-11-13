@@ -11,8 +11,15 @@ from backend.app.schemas import (
 )
 from backend.app.services.audit import record_audit
 from backend.app.services.notification import dispatch_executive_alert
+from backend.app.services.search_engine import fulltext_search_issues
 
 router = APIRouter(prefix="/issues", tags=["Issues & Alerts"])
+
+
+@router.get("/search/fulltext")
+def search_issues_fulltext(q: str = Query(..., min_length=1), limit: int = 20, db: Session = Depends(get_db)):
+    """FR-21: Pencarian full-text isu via OpenSearch dengan fallback SQL."""
+    return fulltext_search_issues(db, q, limit=limit)
 
 @router.get("", response_model=List[IssueOut])
 def list_issues(

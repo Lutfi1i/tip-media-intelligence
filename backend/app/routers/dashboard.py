@@ -1,7 +1,8 @@
 import json
-from typing import Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -9,6 +10,8 @@ from datetime import datetime, timedelta
 from backend.app.database import get_db
 from backend.app.models import Issue, Case, Region, RawItem, Source, ItemAnalysis
 from backend.app.services.ai_analyzer import GAZETTEER_REGIONS
+from backend.app.services.ai_engine import generate_dashboard_ai_insight
+from backend.app.services.social_platform import SOCIAL_PLATFORMS
 from backend.app.schemas import (
     DashboardSummaryOut, DashboardKPI, TrendPoint, RegionSummary, IssueOut
 )
@@ -379,3 +382,98 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         live_articles=live_articles,
         generated_at=now_utc,
     )
+
+
+_INSIGHT_CACHE: Dict[str, Any] = {"ts": 0.0, "data": None}
+_INSIGHT_TTL_SECONDS = 120
+
+
+@router.get("/ai-insight")
+async def get_dashboard_ai_insight(
+    refresh: bool = Query(False, description="Paksa buat ulang insight AI"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Wawasan ringkasan eksekutif dari AI yang terkonfigurasi berdasarkan angka isu & konten terkini."""
+    now_ts = time.monotonic()
+    if not refresh and _INSIGHT_CACHE["data"] and (now_ts - _INSIGHT_CACHE["ts"]) < _INSIGHT_TTL_SECONDS:
+        return {**_INSIGHT_CACHE["data"], "cached": True}
+
+    now_utc = datetime.utcnow()
+    issues = db.query(Issue).order_by(Issue.skor.desc()).all()
+    regions = db.query(Region).all()
+
+    total_items = db.query(RawItem).count()
+    window_now_start = now_utc - timedelta(hours=24)
+    window_prev_start = now_utc - timedelta(hours=48)
+    vol_now = db.query(RawItem).filter(RawItem.published_at >= window_now_start).count()
+    vol_prev = (
+        db.query(RawItem)
+        .filter(RawItem.published_at >= window_prev_start, RawItem.published_at < window_now_start)
+        .count()
+    )
+    mention_growth_pct: Optional[float] = None
+    if vol_prev >= 5 and vol_now > 0:
+        mention_growth_pct = round(((vol_now - vol_prev) / vol_prev) * 100, 1)
+
+    sosmed_count = db.query(RawItem).filter(RawItem.platform.in_(SOCIAL_PLATFORMS)).count()
+    berita_count = max(0, total_items - sosmed_count)
+
+    total_analyzed = db.query(ItemAnalysis).count()
+    neg_count = db.query(ItemAnalysis).filter(ItemAnalysis.sentimen == "negatif").count()
+    negative_pct = round((neg_count / total_analyzed) * 100, 1) if total_analyzed > 0 else 0.0
+
+    critical_count = sum(1 for i in issues if (i.skor or 0) >= 85)
+    high_count = sum(1 for i in issues if 70 <= (i.skor or 0) < 85)
+    isu_prioritas = sum(1 for i in issues if (i.skor or 0) >= 70)
+    menunggu_verifikasi = sum(1 for i in issues if (i.skor or 0) >= 70 and i.status == "otomatis")
+
+    live = _agregasi_wilayah(db, regions, now_utc)
+    active_regions = []
+    for r in regions:
+        slot = live.get(r.nama)
+        if slot and slot["konten"] > 0:
+            neg_pct_r = round((slot["negatif"] / slot["konten"]) * 100, 1)
+            active_regions.append({
+                "nama": r.nama,
+                "konten": slot["konten"],
+                "negatif_pct": neg_pct_r,
+            })
+    active_regions.sort(key=lambda x: x["konten"], reverse=True)
+
+    top_issues_payload = [
+        {
+            "judul": iss.judul,
+            "kategori": iss.kategori,
+            "skor": round(float(iss.skor or 0), 1),
+            "volume": iss.current_volume or 0,
+            "wilayah": iss.wilayah,
+            "status": iss.status,
+        }
+        for iss in issues[:5]
+    ]
+
+    metrics = {
+        "total_items": total_items,
+        "vol_24h": vol_now,
+        "mention_growth_pct": mention_growth_pct,
+        "isu_prioritas": isu_prioritas,
+        "critical_count": critical_count,
+        "high_count": high_count,
+        "wilayah_terdampak": len(active_regions),
+        "menunggu_verifikasi": menunggu_verifikasi,
+        "negative_pct": negative_pct,
+        "sosmed_count": sosmed_count,
+        "berita_count": berita_count,
+        "top_issues": top_issues_payload,
+        "top_regions": active_regions[:3],
+    }
+
+    insight = await generate_dashboard_ai_insight(metrics)
+    result = {
+        **insight,
+        "generated_at": now_utc.isoformat() + "Z",
+        "cached": False,
+    }
+    _INSIGHT_CACHE["ts"] = now_ts
+    _INSIGHT_CACHE["data"] = result
+    return result

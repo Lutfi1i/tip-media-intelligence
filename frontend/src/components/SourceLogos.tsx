@@ -23,12 +23,17 @@ export function getBrandInfo(platform?: string, penerbit?: string): BrandInfo {
     };
   }
 
-  // Instagram & Facebook: belum ada logo resmi di /public/logos, tampil sebagai inisial.
   if (norm.includes("instagram")) {
-    return { name: "Instagram", logo: "", fallbackText: "IG" };
+    return { name: "Instagram", logo: "/logos/instagram.svg", fallbackText: "IG" };
   }
   if (norm.includes("facebook")) {
-    return { name: "Facebook", logo: "", fallbackText: "FB" };
+    return { name: "Facebook", logo: "/logos/facebook.svg", fallbackText: "FB" };
+  }
+  if (norm.includes("reddit")) {
+    return { name: "Reddit", logo: "/logos/reddit.svg", fallbackText: "RD" };
+  }
+  if (norm.includes("telegram") || norm.includes("t.me")) {
+    return { name: "Telegram", logo: "/logos/telegram.svg", fallbackText: "TG" };
   }
 
   // 2. TikTok
@@ -103,11 +108,11 @@ export function getBrandInfo(platform?: string, penerbit?: string): BrandInfo {
     };
   }
 
-  // 9. Bluesky (Jika terpanggil, ditandai nonaktif)
+  // 9. Bluesky
   if (norm.includes("bluesky") || norm.includes("bsky")) {
     return {
-      name: "Bluesky (Nonaktif)",
-      logo: "/logos/x.png",
+      name: "Bluesky",
+      logo: "/logos/bluesky.svg",
       fallbackText: "BSKY",
     };
   }

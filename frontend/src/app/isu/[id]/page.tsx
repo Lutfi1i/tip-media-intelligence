@@ -188,7 +188,7 @@ export default function IssueDetailPage() {
                       rel="noopener noreferrer"
                       className="text-sm font-bold text-zinc-900 dark:text-zinc-100 hover:underline transition-colors block"
                     >
-                      {item.judul} &nearr;
+                      {item.judul} ↗
                     </a>
 
                     {item.isi && (

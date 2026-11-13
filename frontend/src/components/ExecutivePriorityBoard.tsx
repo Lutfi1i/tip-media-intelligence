@@ -67,7 +67,7 @@ export function ExecutivePriorityBoard({ issues }: ExecutivePriorityBoardProps) 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-zinc-200 dark:border-zinc-800/80 text-[11px] font-mono font-bold text-zinc-400 uppercase">
+            <tr className="border-b border-zinc-200 dark:border-zinc-800/80 text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 uppercase">
               <th className="py-2.5 px-3">Isu &amp; Wilayah</th>
               <th className="py-2.5 px-3">Tingkat Risiko</th>
               <th className="py-2.5 px-3">Penanggung Jawab (PIC)</th>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 export const PERIOD_PRESETS = [
+  { label: "15 Mnt", value: "15m" },
   { label: "1 Jam", value: "1h" },
   { label: "6 Jam", value: "6h" },
   { label: "24 Jam", value: "24h" },

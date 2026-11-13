@@ -67,14 +67,14 @@ export function TopHotIssuesCards({ issues }: TopHotIssuesCardsProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center text-white shadow-md shadow-rose-500/20">
-            <Flame className="w-4 h-4 animate-pulse" />
+            <Flame className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-rose-600 dark:text-rose-400">
+              <span className="text-xs font-mono font-bold tracking-wider uppercase text-rose-600 dark:text-rose-400">
                 HOTSPOTS NASIONAL &bull; TOP 3 PRIORITAS TERTINGGI
               </span>
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 animate-pulse">
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                 VIRAL
               </span>
             </div>
@@ -163,7 +163,7 @@ export function TopHotIssuesCards({ issues }: TopHotIssuesCardsProps) {
                 {/* Visual Signals: Overlapping Stack Media Icons (Gambar 2 Sesuai Permintaan) */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-zinc-400">
+                    <span className="text-xs font-mono text-zinc-600 dark:text-zinc-300">
                       Kanal:
                     </span>
                     <MediaAvatarStack
@@ -178,7 +178,7 @@ export function TopHotIssuesCards({ issues }: TopHotIssuesCardsProps) {
                     <span className="text-xs font-black font-mono text-zinc-900 dark:text-zinc-100">
                       {issue.current_volume} Laporan
                     </span>
-                    <span className="text-[10px] font-mono text-zinc-400 block">
+                    <span className="text-xs font-mono text-zinc-600 dark:text-zinc-300 block">
                       Status: {issue.status}
                     </span>
                   </div>
@@ -186,8 +186,8 @@ export function TopHotIssuesCards({ issues }: TopHotIssuesCardsProps) {
 
                 {/* Score Progress Bar */}
                 <div>
-                  <div className="flex items-center justify-between text-[10px] font-mono font-bold mb-1">
-                    <span className="text-zinc-500">Skor Bahaya &amp; Urgensi</span>
+                  <div className="flex items-center justify-between text-xs font-mono font-bold mb-1">
+                    <span className="text-zinc-600 dark:text-zinc-300">Skor Bahaya &amp; Urgensi</span>
                     <span className="text-zinc-900 dark:text-white font-extrabold">
                       {issue.skor} / 100
                     </span>

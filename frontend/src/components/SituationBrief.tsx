@@ -140,7 +140,7 @@ export function SituationBrief({
           <div
             className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 ${currentStatus.bg} ${currentStatus.border}`}
           >
-            <span className={`w-2.5 h-2.5 rounded-full ${currentStatus.pulse} animate-pulse`} />
+            <span className={`w-2.5 h-2.5 rounded-full ${currentStatus.pulse}`} />
             <span className={`text-xs font-black font-mono tracking-wider ${currentStatus.text}`}>
               {currentStatus.label}
             </span>

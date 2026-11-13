@@ -55,10 +55,10 @@ from backend.app.services.social_topics import (
 )
 
 # Panjang jendela (jam), jumlah jendela riwayat untuk baseline, dan pembagian timeline.
-WINDOW_HOURS = {"1h": 1, "6h": 6, "24h": 24, "7d": 168, "30d": 720}
-BASELINE_WINDOWS = {"1h": 24, "6h": 28, "24h": 14, "7d": 4, "30d": 3}
-TIMELINE_BUCKETS = {"1h": (12, 5), "6h": (12, 30), "24h": (24, 60), "7d": (28, 360), "30d": (30, 1440)}
-PRESET_LABELS = {"1h": "1 jam terakhir", "6h": "6 jam terakhir", "24h": "24 jam terakhir", "7d": "7 hari terakhir", "30d": "30 hari terakhir"}
+WINDOW_HOURS = {"15m": 0.25, "1h": 1, "6h": 6, "24h": 24, "7d": 168, "30d": 720}
+BASELINE_WINDOWS = {"15m": 24, "1h": 24, "6h": 28, "24h": 14, "7d": 4, "30d": 3}
+TIMELINE_BUCKETS = {"15m": (15, 1), "1h": (12, 5), "6h": (12, 30), "24h": (24, 60), "7d": (28, 360), "30d": (30, 1440)}
+PRESET_LABELS = {"15m": "15 menit terakhir", "1h": "1 jam terakhir", "6h": "6 jam terakhir", "24h": "24 jam terakhir", "7d": "7 hari terakhir", "30d": "30 hari terakhir"}
 
 # Periode kustom: "custom:YYYY-MM-DD:YYYY-MM-DD" dalam tanggal WIB, tanggal akhir ikut dihitung.
 WIB = timedelta(hours=7)

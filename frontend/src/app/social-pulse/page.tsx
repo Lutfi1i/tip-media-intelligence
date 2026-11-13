@@ -32,6 +32,7 @@ import {
 import { SocialHeatmap } from "@/components/SocialHeatmap";
 import { SocialWatchedAccounts } from "@/components/SocialWatchedAccounts";
 import { SocialContentSearch } from "@/components/SocialContentSearch";
+import { LiveSocialFeed } from "@/components/LiveSocialFeed";
 import { SocialSpreadTrace } from "@/components/SocialSpreadTrace";
 import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
@@ -46,7 +47,7 @@ import { GeographicComparisonTable } from "@/components/GeographicComparisonTabl
 import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
 import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
 
-type Tab = "tren" | "cari" | "alert" | "instansi" | "akun" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type Tab = "live" | "tren" | "cari" | "alert" | "instansi" | "akun" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
 
@@ -171,7 +172,7 @@ export default function SocialPulsePage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isEscalating, setIsEscalating] = useState<boolean>(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("tren");
+  const [activeTab, setActiveTab] = useState<Tab>("live");
 
   const [ready, setReady] = useState(false);
 
@@ -187,7 +188,7 @@ export default function SocialPulsePage() {
     if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
     if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
     const tab = q.get("tab");
-    if (tab && ["tren", "cari", "alert", "instansi", "akun", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    if (tab && ["live", "tren", "cari", "alert", "instansi", "akun", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
     const wilayah = q.get("wilayah");
     if (wilayah) {
       setScopeKode(wilayah);
@@ -362,6 +363,7 @@ export default function SocialPulsePage() {
   const surgingCount = trends.filter((t) => t.velocity_status === "LONJAKAN TINGGI").length;
 
   const tabs: { id: Tab; label: string }[] = [
+    { id: "live", label: "Live Medsos Lokasi" },
     { id: "tren", label: `Topik Tren (${trends.length})` },
     { id: "cari", label: "Cari Konten" },
     { id: "alert", label: unreadAlerts ? `Aturan Alert (${unreadAlerts} baru)` : "Aturan Alert" },
@@ -628,6 +630,22 @@ export default function SocialPulsePage() {
           </button>
         ))}
       </div>
+
+      {/* TAB: LIVE MEDSOS LOKASI */}
+      {activeTab === "live" && (
+        <LiveSocialFeed
+          timeRange={timeRange}
+          scopeKode={scopeKode}
+          scopeName={scopeName}
+          scopeMode={scopeMode}
+          selectedPlatform={selectedPlatform}
+          onSelectPlatform={setSelectedPlatform}
+          facets={facets}
+          onNewPostsCount={() => {
+            refreshUnread();
+          }}
+        />
+      )}
 
       {/* TAB: TREN */}
       {activeTab === "tren" && (

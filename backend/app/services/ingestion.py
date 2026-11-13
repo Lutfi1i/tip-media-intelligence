@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 
 from backend.app.models import Source, RawItem, ItemAnalysis, MonitoringProfile, Issue, IssueItem
-from backend.app.services.dedup import compute_content_hash, is_near_duplicate
+from backend.app.services.dedup import compute_content_hash, compute_simhash, is_near_duplicate, simhash_distance
 from backend.app.services.ai_analyzer import analyze_sentiment, analyze_topic, extract_locations
 from backend.app.services.jev_triage import evaluate_binary_triage
 from backend.app.services.social_platform import legacy_platform
@@ -86,10 +86,14 @@ def ingest_content_item(
                 "message": "URL ini sudah tersimpan",
             }
 
-    # 2. Near-duplicate check with recent items
+    # 2. Near-duplicate check with recent items (SimHash + Jaccard shingles, FR-07)
+    simhash_val = compute_simhash(title, body)
     recent_items = db.query(RawItem).order_by(RawItem.id.desc()).limit(50).all()
     is_repost = False
     for r in recent_items:
+        if r.simhash and simhash_distance(simhash_val, r.simhash) <= 6:
+            is_repost = True
+            break
         is_dup, sim = is_near_duplicate(title, body, r.judul, r.isi, threshold=0.70)
         if is_dup:
             is_repost = True
@@ -101,6 +105,7 @@ def ingest_content_item(
         source_id=source_id,
         url_kanonik=url,
         hash=content_hash,
+        simhash=simhash_val,
         judul=title,
         isi=body,
         penerbit=penerbit,

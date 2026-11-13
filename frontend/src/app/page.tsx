@@ -25,6 +25,7 @@ import { LiveNewsStream } from "@/components/LiveNewsStream";
 import { SourceDeepDive } from "@/components/SourceDeepDive";
 import { TopHotIssuesCards } from "@/components/TopHotIssuesCards";
 import { SituationBrief } from "@/components/SituationBrief";
+import { DashboardAiInsight } from "@/components/DashboardAiInsight";
 import { ExecutivePriorityBoard } from "@/components/ExecutivePriorityBoard";
 import {
   RotateCw,
@@ -150,14 +151,7 @@ export default function DashboardPage() {
       {/* Page Title & Tactical Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
-              PUSAT KOMANDO &bull; EXECUTIVE RADAR
-            </span>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-800">
-              100% DATA BERITA NYATA
-            </span>
-          </div>
+          
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
             Situasi Terkini Media &amp; Bencana
           </h1>
@@ -264,6 +258,9 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Wawasan Ringkasan AI terhadap Angka & Isu Terkini */}
+      <DashboardAiInsight />
 
       {/* Situation Brief - Ringkasan Eksekutif & Arahan Pimpinan (FR-02) */}
       <SituationBrief

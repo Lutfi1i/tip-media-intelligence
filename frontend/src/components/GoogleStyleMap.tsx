@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { fmtDateTime, IndoZone } from "@/lib/format";
 import {
   fetchIndonesiaGeo,
   fetchRegionalDetail,
@@ -49,16 +50,15 @@ const JAWA_PROVINCE_NAMES = new Set([
   "Jawa Timur",
 ]);
 
-// Filter Kategori Masalah (Mengikuti PRD Lampiran A)
+// Filter Kategori Masalah (Selaras dengan backend geo_service.py)
 const CATEGORY_PILLS = [
   "Semua Masalah",
-  "Bencana & Cuaca",
-  "Lalu Lintas & Transportasi",
+  "Banjir & Cuaca",
+  "Lalu Lintas & Macet",
   "Infrastruktur & Jalan",
-  "Layanan Publik",
+  "Pelayanan Publik",
   "Keamanan & Kriminalitas",
   "Kesehatan & Lingkungan",
-  "Ekonomi & Harga",
   "Sosial & Warga",
 ];
 
@@ -89,15 +89,18 @@ export function GoogleStyleMap() {
   // Data States
   const [geoData, setGeoData] = useState<IndonesiaGeoOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [selectedRegionCode, setSelectedRegionCode] = useState<string>("31.71"); // Default: Jakarta Pusat
   const [selectedDetail, setSelectedDetail] = useState<RegionalDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua Masalah");
   const [channelFilter, setChannelFilter] = useState<"ALL" | "berita" | "sosmed">("ALL");
-  const [timeWindow, setTimeWindow] = useState<"1h" | "24h" | "7d">("24h");
+  const [tzZone, setTzZone] = useState<IndoZone>("WIB");
+  const [activePreset, setActivePreset] = useState<string>("java");
 
   // Load Geo Overview Data
   useEffect(() => {
@@ -105,12 +108,16 @@ export function GoogleStyleMap() {
     async function loadGeo() {
       try {
         setLoading(true);
+        setGeoError(null);
         const data = await fetchIndonesiaGeo();
         if (isMounted) {
           setGeoData(data);
         }
       } catch (err) {
         console.error("Gagal memuat data geo overview:", err);
+        if (isMounted) {
+          setGeoError("Gagal memuat data peta wilayah. Silakan coba muat ulang.");
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -125,18 +132,23 @@ export function GoogleStyleMap() {
   useEffect(() => {
     if (!selectedRegionCode) {
       setSelectedDetail(null);
+      setDetailError(null);
       return;
     }
     let isMounted = true;
     async function loadDetail() {
       try {
         setDetailLoading(true);
+        setDetailError(null);
         const detail = await fetchRegionalDetail(selectedRegionCode);
         if (isMounted) {
           setSelectedDetail(detail);
         }
       } catch (err) {
         console.error("Gagal memuat detail wilayah:", err);
+        if (isMounted) {
+          setDetailError("Gagal memuat detail wilayah ini.");
+        }
       } finally {
         if (isMounted) setDetailLoading(false);
       }
@@ -152,6 +164,12 @@ export function GoogleStyleMap() {
     if (!geoData) return [];
     return (geoData.jawa_regions || geoData.jabodetabek_regions || []) as unknown as RegionData[];
   }, [geoData]);
+
+  const activeRegions = useMemo(() => {
+    return allRegions
+      .filter((r) => (r.mention_count || 0) > 0)
+      .sort((a, b) => (b.mention_count || 0) - (a.mention_count || 0));
+  }, [allRegions]);
 
   // Filtered Regions based on Search
   const searchFilteredRegions = useMemo(() => {
@@ -267,11 +285,9 @@ export function GoogleStyleMap() {
         if (threat === "kritis") {
           markerBg = "#EF4444"; // red
           ringColor = "rgba(239, 68, 68, 0.5)";
-          pulseClass = "animate-ping";
         } else if (threat === "tinggi") {
           markerBg = "#F97316"; // orange
           ringColor = "rgba(249, 115, 22, 0.4)";
-          pulseClass = "animate-pulse";
         } else if (threat === "waspada") {
           markerBg = "#F59E0B"; // amber
           ringColor = "rgba(245, 158, 11, 0.35)";
@@ -322,23 +338,26 @@ export function GoogleStyleMap() {
           iconAnchor: [size / 2, size / 2],
         });
 
-        const marker = L.marker([region.lat, region.lng], { icon: customIcon });
+        const marker = L.marker([region.lat, region.lng], {
+          icon: customIcon,
+          zIndexOffset: isSelected ? 1000 : count * 10,
+        });
 
-        // Tooltip on Hover: Clean, Compact Card (Tanpa tumpukan pil hitam)
+        // Tooltip on Hover: Clean, Compact Card (Kontras tinggi)
         const tooltipContent = `
-          <div style="font-family: inherit; padding: 4px 6px; min-width: 150px;">
-            <div style="font-weight: 800; font-size: 12px; color: #09090b; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="font-family: inherit; padding: 6px 8px; min-width: 170px;">
+            <div style="font-weight: 800; font-size: 13px; color: #18181b; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
               <span>${region.nama}</span>
-              <span style="font-size: 9px; padding: 1px 6px; border-radius: 4px; background: ${markerBg}; color: white; text-transform: uppercase;">
+              <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${markerBg}; color: white; text-transform: uppercase;">
                 ${threat}
               </span>
             </div>
-            <div style="font-size: 11px; color: #52525b; margin-top: 3px;">
+            <div style="font-size: 12px; color: #3f3f46; margin-top: 4px;">
               ${region.provinsi} &bull; <strong>${count} Laporan</strong>
             </div>
             ${
               region.top_issue_title
-                ? `<div style="font-size: 10px; color: #0284c7; margin-top: 2px; font-weight: 600;">Topik: ${region.top_issue_title}</div>`
+                ? `<div style="font-size: 11px; color: #0369a1; margin-top: 3px; font-weight: 600;">Topik: ${region.top_issue_title}</div>`
                 : ""
             }
           </div>
@@ -368,6 +387,7 @@ export function GoogleStyleMap() {
 
   // Handle Preset Camera Focus
   const handlePresetCamera = (preset: (typeof CAMERA_PRESETS)[0]) => {
+    setActivePreset(preset.id);
     if (!mapInstanceRef.current) return;
     if (preset.bounds) {
       mapInstanceRef.current.fitBounds(preset.bounds as any, { padding: [20, 20] });
@@ -384,6 +404,7 @@ export function GoogleStyleMap() {
     if (mapInstanceRef.current) mapInstanceRef.current.zoomOut();
   };
   const handleResetView = () => {
+    setActivePreset("java");
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo([-7.45, 110.15], 7, { duration: 1 });
     }
@@ -415,12 +436,12 @@ export function GoogleStyleMap() {
 
   return (
     <div className="space-y-4">
-      {/* Top Filter Bar: Periode & Kategori Masalah Terpusat */}
+      {/* Top Filter Bar: Kategori Masalah Terpusat & Ringkasan Wilayah Aktif */}
       <div className="panel p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Kategori Masalah Pills (Scrollable) */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-            <span className="text-xs font-bold text-zinc-500 shrink-0 flex items-center gap-1 mr-1">
+            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-200 shrink-0 flex items-center gap-1 mr-1">
               <Filter className="w-3.5 h-3.5" />
               <span>Isu:</span>
             </span>
@@ -432,19 +453,19 @@ export function GoogleStyleMap() {
                   key={cat}
                   type="button"
                   onClick={() => setActiveCategory(cat)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 ${
                     isActive
                       ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 shadow-xs"
-                      : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                      : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200"
                   }`}
                 >
                   <span>{cat}</span>
                   {count > 0 && (
                     <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      className={`text-xs px-1.5 py-0.5 rounded-full font-bold leading-none ${
                         isActive
                           ? "bg-white/20 text-white dark:bg-black/20 dark:text-zinc-900"
-                          : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                          : "bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200"
                       }`}
                     >
                       {count}
@@ -455,73 +476,69 @@ export function GoogleStyleMap() {
             })}
           </div>
 
-          {/* Time Window Buttons */}
-          <div className="flex items-center gap-1 shrink-0 self-end md:self-auto">
-            <span className="text-[11px] font-mono text-zinc-400 mr-1">Periode:</span>
-            {(
-              [
-                { id: "1h", label: "1 Jam" },
-                { id: "24h", label: "24 Jam" },
-                { id: "7d", label: "7 Hari" },
-              ] as const
-            ).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTimeWindow(t.id)}
-                className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
-                  timeWindow === t.id
-                    ? "bg-sky-600 text-white"
-                    : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* Ringkasan Status Wilayah Aktif */}
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+              {loading ? "Memuat..." : `${activeRegions.length} Wilayah Aktif`}
+            </span>
           </div>
         </div>
       </div>
 
+      {geoError && (
+        <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 text-xs font-medium text-rose-700 dark:text-rose-300 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{geoError}</span>
+        </div>
+      )}
+
       {/* Main 2-Column Split Screen Layout (Poligon Batas Wilayah WGS84 + Hotspot Clusters) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Kolom Kiri: Peta Poligon Choropleth Leaflet (Sticky, 7/12 cols) */}
-        <div className="lg:col-span-7 xl:col-span-8 sticky top-20">
+        {/* Kolom Kiri: Preset Kamera + Peta Poligon Choropleth Leaflet (Sticky, 7/12 cols) */}
+        <div className="lg:col-span-7 xl:col-span-8 sticky top-20 space-y-2.5">
+          {/* Camera Presets Bar (Di atas peta agar kanvas peta tidak tertutup) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-zinc-950 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1 mr-1">
+                <Compass className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                <span>Fokus Kamera:</span>
+              </span>
+              {CAMERA_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handlePresetCamera(p)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    activePreset === p.id
+                      ? "bg-sky-600 text-white"
+                      : "text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="relative w-full h-[620px] rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm bg-[#F8FAFC] dark:bg-[#09090B]">
             {/* Map Canvas */}
             <div ref={mapContainerRef} className="w-full h-full z-0 tactical-choropleth-canvas" />
 
-            {/* Floating Top Control: Preset Kamera & Status Poligon */}
-            <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-              {/* Camera Presets */}
-              <div className="flex items-center gap-1 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md p-1 rounded-xl shadow-md border border-zinc-200/80 dark:border-zinc-800 pointer-events-auto">
-                <Compass className="w-3.5 h-3.5 text-sky-500 ml-1.5 shrink-0" />
-                <span className="text-[11px] font-bold text-zinc-500 mr-1 hidden sm:inline">Fokus:</span>
-                {CAMERA_PRESETS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handlePresetCamera(p)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                  >
-                    {p.label}
-                  </button>
-                ))}
+            {loading && (
+              <div className="absolute inset-0 z-20 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xs flex items-center justify-center">
+                <div className="px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-md text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+                  Memuat peta dan titik hotspot wilayah...
+                </div>
               </div>
-
-              {/* Status Poligon Mandiri (Tanpa Key / Tanpa Kuota) */}
-              <div className="flex items-center gap-1.5 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border border-zinc-200/80 dark:border-zinc-800 pointer-events-auto">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                  GeoJSON WGS84 &bull; Bebas Kuota
-                </span>
-              </div>
-            </div>
+            )}
 
             {/* Floating Zoom & Center Buttons (Kanan Bawah) */}
             <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1.5 shadow-md">
               <button
                 type="button"
                 onClick={handleZoomIn}
+                aria-label="Perbesar peta"
                 className="w-9 h-9 rounded-lg bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors"
                 title="Perbesar"
               >
@@ -530,6 +547,7 @@ export function GoogleStyleMap() {
               <button
                 type="button"
                 onClick={handleZoomOut}
+                aria-label="Perkecil peta"
                 className="w-9 h-9 rounded-lg bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors"
                 title="Perkecil"
               >
@@ -538,6 +556,7 @@ export function GoogleStyleMap() {
               <button
                 type="button"
                 onClick={handleResetView}
+                aria-label="Reset posisi peta ke Pulau Jawa"
                 className="w-9 h-9 rounded-lg bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors"
                 title="Reset Posisi Jawa"
               >
@@ -546,25 +565,25 @@ export function GoogleStyleMap() {
             </div>
 
             {/* Floating Legend (Kiri Bawah) */}
-            <div className="absolute bottom-4 left-4 z-10 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md p-2.5 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-800 text-[11px] font-sans">
-              <div className="font-bold text-zinc-800 dark:text-zinc-200 mb-1.5 flex items-center gap-1.5">
+            <div className="absolute bottom-4 left-4 z-10 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-2.5 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-800 text-xs font-sans">
+              <div className="font-bold text-zinc-800 dark:text-zinc-100 mb-1.5 flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-rose-500" />
-                <span>Level Sinyal Wilayah:</span>
+                <span>Level Sinyal Wilayah</span>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-200">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Kritis
                 </span>
-                <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Tinggi
+                <span className="flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-200">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Tinggi
                 </span>
-                <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
-                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> Waspada
+                <span className="flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-200">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Waspada
                 </span>
-                <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
+                <span className="flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-200">
                   <span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> Rendah
                 </span>
-                <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">
+                <span className="flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-200">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Kondusif
                 </span>
               </div>
@@ -573,19 +592,105 @@ export function GoogleStyleMap() {
         </div>
 
         {/* Kolom Kanan: Panel Intelijen & Feed Media Mandiri (5/12 cols) */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-4 max-h-[620px] overflow-y-auto pr-1">
+        <div className="lg:col-span-5 xl:col-span-4 space-y-4 lg:max-h-[676px] overflow-y-auto pr-1">
+          {/* Quick Search Wilayah (Di paling atas agar mudah dicari) */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="w-4 h-4 text-zinc-500 dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari kota atau kabupaten di Pulau Jawa"
+                placeholder="Cari kota / kabupaten di Pulau Jawa..."
+                className="w-full pl-9 pr-9 py-2.5 rounded-xl text-xs font-medium bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 dark:placeholder-zinc-400 focus:outline-hidden focus:ring-2 focus:ring-sky-500"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label="Hapus pencarian wilayah"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Jika sedang mencari: Tampilkan hasil pencarian wilayah */}
+            {searchQuery ? (
+              <div className="panel p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl max-h-48 overflow-y-auto space-y-1">
+                <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 block mb-1">
+                  Hasil Pencarian ({searchFilteredRegions.length} Wilayah)
+                </span>
+                {searchFilteredRegions.length > 0 ? (
+                  searchFilteredRegions.map((r) => (
+                    <button
+                      key={r.kode}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRegionCode(r.kode);
+                        setSearchQuery("");
+                        if (mapInstanceRef.current) {
+                          mapInstanceRef.current.flyTo([r.lat, r.lng], 11, { duration: 0.8 });
+                        }
+                      }}
+                      className="w-full p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 flex items-center justify-between text-left text-xs transition-colors"
+                    >
+                      <span className="font-semibold text-zinc-900 dark:text-zinc-100">{r.nama}</span>
+                      <span className="text-xs text-zinc-600 dark:text-zinc-300">
+                        {r.provinsi} &bull; {r.mention_count} Laporan
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-zinc-600 dark:text-zinc-300 py-2">
+                    Wilayah tidak ditemukan.
+                  </p>
+                )}
+              </div>
+            ) : (
+              activeRegions.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 shrink-0">
+                    Teratas:
+                  </span>
+                  {activeRegions.slice(0, 5).map((r) => (
+                    <button
+                      key={r.kode}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRegionCode(r.kode);
+                        if (mapInstanceRef.current) {
+                          mapInstanceRef.current.flyTo([r.lat, r.lng], 10, { duration: 0.8 });
+                        }
+                      }}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 border transition-colors ${
+                        selectedRegionCode === r.kode
+                          ? "bg-sky-600 text-white border-sky-600"
+                          : "bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                      }`}
+                    >
+                      {r.nama} ({r.mention_count})
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+
           {/* Header Wilayah Terpilih */}
           <div className="panel p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs">
             <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-400">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
                   <MapPin className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-base font-black text-zinc-900 dark:text-white leading-tight">
                     {currentRegionMeta?.nama || "Pilih Wilayah di Peta"}
                   </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
                     {currentRegionMeta?.provinsi || "Klik salah satu titik hotspot di peta"}
                   </p>
                 </div>
@@ -593,14 +698,14 @@ export function GoogleStyleMap() {
 
               {currentRegionMeta && (
                 <span
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider shrink-0 ${
                     currentRegionMeta.threat_level === "kritis"
-                      ? "bg-rose-500 text-white"
+                      ? "bg-rose-600 text-white"
                       : currentRegionMeta.threat_level === "tinggi"
-                      ? "bg-amber-500 text-white"
+                      ? "bg-orange-600 text-white"
                       : currentRegionMeta.threat_level === "waspada"
-                      ? "bg-yellow-500 text-zinc-950"
-                      : "bg-emerald-500 text-white"
+                      ? "bg-amber-400 text-zinc-950"
+                      : "bg-emerald-600 text-white"
                   }`}
                 >
                   {currentRegionMeta.threat_level}
@@ -608,24 +713,36 @@ export function GoogleStyleMap() {
               )}
             </div>
 
+            {detailLoading && (
+              <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-900 text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                Memuat detail isu wilayah...
+              </div>
+            )}
+
+            {detailError && !detailLoading && (
+              <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-900 text-xs font-medium text-rose-600 dark:text-rose-400">
+                {detailError}
+              </div>
+            )}
+
             {/* Quick Metrics Cards */}
-            {selectedDetail && (
+            {selectedDetail && !detailLoading && (
               <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-900 text-center">
-                <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60">
-                  <span className="text-[10px] text-zinc-400 block font-medium">Total Isu</span>
-                  <span className="text-sm font-black text-zinc-900 dark:text-white">
-                    {selectedDetail.total_issues || 0} Isu
+                <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-100 dark:border-zinc-800">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-300 block font-semibold">Total Isu</span>
+                  <span className="text-base font-black text-zinc-900 dark:text-white">
+                    {selectedDetail.total_issues || 0}
                   </span>
                 </div>
-                <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60">
-                  <span className="text-[10px] text-zinc-400 block font-medium">Berita Resmi</span>
-                  <span className="text-sm font-black text-sky-600 dark:text-sky-400">
+                <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-100 dark:border-zinc-800">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-300 block font-semibold">Berita Resmi</span>
+                  <span className="text-base font-black text-sky-700 dark:text-sky-400">
                     {selectedDetail.total_berita || 0}
                   </span>
                 </div>
-                <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60">
-                  <span className="text-[10px] text-zinc-400 block font-medium">Sosmed</span>
-                  <span className="text-sm font-black text-purple-600 dark:text-purple-400">
+                <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-100 dark:border-zinc-800">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-300 block font-semibold">Sosmed</span>
+                  <span className="text-base font-black text-purple-700 dark:text-purple-400">
                     {selectedDetail.total_sosmed || 0}
                   </span>
                 </div>
@@ -633,56 +750,9 @@ export function GoogleStyleMap() {
             )}
           </div>
 
-          {/* Quick Search Wilayah (Pencarian Cepat 57 Kab/Kota) */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari kota / kabupaten di Pulau Jawa..."
-              className="w-full pl-9 pr-4 py-2 rounded-xl text-xs bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-hidden focus:ring-2 focus:ring-sky-500"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Jika sedang mencari: Tampilkan hasil pencarian wilayah */}
-          {searchQuery && (
-            <div className="panel p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl max-h-48 overflow-y-auto space-y-1">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
-                Hasil Pencarian ({searchFilteredRegions.length} Wilayah):
-              </span>
-              {searchFilteredRegions.map((r) => (
-                <button
-                  key={r.kode}
-                  type="button"
-                  onClick={() => {
-                    setSelectedRegionCode(r.kode);
-                    setSearchQuery("");
-                    if (mapInstanceRef.current) {
-                      mapInstanceRef.current.flyTo([r.lat, r.lng], 11, { duration: 0.8 });
-                    }
-                  }}
-                  className="w-full p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 flex items-center justify-between text-left text-xs transition-colors"
-                >
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{r.nama}</span>
-                  <span className="text-[10px] text-zinc-400">{r.provinsi} &bull; {r.mention_count} Laporan</span>
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Klaster Isu Prioritas Wilayah */}
           {filteredIssues.length > 0 && (
-            <div className="panel p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
+            <div className="panel p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
@@ -694,16 +764,16 @@ export function GoogleStyleMap() {
                 {filteredIssues.slice(0, 3).map((iss) => (
                   <div
                     key={iss.id}
-                    className="p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-900 bg-zinc-50/70 dark:bg-zinc-900/40 text-xs"
+                    className="p-3 rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-xs space-y-1"
                   >
-                    <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
-                      <span className="font-bold text-zinc-700 dark:text-zinc-300">{iss.kategori}</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400">Skor: {iss.skor}</span>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-zinc-700 dark:text-zinc-200">{iss.kategori}</span>
+                      <span className="font-bold text-amber-700 dark:text-amber-400">Skor: {iss.skor}</span>
                     </div>
-                    <h5 className="font-semibold text-zinc-900 dark:text-zinc-100 leading-snug line-clamp-2">
+                    <h5 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 leading-snug line-clamp-2">
                       {iss.judul}
                     </h5>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-1 mt-1">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-2">
                       {iss.ringkasan}
                     </p>
                   </div>
@@ -714,9 +784,9 @@ export function GoogleStyleMap() {
 
           {/* Feed Konten Berita & Sosmed (Langsung dengan Logo Asli Bulat) */}
           <div className="panel p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Newspaper className="w-3.5 h-3.5 text-sky-500" />
+                <Newspaper className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                 <span>Feed Lapangan ({filteredMediaItems.length})</span>
               </span>
 
@@ -725,10 +795,10 @@ export function GoogleStyleMap() {
                 <button
                   type="button"
                   onClick={() => setChannelFilter("ALL")}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
                     channelFilter === "ALL"
                       ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
-                      : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      : "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   }`}
                 >
                   Semua
@@ -736,10 +806,10 @@ export function GoogleStyleMap() {
                 <button
                   type="button"
                   onClick={() => setChannelFilter("berita")}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
                     channelFilter === "berita"
                       ? "bg-sky-600 text-white"
-                      : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      : "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   }`}
                 >
                   Berita
@@ -747,14 +817,31 @@ export function GoogleStyleMap() {
                 <button
                   type="button"
                   onClick={() => setChannelFilter("sosmed")}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
                     channelFilter === "sosmed"
                       ? "bg-purple-600 text-white"
-                      : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      : "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   }`}
                 >
                   Sosmed
                 </button>
+              </div>
+              <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-lg">
+                {(["WIB", "WITA", "WIT"] as IndoZone[]).map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => setTzZone(z)}
+                    className={`px-2 py-1 rounded-md text-[11px] font-mono font-semibold transition-colors ${
+                      tzZone === z
+                        ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                        : "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    }`}
+                    title={`Tampilkan waktu dalam zona ${z}`}
+                  >
+                    {z}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -776,9 +863,9 @@ export function GoogleStyleMap() {
                   return (
                     <div
                       key={item.id}
-                      className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30 text-xs transition-colors hover:border-zinc-400 dark:hover:border-zinc-700"
+                      className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 text-xs transition-colors hover:border-zinc-400 dark:hover:border-zinc-600"
                     >
-                      <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1.5 gap-2">
+                      <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300 mb-1.5 gap-2">
                         <div className="flex items-center gap-1.5 truncate">
                           {/* Logo Resmi Asli Bulat Seragam */}
                           <SourceLogoBadge
@@ -789,8 +876,8 @@ export function GoogleStyleMap() {
                           />
 
                           {hasDistinctAuthor && (
-                            <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 truncate">
-                              · {item.penulis}
+                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300 truncate">
+                              &middot; {item.penulis}
                             </span>
                           )}
                         </div>
@@ -803,18 +890,18 @@ export function GoogleStyleMap() {
                         href={item.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-semibold text-zinc-900 dark:text-zinc-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline flex items-baseline gap-1.5 leading-snug group"
+                        className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 hover:text-sky-700 dark:hover:text-sky-400 hover:underline flex items-baseline gap-1.5 leading-snug group"
                       >
                         <span className="line-clamp-2">{item.judul}</span>
-                        <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-60 group-hover:opacity-100 text-sky-500 transition-opacity" />
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-70 group-hover:opacity-100 text-sky-600 dark:text-sky-400 transition-opacity" />
                       </a>
 
-                      <div className="mt-2 pt-1.5 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-[10px] text-zinc-400">
-                        <span className="px-1.5 py-0.5 rounded bg-zinc-200/60 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                      <div className="mt-2 pt-2 border-t border-zinc-200/70 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300 gap-2">
+                        <span className="px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-medium">
                           {item.kategori_masalah}
                         </span>
-                        <span>
-                          {item.published_at ? new Date(item.published_at).toLocaleString("id-ID") : "Baru saja"}
+                        <span className="shrink-0 font-mono">
+                          {item.published_at ? fmtDateTime(item.published_at, tzZone) : "Baru saja"}
                         </span>
                       </div>
                     </div>
@@ -822,7 +909,7 @@ export function GoogleStyleMap() {
                 })}
               </div>
             ) : (
-              <div className="p-6 text-center text-zinc-400 text-xs">
+              <div className="p-6 text-center text-zinc-600 dark:text-zinc-300 text-xs font-medium">
                 Tidak ada laporan yang sesuai dengan filter kategori &ldquo;{activeCategory}&rdquo;.
               </div>
             )}

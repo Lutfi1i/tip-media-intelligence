@@ -4,12 +4,14 @@ serta kapabilitas Geographic Scope Intelligence (FR-GEO-01 s/d FR-GEO-09).
 """
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.config import settings
 from backend.app.database import get_db
+from backend.app.services.realtime_social import ingest_licensed_social_post, subscribe_sse_events
 from backend.app.services.social_pulse_service import (
     get_social_pulse_overview,
     get_social_trends,
@@ -30,6 +32,7 @@ from backend.app.services.social_taxonomy import catalog as social_catalog
 from backend.app.services.social_notes import NOTE_STATUSES, add_note, list_notes
 from backend.app.services.social_accounts import add_account, get_account_activity, remove_account
 from backend.app.services.social_search import SEARCH_SORTS, export_social_content_csv, search_social_content
+from backend.app.services.live_social_collector import fetch_live_social_for_location
 from backend.app.services.social_spread import get_spread_trace
 from backend.app.services.social_cooccurrence import get_hashtag_cooccurrence
 from backend.app.services.social_alert_rules import (
@@ -578,3 +581,90 @@ def read_hashtag_cooccurrence(
         agency=agency,
         limit=limit,
     )
+
+
+@router.post("/live-fetch")
+def trigger_live_social_fetch(
+    scope_kode: str = Query("ID", description="Kode wilayah Kemendagri"),
+    platform: Optional[str] = Query(None, description="Platform medsos spesifik, mis. X (Twitter), TikTok"),
+    q: Optional[str] = Query(None, max_length=200, description="Kata kunci tambahan"),
+    force: bool = Query(False, description="Abaikan cooldown 8 detik"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Tarik langsung postingan media sosial warga terbaru untuk wilayah yang dipilih."""
+    return fetch_live_social_for_location(
+        db,
+        scope_kode=scope_kode,
+        platform=None if platform in (None, "", "Semua") else platform,
+        q=q,
+        force=force,
+    )
+
+
+@router.get("/live-feed")
+def read_live_social_feed(
+    filters: Dict[str, Any] = Depends(_search_filters),
+    fetch_live: bool = Query(True, description="Tarik langsung dari medsos bila cooldown lewat"),
+    force_fetch: bool = Query(False, description="Paksa tarik langsung tanpa menunggu cooldown"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=5, le=100),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Stream langsung postingan media sosial warga di lokasi terpilih dengan filtering lengkap."""
+    live_summary: Optional[Dict[str, Any]] = None
+    if fetch_live:
+        live_summary = fetch_live_social_for_location(
+            db,
+            scope_kode=filters["scope_kode"],
+            platform=filters["platform"],
+            q=filters["q"],
+            force=force_fetch,
+        )
+    result = search_social_content(db, page=page, page_size=page_size, **filters)
+    return {
+        **result,
+        "scope_kode": filters["scope_kode"],
+        "scope_mode": filters["scope_mode"],
+        "live_fetch": live_summary,
+    }
+
+
+@router.get("/stream")
+async def stream_social_events():
+    """FR-25: Server-Sent Events (SSE) untuk push postingan baru ke frontend tanpa polling."""
+    return StreamingResponse(
+        subscribe_sse_events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+class LicensedWebhookPayload(BaseModel):
+    platform: str
+    url: str
+    title: str
+    body: str
+    author: Optional[str] = None
+    engagement: Optional[Dict[str, Any]] = None
+
+
+@router.post("/webhooks/{vendor}")
+def receive_licensed_vendor_webhook(
+    vendor: str,
+    payload: LicensedWebhookPayload,
+    x_webhook_secret: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """FR-25: Receiver webhook vendor data berlisensi (TikTok/IG/FB) dengan verifikasi secret."""
+    if x_webhook_secret != settings.SOCIAL_WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Webhook secret tidak valid")
+    res = ingest_licensed_social_post(
+        db,
+        platform=payload.platform,
+        url=payload.url,
+        title=payload.title,
+        body=payload.body,
+        author=payload.author,
+        engagement=payload.engagement,
+    )
+    return {"vendor": vendor, **res}

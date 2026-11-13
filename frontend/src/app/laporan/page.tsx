@@ -6,6 +6,7 @@ import {
   generateSocialReport,
   generateNewReport,
   getReportViewUrl,
+  getReportPdfUrl,
 } from "@/lib/api";
 
 export default function LaporanPage() {
@@ -179,7 +180,7 @@ export default function LaporanPage() {
                   rel="noreferrer"
                   className="w-full min-h-[40px] inline-flex items-center justify-center py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold rounded-md transition-colors shadow-xs"
                 >
-                  Buka &amp; Cetak Dokumen Lengkap &nearr;
+                  Buka &amp; Cetak Dokumen Lengkap ↗
                 </a>
               ) : (
                 <button
@@ -260,14 +261,24 @@ export default function LaporanPage() {
                       </div>
                     </div>
 
-                    <a
-                      href={getReportViewUrl(rep.id)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="self-start sm:self-auto min-h-[36px] inline-flex items-center px-3.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-800 rounded-md text-xs font-bold transition-colors font-mono"
-                    >
-                      Buka Dokumen &nearr;
-                    </a>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <a
+                        href={getReportViewUrl(rep.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-800 rounded-md text-xs font-bold transition-colors font-mono"
+                      >
+                        Buka HTML ↗
+                      </a>
+                      <a
+                        href={getReportPdfUrl(rep.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors font-mono"
+                      >
+                        Unduh PDF
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>

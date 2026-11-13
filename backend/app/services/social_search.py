@@ -93,12 +93,14 @@ def _matches(
             "penerbit": it.penerbit,
             "url": it.url_kanonik,
             "published_at": it.published_at.isoformat(),
+            "fetched_at": it.fetched_at.isoformat() if it.fetched_at else None,
             "sentimen": (ana.sentimen if ana else "netral") or "netral",
             "lokasi": ana.lokasi_kejadian if ana else None,
             "kategori": [category_label(c) for c in cats if c != "lainnya"],
             "instansi": [agency_label(a) for a in ags],
             "emosi": [EMOTION_LABELS[e] for e in emos],
             "geo_context": geo_label,
+            "geo_confidence": geo_conf,
             "engagement": {"likes": likes, "shares": shares, "replies": replies, "views": it.eng_views, "interactions": interactions},
         })
     if sort == "jangkauan":

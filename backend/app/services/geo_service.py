@@ -66,38 +66,38 @@ JAWA_REGIONS: List[Dict[str, Any]] = [
     {"kode": "31.01", "nama": "Kepulauan Seribu", "jenis": "Kabupaten Administrasi", "provinsi": "DKI Jakarta", "lat": -5.5878, "lng": 106.5540, "aliases": ["kepulauan seribu", "pulau seribu", "pulau pramuka", "pulau tidung", "pulau pari"]},
 
     # --- Banten & Tangerang Raya ---
-    {"kode": "36.71", "nama": "Kota Tangerang", "jenis": "Kota", "provinsi": "Banten", "lat": -6.1783, "lng": 106.6319, "aliases": ["kota tangerang", "tangerang kota", "cipondoh", "karawaci", "ciledug", "batuceper", "benda"]},
+    {"kode": "36.71", "nama": "Kota Tangerang", "jenis": "Kota", "provinsi": "Banten", "lat": -6.1783, "lng": 106.6319, "aliases": ["kota tangerang", "tangerang kota", "pemkot tangerang", "cipondoh", "karawaci", "ciledug", "batuceper", "benda", "tangerang"]},
     {"kode": "36.74", "nama": "Kota Tangerang Selatan", "jenis": "Kota", "provinsi": "Banten", "lat": -6.2888, "lng": 106.7179, "aliases": ["tangerang selatan", "tangsel", "bsd", "bsd city", "serpong", "bintaro", "ciputat", "pamulang"]},
-    {"kode": "36.03", "nama": "Kabupaten Tangerang", "jenis": "Kabupaten", "provinsi": "Banten", "lat": -6.2088, "lng": 106.4673, "aliases": ["kabupaten tangerang", "kab tangerang", "tigaraksa", "balaraja", "cikupa", "pasar kemis"]},
-    {"kode": "36.73", "nama": "Kota Serang", "jenis": "Kota", "provinsi": "Banten", "lat": -6.1104, "lng": 106.1640, "aliases": ["kota serang", "serang kota", "kasemen"]},
+    {"kode": "36.03", "nama": "Kabupaten Tangerang", "jenis": "Kabupaten", "provinsi": "Banten", "lat": -6.2088, "lng": 106.4673, "aliases": ["kabupaten tangerang", "kab tangerang", "pemkab tangerang", "tigaraksa", "balaraja", "cikupa", "pasar kemis"]},
+    {"kode": "36.73", "nama": "Kota Serang", "jenis": "Kota", "provinsi": "Banten", "lat": -6.1104, "lng": 106.1640, "aliases": ["kota serang", "serang kota", "pemkot serang", "kasemen", "serang"]},
     {"kode": "36.04", "nama": "Kabupaten Serang", "jenis": "Kabupaten", "provinsi": "Banten", "lat": -6.1667, "lng": 105.9833, "aliases": ["kabupaten serang", "kab serang", "ciruas", "kramatwatu", "anyer"]},
     {"kode": "36.72", "nama": "Kota Cilegon", "jenis": "Kota", "provinsi": "Banten", "lat": -6.0022, "lng": 106.0125, "aliases": ["kota cilegon", "cilegon", "merak", "pelabuhan merak"]},
     {"kode": "36.02", "nama": "Kabupaten Lebak", "jenis": "Kabupaten", "provinsi": "Banten", "lat": -6.6500, "lng": 106.2167, "aliases": ["kabupaten lebak", "lebak", "rangkasbitung"]},
     {"kode": "36.01", "nama": "Kabupaten Pandeglang", "jenis": "Kabupaten", "provinsi": "Banten", "lat": -6.3083, "lng": 106.1067, "aliases": ["kabupaten pandeglang", "pandeglang", "labuan", "panimbang"]},
 
     # --- Jawa Barat (Bodetabek + Priangan & Pantura) ---
-    {"kode": "32.71", "nama": "Kota Bogor", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.5971, "lng": 106.8060, "aliases": ["kota bogor", "bogor kota", "kebun raya bogor", "bogor tengah", "bogor selatan", "bogor timur", "bogor utara", "bogor barat"]},
-    {"kode": "32.01", "nama": "Kabupaten Bogor", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.4797, "lng": 106.8247, "aliases": ["kabupaten bogor", "kab bogor", "cibinong", "cileungsi", "gunung putri", "puncak", "ciawi", "bojonggede", "parung", "sentul"]},
+    {"kode": "32.71", "nama": "Kota Bogor", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.5971, "lng": 106.8060, "aliases": ["kota bogor", "bogor kota", "pemkot bogor", "polresta bogor", "stasiun bogor", "alun-alun bogor", "kebun raya bogor", "bogor tengah", "bogor selatan", "bogor timur", "bogor utara", "bogor barat"]},
+    {"kode": "32.01", "nama": "Kabupaten Bogor", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.4797, "lng": 106.8247, "aliases": ["kabupaten bogor", "kab bogor", "pemkab bogor", "cibinong", "cileungsi", "gunung putri", "puncak", "ciawi", "bojonggede", "parung", "sentul"]},
     {"kode": "32.76", "nama": "Kota Depok", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.4025, "lng": 106.7942, "aliases": ["depok", "kota depok", "margonda", "sawangan", "cimanggis", "pancoran mas", "sukmajaya", "cinere"]},
-    {"kode": "32.75", "nama": "Kota Bekasi", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.2383, "lng": 106.9756, "aliases": ["kota bekasi", "bekasi kota", "bekasi barat", "bekasi timur", "bekasi selatan", "bekasi utara", "rawalumbu", "pondok gede", "kranji"]},
-    {"kode": "32.16", "nama": "Kabupaten Bekasi", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.2415, "lng": 107.0988, "aliases": ["kabupaten bekasi", "kab bekasi", "cikarang", "tambun", "cibitung", "sukatani"]},
-    {"kode": "32.73", "nama": "Kota Bandung", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.9175, "lng": 107.6191, "aliases": ["kota bandung", "bandung kota", "dago", "gedebage", "pasteur", "lembang", "asia afrika"]},
-    {"kode": "32.04", "nama": "Kabupaten Bandung", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -7.0253, "lng": 107.5198, "aliases": ["kabupaten bandung", "kab bandung", "soreang", "ciwidey", "rancaekek", "baleendah"]},
+    {"kode": "32.75", "nama": "Kota Bekasi", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.2383, "lng": 106.9756, "aliases": ["kota bekasi", "bekasi kota", "pemkot bekasi", "bekasi barat", "bekasi timur", "bekasi selatan", "bekasi utara", "rawalumbu", "pondok gede", "kranji", "bekasi"]},
+    {"kode": "32.16", "nama": "Kabupaten Bekasi", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.2415, "lng": 107.0988, "aliases": ["kabupaten bekasi", "kab bekasi", "pemkab bekasi", "cikarang", "tambun", "cibitung", "sukatani"]},
+    {"kode": "32.73", "nama": "Kota Bandung", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.9175, "lng": 107.6191, "aliases": ["kota bandung", "bandung kota", "pemkot bandung", "dago", "gedebage", "pasteur", "asia afrika", "bandung"]},
+    {"kode": "32.04", "nama": "Kabupaten Bandung", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -7.0253, "lng": 107.5198, "aliases": ["kabupaten bandung", "kab bandung", "pemkab bandung", "soreang", "ciwidey", "rancaekek", "baleendah"]},
     {"kode": "32.77", "nama": "Kota Cimahi", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.8722, "lng": 107.5422, "aliases": ["kota cimahi", "cimahi"]},
-    {"kode": "32.17", "nama": "Kabupaten Bandung Barat", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.8431, "lng": 107.4942, "aliases": ["kabupaten bandung barat", "bandung barat", "padalarang", "ngamprah"]},
+    {"kode": "32.17", "nama": "Kabupaten Bandung Barat", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.8431, "lng": 107.4942, "aliases": ["kabupaten bandung barat", "bandung barat", "padalarang", "ngamprah", "lembang"]},
     {"kode": "32.15", "nama": "Kabupaten Karawang", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.3050, "lng": 107.3000, "aliases": ["kabupaten karawang", "karawang", "cikampek", "klari"]},
     {"kode": "32.14", "nama": "Kabupaten Purwakarta", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.5389, "lng": 107.4439, "aliases": ["kabupaten purwakarta", "purwakarta", "sadang", "jatiluhur"]},
     {"kode": "32.13", "nama": "Kabupaten Subang", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.5683, "lng": 107.7583, "aliases": ["kabupaten subang", "subang", "patimban", "kalijati"]},
-    {"kode": "32.74", "nama": "Kota Cirebon", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.7063, "lng": 108.5570, "aliases": ["kota cirebon", "cirebon kota", "kesambi", "kejaksan"]},
+    {"kode": "32.74", "nama": "Kota Cirebon", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.7063, "lng": 108.5570, "aliases": ["kota cirebon", "cirebon kota", "kesambi", "kejaksan", "cirebon"]},
     {"kode": "32.09", "nama": "Kabupaten Cirebon", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.7589, "lng": 108.4811, "aliases": ["kabupaten cirebon", "kab cirebon", "sumber", "plered"]},
-    {"kode": "32.72", "nama": "Kota Sukabumi", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.9277, "lng": 106.9299, "aliases": ["kota sukabumi", "sukabumi kota"]},
-    {"kode": "32.02", "nama": "Kabupaten Sukabumi", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.9850, "lng": 106.7550, "aliases": ["kabupaten sukabumi", "kab sukabumi", "pelabuhan ratu", "cibadak"]},
-    {"kode": "32.78", "nama": "Kota Tasikmalaya", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -7.3274, "lng": 108.2207, "aliases": ["kota tasikmalaya", "tasikmalaya kota", "tasik"]},
+    {"kode": "32.72", "nama": "Kota Sukabumi", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -6.9277, "lng": 106.9299, "aliases": ["kota sukabumi", "sukabumi kota", "sukabumi"]},
+    {"kode": "32.02", "nama": "Kabupaten Sukabumi", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.9850, "lng": 106.7550, "aliases": ["kabupaten sukabumi", "kab sukabumi", "pelabuhan ratu", "palabuhanratu", "cibadak"]},
+    {"kode": "32.78", "nama": "Kota Tasikmalaya", "jenis": "Kota", "provinsi": "Jawa Barat", "lat": -7.3274, "lng": 108.2207, "aliases": ["kota tasikmalaya", "tasikmalaya kota", "tasikmalaya", "tasik"]},
     {"kode": "32.05", "nama": "Kabupaten Garut", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -7.2167, "lng": 107.9000, "aliases": ["kabupaten garut", "garut", "tarogong"]},
     {"kode": "32.03", "nama": "Kabupaten Cianjur", "jenis": "Kabupaten", "provinsi": "Jawa Barat", "lat": -6.8167, "lng": 107.1333, "aliases": ["kabupaten cianjur", "cianjur", "cipanas"]},
 
     # --- Jawa Tengah & DI Yogyakarta ---
-    {"kode": "33.74", "nama": "Kota Semarang", "jenis": "Kota", "provinsi": "Jawa Tengah", "lat": -6.9932, "lng": 110.4203, "aliases": ["kota semarang", "semarang kota", "simpang lima", "tembalang", "banyumanik", "tugu muda"]},
+    {"kode": "33.74", "nama": "Kota Semarang", "jenis": "Kota", "provinsi": "Jawa Tengah", "lat": -6.9932, "lng": 110.4203, "aliases": ["kota semarang", "semarang kota", "simpang lima", "tembalang", "banyumanik", "tugu muda", "semarang"]},
     {"kode": "33.22", "nama": "Kabupaten Semarang", "jenis": "Kabupaten", "provinsi": "Jawa Tengah", "lat": -7.1408, "lng": 110.4061, "aliases": ["kabupaten semarang", "kab semarang", "ungaran", "ambarawa"]},
     {"kode": "33.72", "nama": "Kota Surakarta (Solo)", "jenis": "Kota", "provinsi": "Jawa Tengah", "lat": -7.5667, "lng": 110.8167, "aliases": ["surakarta", "solo", "kota solo", "laweyan", "jebres", "manahan"]},
     {"kode": "33.71", "nama": "Kota Magelang", "jenis": "Kota", "provinsi": "Jawa Tengah", "lat": -7.4833, "lng": 110.2167, "aliases": ["kota magelang", "magelang kota"]},
@@ -187,19 +187,51 @@ def _categorize_issue_topic(title: str, body: str, raw_topic: str) -> str:
     return raw_topic or "Umum"
 
 
+_REGION_PATTERNS: Dict[str, List[re.Pattern]] = {}
+
+
+def _text_matches_region(text: str, region: Dict[str, Any]) -> bool:
+    """Cocokkan teks dengan alias wilayah memakai batas kata agar kata pendek tidak salah cocok."""
+    code = region["kode"]
+    patterns = _REGION_PATTERNS.get(code)
+    if patterns is None:
+        patterns = [re.compile(r"\b" + re.escape(a.lower()) + r"\b") for a in region["aliases"]]
+        _REGION_PATTERNS[code] = patterns
+    if not any(p.search(text) for p in patterns):
+        return False
+
+    # Disambiguasi Kota vs Kabupaten yang berbagi nama dasar (mis. Bandung, Tangerang, Bekasi, Serang, Cirebon, Sukabumi)
+    if code == "32.73" and ("kabupaten bandung" in text or "kab bandung" in text or "bandung barat" in text):
+        return "kota bandung" in text or "bandung kota" in text or "pemkot bandung" in text
+    if code == "36.71" and ("tangerang selatan" in text or "tangsel" in text or "kabupaten tangerang" in text or "kab tangerang" in text):
+        return "kota tangerang" in text or "tangerang kota" in text or "pemkot tangerang" in text
+    if code == "32.75" and ("kabupaten bekasi" in text or "kab bekasi" in text or "cikarang" in text):
+        return "kota bekasi" in text or "bekasi kota" in text or "pemkot bekasi" in text
+    if code == "36.73" and ("kabupaten serang" in text or "kab serang" in text or "anyer" in text):
+        return "kota serang" in text or "serang kota" in text or "pemkot serang" in text
+    if code == "32.74" and ("kabupaten cirebon" in text or "kab cirebon" in text):
+        return "kota cirebon" in text or "cirebon kota" in text
+    if code == "32.72" and ("kabupaten sukabumi" in text or "kab sukabumi" in text):
+        return "kota sukabumi" in text or "sukabumi kota" in text
+    return True
+
+
 def get_indonesia_geo_overview(db: Session) -> Dict[str, Any]:
     """
     Returns Indonesia Archipelago geospatial overview with Pulau Jawa as the core focus.
     """
     now = datetime.utcnow()
-    since_24h = now - timedelta(hours=24)
+    since_window = now - timedelta(days=7)
 
-    # Fetch recent items for live heatmap calculations
+    # Ambil item 7 hari terakhir agar sebaran wilayah Jawa tetap kaya & akurat
     recent_items = (
         db.query(RawItem)
-        .filter(RawItem.published_at >= since_24h)
+        .filter(RawItem.published_at >= since_window)
+        .order_by(RawItem.published_at.desc())
         .all()
     )
+    if len(recent_items) < 100:
+        recent_items = db.query(RawItem).order_by(RawItem.published_at.desc()).limit(500).all()
 
     region_metrics: Dict[str, Dict[str, Any]] = {}
     for r in JAWA_REGIONS:
@@ -231,7 +263,7 @@ def get_indonesia_geo_overview(db: Session) -> Dict[str, Any]:
 
         for r in JAWA_REGIONS:
             code = r["kode"]
-            matched = any(alias in text for alias in r["aliases"])
+            matched = _text_matches_region(text, r)
             if matched:
                 rm = region_metrics[code]
                 rm["mention_count"] += 1
@@ -268,14 +300,14 @@ def get_indonesia_geo_overview(db: Session) -> Dict[str, Any]:
             rm["threat_level"] = "rendah"
             rm["heat_intensity"] = 0.1
 
-    # Match priority issues
-    recent_issues = db.query(Issue).order_by(Issue.skor.desc()).limit(15).all()
+    # Match priority issues (scan all issues sorted by score so every region gets its top issue)
+    recent_issues = db.query(Issue).order_by(Issue.skor.desc()).all()
     for iss in recent_issues:
         iss_text = f"{iss.judul} {iss.ringkasan or ''}".lower()
         for rm in region_metrics.values():
             if not rm["top_issue_title"]:
                 r_obj = next((x for x in JAWA_REGIONS if x["kode"] == rm["kode"]), None)
-                if r_obj and any(alias in iss_text for alias in r_obj["aliases"]):
+                if r_obj and _text_matches_region(iss_text, r_obj):
                     rm["top_issue_title"] = iss.judul
 
     # Assemble provinces
@@ -332,7 +364,7 @@ def get_region_detail_and_issues(db: Session, kode_wilayah: str) -> Dict[str, An
     aliases = region_info["aliases"]
 
     # Find matching recent raw items (both news and social media)
-    items = db.query(RawItem).order_by(RawItem.published_at.desc()).limit(200).all()
+    items = db.query(RawItem).order_by(RawItem.published_at.desc()).limit(1000).all()
     matched_items = []
     category_counts: Dict[str, int] = {
         "Semua Masalah": 0,
@@ -354,7 +386,7 @@ def get_region_detail_and_issues(db: Session, kode_wilayah: str) -> Dict[str, An
             continue
 
         text = f"{item.judul} {item.isi or ''}".lower()
-        if any(alias in text for alias in aliases):
+        if _text_matches_region(text, region_info):
             analysis = item.analysis
             ch_type, platform_name = _detect_channel_info(item.penerbit, item.url_kanonik)
             if ch_type == "sosmed":
@@ -404,7 +436,7 @@ def get_region_detail_and_issues(db: Session, kode_wilayah: str) -> Dict[str, An
     matched_issues = []
     for iss in all_issues:
         iss_text = f"{iss.judul} {iss.ringkasan or ''}".lower()
-        if any(alias in iss_text for alias in aliases):
+        if _text_matches_region(iss_text, region_info):
             cat = _categorize_issue_topic(iss.judul, iss.ringkasan or "", iss.kategori or "")
             matched_issues.append({
                 "id": iss.id,

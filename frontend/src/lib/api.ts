@@ -147,6 +147,29 @@ export async function fetchDashboardSummary() {
   return res.json();
 }
 
+export interface DashboardAiHighlight {
+  label: string;
+  text: string;
+  severity: "critical" | "warning" | "info" | "positive" | string;
+}
+
+export interface DashboardAiInsightData {
+  headline: string;
+  highlights: DashboardAiHighlight[];
+  rekomendasi: string;
+  ai_engine_used: string;
+  generated_at: string;
+  cached?: boolean;
+}
+
+export async function fetchDashboardAiInsight(refresh = false): Promise<DashboardAiInsightData> {
+  const res = await fetch(`${API_BASE_URL}/dashboard/ai-insight?refresh=${refresh ? "true" : "false"}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Gagal memuat wawasan ringkasan AI");
+  return res.json();
+}
+
 export async function fetchIssues(params?: {
   status?: string;
   level?: string;
@@ -1236,13 +1259,34 @@ export interface SocialSearchItem {
   penerbit: string | null;
   url: string | null;
   published_at: string;
+  fetched_at?: string | null;
   sentimen: string;
   lokasi: string | null;
   kategori: string[];
   instansi: string[];
   emosi: string[];
   geo_context: string;
+  geo_confidence?: string;
   engagement: { likes: number | null; shares: number | null; replies: number | null; views: number | null; interactions: number | null };
+}
+
+export interface LiveFetchSummary {
+  scope_kode: string;
+  location_query: string;
+  fetched_at: string;
+  cached: boolean;
+  cooldown_seconds: number;
+  dibaca: number;
+  baru: number;
+  duplikat: number;
+  platforms: string[];
+  errors: string[];
+}
+
+export interface LiveSocialFeedResult extends SocialSearchResult {
+  scope_kode: string;
+  scope_mode: string;
+  live_fetch: LiveFetchSummary | null;
 }
 
 export interface SocialSearchResult {
@@ -1276,6 +1320,36 @@ export async function searchSocialContent(
 
 export function socialSearchExportUrl(p: SocialSearchParams & { time_range: string; scope_kode: string; scope_mode: string }): string {
   return `${API_BASE_URL}/social-pulse/search/export?${searchQuery(p).toString()}`;
+}
+
+export async function fetchLiveSocialFeed(
+  p: SocialSearchParams & { time_range: string; scope_kode: string; scope_mode: string },
+  options: { fetchLive?: boolean; forceFetch?: boolean; page?: number; pageSize?: number } = {}
+): Promise<LiveSocialFeedResult> {
+  const params = searchQuery(p);
+  params.append("fetch_live", String(options.fetchLive ?? true));
+  params.append("force_fetch", String(options.forceFetch ?? false));
+  params.append("page", String(options.page ?? 1));
+  params.append("page_size", String(options.pageSize ?? 30));
+  return jsonOrError(
+    await fetch(`${API_BASE_URL}/social-pulse/live-feed?${params.toString()}`, { cache: "no-store" }),
+    "Gagal memuat stream live media sosial"
+  );
+}
+
+export async function triggerLiveSocialFetch(
+  scopeKode: string,
+  platform?: string,
+  q?: string,
+  force = true
+): Promise<LiveFetchSummary> {
+  const params = new URLSearchParams({ scope_kode: scopeKode, force: String(force) });
+  if (platform && platform !== "Semua") params.append("platform", platform);
+  if (q) params.append("q", q);
+  return jsonOrError(
+    await fetch(`${API_BASE_URL}/social-pulse/live-fetch?${params.toString()}`, { method: "POST" }),
+    "Gagal menarik postingan media sosial langsung"
+  );
 }
 
 export interface SocialSpreadItem {
@@ -1395,4 +1469,76 @@ export async function fetchHashtagCooccurrence(opts: {
   const res = await fetch(`${API_BASE_URL}/social-pulse/hashtag-cooccurrence?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal memuat hashtag yang muncul bersama");
   return res.json();
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = window.localStorage.getItem("tip_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  nama: string;
+  role: string;
+  wilayah_scope: string[];
+  mfa_enabled: boolean;
+  is_active?: boolean;
+}
+
+export async function loginUser(email: string, password: string, mfaCode?: string) {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, mfa_code: mfaCode || null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Gagal masuk ke sistem");
+  }
+  const data = await res.json();
+  if (data.access_token && typeof window !== "undefined") {
+    window.localStorage.setItem("tip_token", data.access_token);
+  }
+  return data;
+}
+
+export async function fetchCurrentUser(): Promise<{ authenticated: boolean; auth_required: boolean; keycloak_enabled: boolean; user: AuthUser | null }> {
+  const res = await fetch(`${API_BASE_URL}/auth/me`, { headers: getAuthHeaders(), cache: "no-store" });
+  if (!res.ok) return { authenticated: false, auth_required: false, keycloak_enabled: false, user: null };
+  return res.json();
+}
+
+export async function listUsers(): Promise<AuthUser[]> {
+  const res = await fetch(`${API_BASE_URL}/users`, { headers: getAuthHeaders(), cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal memuat daftar pengguna");
+  return res.json();
+}
+
+export async function createUserAccount(payload: { email: string; nama: string; password: string; role: string; wilayah_scope: string[] }): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE_URL}/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Gagal membuat pengguna");
+  }
+  return res.json();
+}
+
+export async function updateUserAccount(id: number, payload: Partial<{ nama: string; role: string; wilayah_scope: string[]; is_active: boolean }>): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE_URL}/users/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Gagal memperbarui pengguna");
+  return res.json();
+}
+
+export function getReportPdfUrl(reportId: number): string {
+  return `${API_BASE_URL}/reports/${reportId}/pdf`;
 }

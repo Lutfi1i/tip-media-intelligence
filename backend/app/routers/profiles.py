@@ -1,10 +1,11 @@
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 import json
 
 from backend.app.database import get_db
-from backend.app.models import MonitoringProfile, ProfileRule, RawItem
+from backend.app.models import MonitoringProfile, MonitoringProfileVersion, ProfileRule, RawItem
 from backend.app.schemas import MonitoringProfileCreate, MonitoringProfileOut, RuleConfig
 from backend.app.services.audit import record_audit
 
@@ -63,6 +64,16 @@ def create_profile(payload: MonitoringProfileCreate, db: Session = Depends(get_d
         ambang_multiplier=payload.rule.ambang_multiplier
     )
     db.add(rule)
+    db.add(
+        MonitoringProfileVersion(
+            profile_id=profile.id,
+            versi=1,
+            diubah_oleh="admin",
+            effective_from=datetime.utcnow(),
+            catatan_perubahan="Versi awal profil",
+            rules_snapshot_json=json.dumps(payload.rule.model_dump()),
+        )
+    )
     db.commit()
 
     record_audit(
@@ -145,16 +156,17 @@ def test_profile_7d(profile_id: int, db: Session = Depends(get_db)):
     keywords = json.loads(active_rule.keyword_json) if active_rule else []
     pengecualian = json.loads(active_rule.pengecualian_json) if active_rule else []
 
-    all_items = db.query(RawItem).all()
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    all_items = db.query(RawItem).filter(RawItem.published_at >= cutoff).all()
     matched = 0
     excluded = 0
 
     for item in all_items:
         text = f"{item.judul} {item.isi}".lower()
-        if any(exc in text for exc in pengecualian):
+        if any(exc.lower() in text for exc in pengecualian):
             excluded += 1
             continue
-        if any(kw in text for kw in keywords):
+        if any(kw.lower() in text for kw in keywords):
             matched += 1
 
     return {
@@ -164,6 +176,29 @@ def test_profile_7d(profile_id: int, db: Session = Depends(get_db)):
         "total_historical_items_checked": len(all_items),
         "matches_found": matched,
         "exclusions_filtered": excluded,
-        "estimated_daily_catch": max(1, matched // 7),
+        "estimated_daily_catch": max(0, matched // 7),
         "recommendation": "Parameter profil terverifikasi stabil. Lolos pengujian 7 hari."
     }
+
+
+@router.get("/{profile_id}/versions")
+def list_profile_versions(profile_id: int, db: Session = Depends(get_db)):
+    """FR-02: Riwayat versi profil monitoring beserta pengubah dan tanggal efektif."""
+    rows = (
+        db.query(MonitoringProfileVersion)
+        .filter(MonitoringProfileVersion.profile_id == profile_id)
+        .order_by(MonitoringProfileVersion.versi.desc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "profile_id": r.profile_id,
+            "versi": r.versi,
+            "diubah_oleh": r.diubah_oleh,
+            "effective_from": r.effective_from,
+            "catatan_perubahan": r.catatan_perubahan,
+            "rules": json.loads(r.rules_snapshot_json or "{}"),
+        }
+        for r in rows
+    ]
