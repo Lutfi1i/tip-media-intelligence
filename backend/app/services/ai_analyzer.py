@@ -116,6 +116,27 @@ GAZETTEER_REGIONS = {
     "cikunir": _g("Cikunir", "Bekasi", "kawasan"),
 }
 
+
+def _extend_gazetteer_nationally() -> None:
+    """Tambahkan 38 provinsi dan 514 kota/kabupaten resmi ke gazetir.
+
+    Entri kurasi di atas (Jabodetabek, kecamatan, kawasan) tidak ditimpa. Nama pendek yang
+    ambigu ("batu", "bone") hanya dikenali dalam bentuk lengkap; lihat geo_hierarchy.
+    """
+    from backend.app.services.geo_hierarchy import KABUPATEN_DATA, PROVINCES_DATA, region_keywords
+
+    for prov in PROVINCES_DATA:
+        GAZETTEER_REGIONS.setdefault(prov["nama"].lower(), _g(prov["nama"], "Indonesia", "provinsi"))
+    # Kota lebih dulu: bila Kota dan Kabupaten berbagi nama pendek, kata lepasnya
+    # ("kupang") dianggap kotanya; kabupaten tetap dikenali lewat "kabupaten kupang".
+    for kab in sorted(KABUPATEN_DATA, key=lambda k: (k["tipe"] != "Kota", k["kode"])):
+        entry = _g(kab["nama"], kab["provinsi_nama"], kab["tipe"].lower())
+        for kw in region_keywords(kab):
+            GAZETTEER_REGIONS.setdefault(kw, entry)
+
+
+_extend_gazetteer_nationally()
+
 TOPIC_KEYWORDS = {
     "Bencana & Cuaca": [
         "banjir", "genangan", "air naik", "luapan", "longsor", "tanah longsor", "gempa",
@@ -236,6 +257,9 @@ def extract_locations(text: str) -> Tuple[Optional[str], List[str], float]:
     found: List[Dict[str, Any]] = []
 
     for key, data in GAZETTEER_REGIONS.items():
+        # Saring cepat dengan substring sebelum regex: gazetir berisi ribuan entri nasional.
+        if key not in lower:
+            continue
         pattern = r"\b" + re.escape(key) + r"\b"
         matches = list(re.finditer(pattern, lower))
         if matches:

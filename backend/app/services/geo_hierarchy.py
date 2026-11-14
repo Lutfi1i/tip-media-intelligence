@@ -8,7 +8,9 @@ untuk modul RADAR Social Pulse.
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # Master data provinsi Indonesia (38 Provinsi Kemendagri)
@@ -45,8 +47,8 @@ PROVINCES_DATA = [
     {"kode": "76", "nama": "Sulawesi Barat", "pulau": "Sulawesi"},
     {"kode": "81", "nama": "Maluku", "pulau": "Maluku"},
     {"kode": "82", "nama": "Maluku Utara", "pulau": "Maluku"},
-    {"kode": "91", "nama": "Papua Barat", "pulau": "Papua"},
-    {"kode": "92", "nama": "Papua", "pulau": "Papua"},
+    {"kode": "91", "nama": "Papua", "pulau": "Papua"},
+    {"kode": "92", "nama": "Papua Barat", "pulau": "Papua"},
     {"kode": "93", "nama": "Papua Selatan", "pulau": "Papua"},
     {"kode": "94", "nama": "Papua Tengah", "pulau": "Papua"},
     {"kode": "95", "nama": "Papua Pegunungan", "pulau": "Papua"},
@@ -182,11 +184,80 @@ KABUPATEN_DATA = [
     # Maluku & Papua (81, 82, 91, 92, 94, 96)
     {"kode": "81.71", "nama": "Kota Ambon", "provinsi_kode": "81", "provinsi_nama": "Maluku", "tipe": "Kota", "aliases": ["ambon"]},
     {"kode": "82.71", "nama": "Kota Ternate", "provinsi_kode": "82", "provinsi_nama": "Maluku Utara", "tipe": "Kota", "aliases": ["ternate"]},
-    {"kode": "92.71", "nama": "Kota Jayapura", "provinsi_kode": "92", "provinsi_nama": "Papua", "tipe": "Kota", "aliases": ["jayapura"]},
-    {"kode": "91.02", "nama": "Kabupaten Manokwari", "provinsi_kode": "91", "provinsi_nama": "Papua Barat", "tipe": "Kabupaten", "aliases": ["manokwari"]},
+    {"kode": "91.71", "nama": "Kota Jayapura", "provinsi_kode": "91", "provinsi_nama": "Papua", "tipe": "Kota", "aliases": ["jayapura"]},
+    {"kode": "92.02", "nama": "Kabupaten Manokwari", "provinsi_kode": "92", "provinsi_nama": "Papua Barat", "tipe": "Kabupaten", "aliases": ["manokwari"]},
     {"kode": "96.71", "nama": "Kota Sorong", "provinsi_kode": "96", "provinsi_nama": "Papua Barat Daya", "tipe": "Kota", "aliases": ["sorong"]},
     {"kode": "94.04", "nama": "Kabupaten Mimika (Timika)", "provinsi_kode": "94", "provinsi_nama": "Papua Tengah", "tipe": "Kabupaten", "aliases": ["timika", "mimika"]},
 ]
+
+# Daftar resmi 514 kota/kabupaten (Kepmendagri 2025). Entri di atas dipertahankan karena
+# punya nama tampilan dan alias pilihan; sisanya ditambahkan dari file data.
+_WILAYAH_FILE = Path(__file__).resolve().parent.parent / "data" / "wilayah_kemendagri.json"
+
+# Nama pendek yang juga kata umum atau nama lain. Hanya dicocokkan dalam bentuk lengkap
+# ("kota batu", "kabupaten bone"), bukan kata lepasnya, agar tidak salah deteksi.
+AMBIGUOUS_SHORT_NAMES = {
+    "agam", "alor", "aru", "banjar", "batu", "batu bara", "belu", "bone", "bungo", "buru", "ende",
+    "kapuas", "kaur", "ketapang", "kota", "landak", "lingga", "malaka", "metro", "muna", "pati",
+    "puncak", "sula", "tanah datar", "tanah laut", "tebing tinggi", "tual",
+}
+
+_PREFIX_RE = re.compile(r"^(kabupaten administrasi|kota administrasi|kabupaten|kota)\s+")
+
+
+def short_region_name(nama: str) -> str:
+    """'Kabupaten Bogor' -> 'bogor', 'Kota Surakarta (Solo)' -> 'surakarta'."""
+    short = _PREFIX_RE.sub("", nama.lower().strip())
+    return re.sub(r"\s*\([^)]*\)", "", short).strip()
+
+
+def qualified_names(nama: str, tipe: str) -> List[str]:
+    """Bentuk lengkap yang aman dicocokkan walau nama pendeknya ambigu."""
+    short = short_region_name(nama)
+    if tipe == "Kota":
+        return [f"kota {short}"]
+    return [f"kabupaten {short}", f"kab {short}", f"kab. {short}"]
+
+
+def _load_official_regions() -> Dict[str, Any]:
+    try:
+        return json.loads(_WILAYAH_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"provinsi": [], "kabkota": []}
+
+
+def _extend_with_official(kabupaten: List[Dict[str, Any]]) -> None:
+    prov_name = {p["kode"]: p["nama"] for p in PROVINCES_DATA}
+    existing = {k["kode"] for k in kabupaten}
+    for row in _load_official_regions().get("kabkota", []):
+        if row["kode"] in existing:
+            continue
+        tipe = "Kota" if row["nama"].startswith("Kota") else "Kabupaten"
+        short = short_region_name(row["nama"])
+        aliases = qualified_names(row["nama"], tipe) if short in AMBIGUOUS_SHORT_NAMES else [short]
+        prov_kode = row["kode"][:2]
+        kabupaten.append({
+            "kode": row["kode"],
+            "nama": row["nama"],
+            "provinsi_kode": prov_kode,
+            "provinsi_nama": prov_name.get(prov_kode, prov_kode),
+            "tipe": tipe,
+            "aliases": aliases,
+        })
+
+
+_extend_with_official(KABUPATEN_DATA)
+
+
+def region_keywords(kab: Dict[str, Any]) -> List[str]:
+    """Kata kunci pencocokan teks untuk satu kota/kabupaten, tanpa nama pendek yang ambigu."""
+    short = short_region_name(kab["nama"])
+    words = [kab["nama"].lower(), *qualified_names(kab["nama"], kab.get("tipe", "Kabupaten"))]
+    if short not in AMBIGUOUS_SHORT_NAMES:
+        words.append(short)
+    words += [a.lower() for a in kab.get("aliases", []) if a.lower() not in AMBIGUOUS_SHORT_NAMES]
+    return list(dict.fromkeys(words))
+
 
 # Master Kecamatan (Kecamatan Kunci Kabupaten Bogor & sekitarnya)
 KECAMATAN_DATA = [
@@ -401,14 +472,7 @@ def get_scope_expansion_keywords(scope_kode: str) -> Dict[str, Any]:
     # Jika memilih Kabupaten/Kota
     for kab in KABUPATEN_DATA:
         if kab["kode"] == scope_kode:
-            short_name = re.sub(r"^(kota|kabupaten)\s+", "", kab["nama"].lower())
-            # Hapus catatan kurung mis. "kota surakarta (solo)" -> "kota surakarta"
-            clean_short = re.sub(r"\s*\([^)]*\)", "", short_name).strip()
-            primary_kws = list(dict.fromkeys([
-                kab["nama"].lower(),
-                clean_short,
-                *[a.lower() for a in kab.get("aliases", [])],
-            ]))
+            primary_kws = region_keywords(kab)
             sub_kecs = [
                 k["nama"].lower()
                 for k in KECAMATAN_DATA
@@ -423,13 +487,15 @@ def get_scope_expansion_keywords(scope_kode: str) -> Dict[str, Any]:
                 "regional_code": kab["provinsi_kode"],
             }
 
-    # Jika memilih Provinsi
+    # Jika memilih Provinsi: nama provinsi, ditambah semua kota/kabupaten di dalamnya
+    # (postingan jarang menyebut nama provinsi, lebih sering nama kotanya).
     for prov in PROVINCES_DATA:
         if prov["kode"] == scope_kode:
+            cities = [kw for kab in KABUPATEN_DATA if kab["provinsi_kode"] == scope_kode for kw in region_keywords(kab)]
             return {
                 "scope_kode": scope_kode,
                 "primary": [prov["nama"].lower()],
-                "sub_entities": [],
+                "sub_entities": list(dict.fromkeys(cities)),
                 "landmarks": [],
                 "regional_parent": "indonesia",
                 "regional_code": "ID",
