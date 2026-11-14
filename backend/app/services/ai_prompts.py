@@ -17,13 +17,13 @@ Pedoman Penilaian:
    - Bedakan tegas antara "lokasi_kejadian" (tempat fisik insiden terjadi) dan "lokasi_disebut" (lokasi kantor narasumber/rujukan).
    - Gunakan nama baku tingkat Kota/Kabupaten sesuai standar Kemendagri jika terdeteksi di Jabodetabek (Jakarta Pusat, Jakarta Utara, Jakarta Barat, Jakarta Selatan, Jakarta Timur, Kepulauan Seribu, Bogor, Depok, Tangerang, Tangerang Selatan, Bekasi).
 3. Topik:
-   - Pilih satu topik primer: Bencana, Infrastruktur, Pelayanan Publik, Lingkungan, Sosial, Keamanan, Ekonomi, Umum.
+   - Pilih tepat satu topik primer, tulis persis salah satu dari: Bencana & Cuaca, Lalu Lintas & Transportasi, Infrastruktur & Jalan, Layanan Publik, Keamanan & Kriminalitas, Kesehatan & Lingkungan, Ekonomi & Harga, Sosial & Warga.
 
 Format Output WAJIB berupa JSON valid persis seperti berikut tanpa pembungkus markdown lain:
 {
   "sentimen": "negatif" | "netral" | "positif" | "campuran",
   "sentimen_confidence": 0.85,
-  "topik": "Bencana" | "Infrastruktur" | "Pelayanan Publik" | "Lingkungan" | "Sosial" | "Keamanan" | "Ekonomi" | "Umum",
+  "topik": "Bencana & Cuaca" | "Lalu Lintas & Transportasi" | "Infrastruktur & Jalan" | "Layanan Publik" | "Keamanan & Kriminalitas" | "Kesehatan & Lingkungan" | "Ekonomi & Harga" | "Sosial & Warga",
   "topik_confidence": 0.90,
   "lokasi_kejadian": "Jakarta Selatan",
   "lokasi_disebut": ["Kemang", "Pejaten"],

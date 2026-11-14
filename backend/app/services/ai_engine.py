@@ -17,6 +17,7 @@ from backend.app.services.ai_prompts import (
     SYSTEM_PROMPT_EXECUTIVE_BRIEF,
 )
 from backend.app.services.ai_analyzer import (
+    TOPIC_KEYWORDS,
     analyze_sentiment,
     analyze_topic,
     extract_locations,
@@ -43,6 +44,14 @@ def _clean_and_parse_json(raw_text: str) -> Optional[Dict[str, Any]]:
             except Exception:
                 pass
     return None
+
+
+def _validated_topic(parsed: Dict[str, Any], fallback: Dict[str, Any]) -> Dict[str, Any]:
+    """Topik dari model hanya dipakai bila persis salah satu label resmi; selain itu pakai heuristik."""
+    topik = parsed.get("topik")
+    if topik in TOPIC_KEYWORDS:
+        return {"topik": topik, "topik_confidence": float(parsed.get("topik_confidence", 0.85))}
+    return {"topik": fallback["topik"], "topik_confidence": fallback["topik_confidence"]}
 
 
 async def analyze_incident_with_ai(title: str, body: str, publisher: str = "") -> Dict[str, Any]:
@@ -102,8 +111,7 @@ async def analyze_incident_with_ai(title: str, body: str, publisher: str = "") -
                     return {
                         "sentimen": parsed.get("sentimen", fallback_result["sentimen"]),
                         "sentimen_confidence": float(parsed.get("sentimen_confidence", 0.85)),
-                        "topik": parsed.get("topik", fallback_result["topik"]),
-                        "topik_confidence": float(parsed.get("topik_confidence", 0.85)),
+                        **_validated_topic(parsed, fallback_result),
                         "lokasi_kejadian": parsed.get("lokasi_kejadian") or fallback_result["lokasi_kejadian"],
                         "lokasi_disebut": parsed.get("lokasi_disebut", fallback_result["lokasi_disebut"]),
                         "ringkasan_singkat": parsed.get("ringkasan_singkat", fallback_result["ringkasan_singkat"]),
