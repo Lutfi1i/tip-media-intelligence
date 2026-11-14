@@ -7,6 +7,7 @@ import {
   testProfile7d,
   MonitoringProfile,
 } from "@/lib/api";
+import { ErrorPanel, Notice } from "@/components/ui";
 
 export default function MonitoringPage() {
   const [profiles, setProfiles] = useState<MonitoringProfile[]>([]);
@@ -18,6 +19,8 @@ export default function MonitoringPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [wilayahList, setWilayahList] = useState<string[]>([]);
   const [keywordList, setKeywordList] = useState<string[]>([]);
@@ -39,7 +42,7 @@ export default function MonitoringPage() {
         selectProfile(data[0]);
       }
     } catch (err) {
-      console.error(err);
+      setLoadError(err instanceof Error ? err.message : "Gagal memuat profil pemantauan");
     } finally {
       setLoading(false);
     }
@@ -102,7 +105,7 @@ export default function MonitoringPage() {
         `Konfigurasi profil berhasil diperbarui ke versi v${updated.versi}. Aturan langsung aktif pada pipeline ingest.`
       );
     } catch (err: any) {
-      alert(err.message || "Gagal menyimpan profil");
+      setErrorMsg(err.message || "Gagal menyimpan profil");
     } finally {
       setSaving(false);
     }
@@ -116,11 +119,15 @@ export default function MonitoringPage() {
       const result = await testProfile7d(activeProfile.id);
       setTestResult(result);
     } catch (err: any) {
-      alert(err.message || "Gagal menguji profil");
+      setErrorMsg(err.message || "Gagal menguji profil");
     } finally {
       setTesting(false);
     }
   };
+
+  if (loadError) {
+    return <ErrorPanel title="Profil pemantauan gagal dimuat" message={loadError} onRetry={loadProfiles} />;
+  }
 
   if (loading) {
     return (
@@ -138,7 +145,7 @@ export default function MonitoringPage() {
       <div className="pb-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
-            LISTENING STUDIO &bull; QUERY BUILDER
+            Aturan pemantauan
           </p>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
             Konfigurasi Profil &amp; Ambang Alert
@@ -165,12 +172,8 @@ export default function MonitoringPage() {
           </span>
         </div>
 
-        {saveMessage && (
-          <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-xs text-emerald-700 dark:text-emerald-300 font-mono font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {saveMessage}
-          </div>
-        )}
+        {saveMessage && <Notice tone="success" message={saveMessage} onClose={() => setSaveMessage(null)} />}
+        {errorMsg && <Notice tone="error" message={errorMsg} onClose={() => setErrorMsg(null)} />}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Left Column: Wilayah, Kata kunci, Pengecualian */}

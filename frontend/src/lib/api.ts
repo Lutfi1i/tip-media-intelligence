@@ -209,7 +209,7 @@ export async function submitIssueReview(
 ) {
   const res = await fetch(`${API_BASE_URL}/issues/${issueId}/review`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Gagal mengirim verifikasi analis");
@@ -228,7 +228,7 @@ export async function fetchCases(status?: string) {
 export async function updateCaseStatus(caseId: number, payload: any) {
   const res = await fetch(`${API_BASE_URL}/cases/${caseId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Gagal memperbarui status kasus");
@@ -290,8 +290,8 @@ export function getReportViewUrl(reportId: number) {
   return `/api/v1/reports/${reportId}/view`;
 }
 
-export async function fetchAuditLogs() {
-  const res = await fetch(`${API_BASE_URL}/audit/logs`, { cache: "no-store" });
+export async function fetchAuditLogs(limit = 50) {
+  const res = await fetch(`${API_BASE_URL}/audit/logs?limit=${limit}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil log audit");
   return res.json();
 }
@@ -310,6 +310,89 @@ export async function pollSources(force: boolean = true) {
   });
   if (!res.ok) throw new Error("Gagal menyinkronkan data berita nyata");
   return res.json();
+}
+
+/** Dipancarkan AppShell setelah tarik berita selesai; halaman memuat ulang datanya sendiri. */
+export const DATA_SYNCED_EVENT = "tip:data-synced";
+
+export function onDataSynced(handler: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(DATA_SYNCED_EVENT, handler);
+  return () => window.removeEventListener(DATA_SYNCED_EVENT, handler);
+}
+
+export async function uploadCaseEvidence(caseId: number, file: File, uploadedBy: string) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("uploaded_by", uploadedBy);
+  const res = await fetch(`${API_BASE_URL}/cases/${caseId}/evidence`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Gagal mengunggah ${file.name}`);
+  return res.json() as Promise<{ id: number; filename: string; download_url: string }>;
+}
+
+export interface AlertItem {
+  id: number;
+  issue_id: number;
+  level: string;
+  penerima: string;
+  kanal: string;
+  konten_pesan: string;
+  terkirim_at: string;
+  diakui_at: string | null;
+  status: string;
+}
+
+export async function fetchAlerts(): Promise<AlertItem[]> {
+  const res = await fetch(`${API_BASE_URL}/alerts`, { cache: "no-store", headers: getAuthHeaders() });
+  if (!res.ok) throw new Error("Gagal memuat notifikasi");
+  return res.json();
+}
+
+export async function acknowledgeAlert(alertId: number, userNama: string): Promise<AlertItem> {
+  const res = await fetch(
+    `${API_BASE_URL}/alerts/${alertId}/acknowledge?user_nama=${encodeURIComponent(userNama)}`,
+    { method: "POST", headers: getAuthHeaders() }
+  );
+  if (!res.ok) throw new Error("Gagal menandai notifikasi");
+  return res.json();
+}
+
+export interface IssueSearchHit {
+  id: number;
+  kode_referensi: string;
+  judul: string;
+  wilayah: string;
+  kategori: string;
+  level: string;
+  skor: number;
+  status: string;
+}
+
+export async function searchIssuesFulltext(q: string, limit = 8): Promise<IssueSearchHit[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/issues/search/fulltext?q=${encodeURIComponent(q)}&limit=${limit}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) throw new Error("Pencarian gagal");
+  const data = await res.json();
+  return data.items || [];
+}
+
+/** sessionStorage: urutan id isu yang tampil di antrean, untuk tombol "isu berikutnya" di detail. */
+export const ISSUE_QUEUE_KEY = "tip_isu_queue";
+
+/** true bila backend menjawab. Dipakai indikator koneksi di header. */
+export async function checkBackendOnline(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/sources`, { cache: "no-store" });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 
@@ -1485,6 +1568,7 @@ export interface AuthUser {
   wilayah_scope: string[];
   mfa_enabled: boolean;
   is_active?: boolean;
+  last_login_at?: string | null;
 }
 
 export async function loginUser(email: string, password: string, mfaCode?: string) {
@@ -1529,7 +1613,7 @@ export async function createUserAccount(payload: { email: string; nama: string; 
   return res.json();
 }
 
-export async function updateUserAccount(id: number, payload: Partial<{ nama: string; role: string; wilayah_scope: string[]; is_active: boolean }>): Promise<AuthUser> {
+export async function updateUserAccount(id: number, payload: Partial<{ nama: string; role: string; wilayah_scope: string[]; is_active: boolean; password: string }>): Promise<AuthUser> {
   const res = await fetch(`${API_BASE_URL}/users/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },

@@ -3,8 +3,25 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { fetchIssueDetail, submitIssueReview, IssueDetail } from "@/lib/api";
+import {
+  AuthUser,
+  fetchCurrentUser,
+  fetchIssueDetail,
+  ISSUE_QUEUE_KEY,
+  submitIssueReview,
+  IssueDetail,
+} from "@/lib/api";
+import { fmtDateTime } from "@/lib/format";
 import { ThreatLevelPill, SourceBadge } from "@/components/RadarUi";
+import { CaseStatusBadge, ConfirmDialog, IssueStatusBadge, Notice } from "@/components/ui";
+
+type Keputusan = "verifikasi" | "koreksi" | "tolak";
+
+const KEPUTUSAN_LABEL: Record<Keputusan, string> = {
+  verifikasi: "Verifikasi",
+  koreksi: "Koreksi",
+  tolak: "Tolak",
+};
 
 export default function IssueDetailPage() {
   const params = useParams();
@@ -17,6 +34,26 @@ export default function IssueDetailPage() {
   const [reviewerCatatan, setReviewerCatatan] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pending, setPending] = useState<Keputusan | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [nextIssueId, setNextIssueId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchCurrentUser().then((res) => setAuthUser(res.user));
+  }, []);
+
+  // Isu berikutnya diambil dari urutan antrean terakhir yang dilihat pengguna.
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(ISSUE_QUEUE_KEY);
+      const ids: number[] = raw ? JSON.parse(raw) : [];
+      const idx = ids.indexOf(Number(issueId));
+      setNextIssueId(idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null);
+    } catch {
+      setNextIssueId(null);
+    }
+  }, [issueId]);
 
   const loadDetail = async () => {
     setLoading(true);
@@ -37,16 +74,23 @@ export default function IssueDetailPage() {
     loadDetail();
   }, [issueId]);
 
-  const handleDecision = async (
-    keputusan: "verifikasi" | "koreksi" | "tolak"
-  ) => {
+  const catatanWajib = (k: Keputusan) => k !== "verifikasi";
+
+  const handleDecision = async (keputusan: Keputusan) => {
     if (!issue) return;
+    if (catatanWajib(keputusan) && !reviewerCatatan.trim()) {
+      setPending(null);
+      setActionError(`Isi catatan dulu: alasan ${KEPUTUSAN_LABEL[keputusan].toLowerCase()} wajib dicatat untuk audit.`);
+      document.getElementById("catatan-analis")?.focus();
+      return;
+    }
     setSubmitting(true);
     setActionSuccess(null);
+    setActionError(null);
     try {
       await submitIssueReview(issue.id, {
-        reviewer_id: "analis_01",
-        reviewer_nama: "Analis Piket Krisis (Budi Santoso)",
+        reviewer_id: authUser ? String(authUser.id) : "tanpa-login",
+        reviewer_nama: authUser ? authUser.nama : "Pengguna tanpa login",
         keputusan,
         catatan:
           reviewerCatatan ||
@@ -55,13 +99,14 @@ export default function IssueDetailPage() {
             : ""),
       });
       setActionSuccess(
-        `Keputusan "${keputusan.toUpperCase()}" berhasil disimpan dan tercatat di audit log.`
+        `Keputusan ${KEPUTUSAN_LABEL[keputusan]} tersimpan dan tercatat di audit trail.`
       );
       await loadDetail();
     } catch (err: any) {
-      alert(err.message || "Gagal memproses verifikasi");
+      setActionError(err.message || "Gagal menyimpan keputusan");
     } finally {
       setSubmitting(false);
+      setPending(null);
     }
   };
 
@@ -98,26 +143,44 @@ export default function IssueDetailPage() {
       <div className="pb-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
-            RADAR INCIDENT &bull; #{issue.kode_referensi}
+            Berkas isu &bull; {issue.kode_referensi}
           </p>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
             Verifikasi Analis &amp; Bukti Sumber
           </h1>
         </div>
-        <Link
-          href="/isu"
-          className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 bg-zinc-100 dark:bg-zinc-900 px-3.5 py-2 rounded-md border border-zinc-300 dark:border-zinc-800 transition-colors"
-        >
-          &larr; Kembali ke Antrean
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/isu"
+            className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 bg-zinc-100 dark:bg-zinc-900 px-3.5 py-2 rounded-md border border-zinc-300 dark:border-zinc-800 transition-colors"
+          >
+            &larr; Antrean
+          </Link>
+          {nextIssueId && (
+            <Link
+              href={`/isu/${nextIssueId}`}
+              className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 bg-zinc-100 dark:bg-zinc-900 px-3.5 py-2 rounded-md border border-zinc-300 dark:border-zinc-800 transition-colors"
+            >
+              Isu berikutnya &rarr;
+            </Link>
+          )}
+        </div>
       </div>
 
       {actionSuccess && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-xs text-emerald-700 dark:text-emerald-300 font-mono font-semibold flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <Notice tone="success" onClose={() => setActionSuccess(null)}>
           {actionSuccess}
-        </div>
+          {nextIssueId && (
+            <>
+              {" "}
+              <Link href={`/isu/${nextIssueId}`} className="underline underline-offset-2 font-bold">
+                Lanjut ke isu berikutnya
+              </Link>
+            </>
+          )}
+        </Notice>
       )}
+      {actionError && <Notice tone="error" message={actionError} onClose={() => setActionError(null)} />}
 
       {/* Main Split: Incident Evidence & Analyst Decisions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -131,12 +194,7 @@ export default function IssueDetailPage() {
               </span>
             </div>
             <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
-              Pertama dilihat:{" "}
-              {new Date(issue.first_seen).toLocaleTimeString("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              WIB
+              Pertama terdeteksi: {fmtDateTime(issue.first_seen)}
             </span>
           </div>
 
@@ -174,11 +232,7 @@ export default function IssueDetailPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <SourceBadge source={item.penerbit} />
                       <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
-                        {new Date(item.published_at).toLocaleTimeString("id-ID", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}{" "}
-                        WIB
+                        {fmtDateTime(item.published_at)}
                       </span>
                     </div>
 
@@ -240,10 +294,38 @@ export default function IssueDetailPage() {
             <p className="text-[10px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
               KEPUTUSAN ANALIS
             </p>
-            <h2 className="text-base font-bold text-zinc-900 dark:text-white mt-0.5 font-mono">
-              Status: <span className="capitalize">{issue.status}</span>
+            <h2 className="text-base font-bold text-zinc-900 dark:text-white mt-1 font-mono flex items-center gap-2">
+              Status: <IssueStatusBadge status={issue.status} />
             </h2>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1.5">
+              Dicatat atas nama{" "}
+              <strong className="text-zinc-700 dark:text-zinc-300">
+                {authUser ? authUser.nama : "pengguna tanpa login"}
+              </strong>
+              .
+            </p>
           </div>
+
+          {issue.case && (
+            <Link
+              href={`/kasus?kasus=${issue.case.id}`}
+              className="block p-3 rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                  Kasus #{issue.case.id}
+                </span>
+                <CaseStatusBadge status={issue.case.status} />
+              </div>
+              <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 mt-1">
+                {issue.case.pic_nama ? `PIC: ${issue.case.pic_nama}` : "Belum ada PIC"} &bull; tenggat{" "}
+                {fmtDateTime(issue.case.tenggat)}
+              </div>
+              <div className="text-[11px] font-mono font-bold text-sky-600 dark:text-sky-400 mt-1.5">
+                Kelola di Papan Kasus &rarr;
+              </div>
+            </Link>
+          )}
 
           <div className="space-y-4">
             <div>
@@ -253,6 +335,9 @@ export default function IssueDetailPage() {
               >
                 Catatan Verifikasi Lapangan
               </label>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mb-1.5">
+                Wajib diisi untuk Koreksi dan Tolak.
+              </p>
               <textarea
                 id="catatan-analis"
                 rows={4}
@@ -275,7 +360,7 @@ export default function IssueDetailPage() {
 
               <button
                 type="button"
-                onClick={() => handleDecision("koreksi")}
+                onClick={() => setPending("koreksi")}
                 disabled={submitting}
                 className="w-full min-h-[42px] px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs font-bold border border-zinc-300 dark:border-zinc-800 rounded-md transition-colors disabled:opacity-50"
               >
@@ -284,7 +369,7 @@ export default function IssueDetailPage() {
 
               <button
                 type="button"
-                onClick={() => handleDecision("tolak")}
+                onClick={() => setPending("tolak")}
                 disabled={submitting}
                 className="w-full min-h-[42px] px-4 py-2.5 bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-400 text-xs font-bold border border-red-500/30 rounded-md transition-colors disabled:opacity-50"
               >
@@ -313,12 +398,39 @@ export default function IssueDetailPage() {
                     </span>
                   </div>
                   <p className="text-zinc-600 dark:text-zinc-400 text-[11px]">{rev.catatan}</p>
+                  <p className="text-zinc-400 text-[10px]">{fmtDateTime(rev.waktu)}</p>
                 </div>
               ))}
             </div>
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        title={pending === "tolak" ? "Tolak isu ini?" : "Simpan koreksi?"}
+        confirmLabel={pending === "tolak" ? "Ya, tolak isu" : "Ya, simpan koreksi"}
+        tone={pending === "tolak" ? "danger" : "default"}
+        busy={submitting}
+        onCancel={() => setPending(null)}
+        onConfirm={() => pending && handleDecision(pending)}
+      >
+        <div className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p>
+            {pending === "tolak"
+              ? "Isu ditandai sebagai false alarm dan keluar dari antrean prioritas."
+              : "Label isu ditandai dikoreksi oleh analis."}
+          </p>
+          <p className="text-xs">
+            Catatan:{" "}
+            {reviewerCatatan.trim() ? (
+              <span className="text-zinc-800 dark:text-zinc-200">{reviewerCatatan.trim()}</span>
+            ) : (
+              <span className="text-red-600 dark:text-red-400 font-semibold">belum diisi (wajib)</span>
+            )}
+          </p>
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

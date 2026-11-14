@@ -9,6 +9,7 @@ import {
   SocialWatchedAccounts as Data,
 } from "@/lib/api";
 import { Sparkline, formatWib } from "@/components/SocialCharts";
+import { ConfirmDialog } from "@/components/ui";
 
 const NAME_KEY = "tip.analystName";
 const inputCls =
@@ -55,6 +56,8 @@ export function SocialWatchedAccounts({
   const [kelompok, setKelompok] = useState("lainnya");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<{ id: number; handle: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -96,14 +99,33 @@ export function SocialWatchedAccounts({
     if (handle.trim()) add(handle.trim(), label.trim());
   };
 
-  const remove = async (id: number, h: string) => {
-    if (!window.confirm(`Berhenti memantau @${h}?`)) return;
-    await deleteSocialWatchedAccount(id);
-    await load();
+  const remove = (id: number, h: string) => setPendingRemove({ id, handle: h });
+
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    setRemoving(true);
+    try {
+      await deleteSocialWatchedAccount(pendingRemove.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Akun gagal dihapus.");
+    } finally {
+      setRemoving(false);
+      setPendingRemove(null);
+    }
   };
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        open={!!pendingRemove}
+        title={`Berhenti memantau @${pendingRemove?.handle ?? ""}?`}
+        description="Akun dihapus dari daftar pantauan. Konten yang sudah terkumpul tetap tersimpan."
+        confirmLabel="Ya, berhenti memantau"
+        busy={removing}
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={confirmRemove}
+      />
       <div>
         <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Akun Pantauan</h2>
         <p className="max-w-3xl text-xs text-zinc-500 dark:text-zinc-400">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   fetchDashboardSummary,
@@ -12,31 +12,23 @@ import {
   FlowItem,
   LiveArticle,
   TriageStats,
+  onDataSynced,
 } from "@/lib/api";
-import {
-  RadarKpiCard,
-  ThreatLevelPill,
-  SourceBadge,
-} from "@/components/RadarUi";
+import { fmtRelative } from "@/lib/format";
+import { ErrorPanel, Notice } from "@/components/ui";
+import { RadarKpiCard } from "@/components/RadarUi";
 import { HealthIndexDial } from "@/components/HealthIndexDial";
 import { ConversationGalaxy } from "@/components/ConversationGalaxy";
 import { ConversationFlow } from "@/components/ConversationFlow";
 import { LiveNewsStream } from "@/components/LiveNewsStream";
 import { SourceDeepDive } from "@/components/SourceDeepDive";
-import { TopHotIssuesCards } from "@/components/TopHotIssuesCards";
 import { SituationBrief } from "@/components/SituationBrief";
 import { DashboardAiInsight } from "@/components/DashboardAiInsight";
 import { ExecutivePriorityBoard } from "@/components/ExecutivePriorityBoard";
-import {
-  RotateCw,
-  TrendingUp,
-  AlertTriangle,
-  MapPin,
-  Clock,
-  Radio,
-  Shield,
-  Layers,
-} from "lucide-react";
+import { RotateCw, AlertTriangle, MapPin, Clock, Radio, Layers } from "lucide-react";
+
+const AUTO_REFRESH_MS = 2 * 60 * 1000;
+const MODE_KEY = "tip_dashboard_mode";
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -51,12 +43,40 @@ export default function DashboardPage() {
   const [triageStats, setTriageStats] = useState<TriageStats | undefined>(undefined);
   const [liveArticles, setLiveArticles] = useState<LiveArticle[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-  // Mode Pengalaman: "pimpinan" (Understand & Decide) vs "analis" (Investigate & Verify)
-  const [experienceMode, setExperienceMode] = useState<"pimpinan" | "analis">("pimpinan");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  // Memicu render ulang tiap 30 detik agar label "diperbarui X menit lalu" tetap akurat.
+  const [, setTick] = useState(0);
+  // Mode Pimpinan (ringkas, untuk memutuskan) vs Mode Analis (instrumen investigasi).
+  const [experienceMode, setExperienceModeState] = useState<"pimpinan" | "analis">("pimpinan");
+  const hasData = useRef(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(MODE_KEY);
+      if (saved === "pimpinan" || saved === "analis") setExperienceModeState(saved);
+    } catch {
+      // localStorage bisa diblokir (mode privat); pakai default.
+    }
+  }, []);
+
+  const setExperienceMode = (mode: "pimpinan" | "analis") => {
+    setExperienceModeState(mode);
+    try {
+      window.localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      // abaikan
+    }
+  };
+
+  // Muat pertama memakai layar memuat penuh. Muat ulang berikutnya (tombol,
+  // auto-refresh, sinkronisasi) mempertahankan data lama di layar.
+  const loadData = useCallback(async () => {
+    const silent = hasData.current;
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     setError(null);
+    setRefreshError(null);
     try {
       const data = await fetchDashboardSummary();
       setKpi(data.kpi);
@@ -69,19 +89,32 @@ export default function DashboardPage() {
       if (data.triage_stats) setTriageStats(data.triage_stats);
       if (data.live_articles) setLiveArticles(data.live_articles);
       setLastRefreshed(new Date());
+      hasData.current = true;
     } catch (err: any) {
-      setError(
+      const msg =
         err.message ||
-          "Gagal terhubung ke server API backend di port 8001. Pastikan backend aktif."
-      );
+        "Gagal terhubung ke server API backend di port 8001. Pastikan backend aktif.";
+      if (silent) setRefreshError(`Pembaruan gagal: ${msg} Data di bawah dari pembaruan terakhir.`);
+      else setError(msg);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+    const refreshId = window.setInterval(() => {
+      if (document.visibilityState === "visible") loadData();
+    }, AUTO_REFRESH_MS);
+    const tickId = window.setInterval(() => setTick((t) => t + 1), 30_000);
+    const off = onDataSynced(loadData);
+    return () => {
+      window.clearInterval(refreshId);
+      window.clearInterval(tickId);
+      off();
+    };
+  }, [loadData]);
 
   if (loading) {
     return (
@@ -99,22 +132,12 @@ export default function DashboardPage() {
 
   if (error || !kpi) {
     return (
-      <div className="panel border-red-500/40 p-8 max-w-lg mx-auto my-12 bg-red-500/5">
-        <div className="flex items-center gap-2 mb-2 text-red-600 dark:text-red-400 font-mono font-bold text-sm">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
-          <span>Gagal Memuat Dashboard</span>
-        </div>
-        <p className="text-xs text-zinc-600 dark:text-zinc-400 font-mono leading-relaxed mb-4">
-          {error}
-        </p>
-        <button
-          type="button"
-          onClick={loadData}
-          className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-mono font-bold rounded-md transition-colors"
-        >
-          Coba Hubungkan Kembali
-        </button>
-      </div>
+      <ErrorPanel
+        title="Dashboard gagal dimuat"
+        message={error || "Data ringkasan tidak tersedia."}
+        hint="Pastikan backend berjalan di port 8001."
+        onRetry={loadData}
+      />
     );
   }
 
@@ -184,19 +207,27 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono hidden md:inline">
-            Pembaruan: {lastRefreshed.toLocaleTimeString("id-ID")} WIB
+          <span
+            className="text-xs text-zinc-500 dark:text-zinc-400 font-mono hidden md:inline"
+            title="Diperbarui otomatis tiap 2 menit"
+          >
+            Diperbarui {fmtRelative(lastRefreshed.toISOString())}
           </span>
           <button
             type="button"
             onClick={loadData}
-            className="min-h-[36px] px-3.5 py-1.5 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-800 rounded-md transition-colors flex items-center gap-1.5"
+            disabled={refreshing}
+            className="min-h-[36px] px-3.5 py-1.5 text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-800 rounded-md transition-colors flex items-center gap-1.5 disabled:opacity-60"
           >
-            <RotateCw className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
-            Segarkan
+            <RotateCw className={`w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Memperbarui..." : "Segarkan"}
           </button>
         </div>
       </div>
+
+      {refreshError && (
+        <Notice tone="error" message={refreshError} onRetry={loadData} onClose={() => setRefreshError(null)} />
+      )}
 
       {/* Top Section: Health Index Dial + Core KPI Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
@@ -206,7 +237,7 @@ export default function DashboardPage() {
             score={healthIndex}
             criticalCount={kpi.critical_count}
             highCount={kpi.high_count}
-            negativePct={peakDay ? peakDay.negative_pct : 25}
+            negativePct={peakDay ? peakDay.negative_pct : 0}
             triageStats={triageStats}
           />
         </div>
@@ -280,9 +311,6 @@ export default function DashboardPage() {
         lastUpdated={lastRefreshed}
       />
 
-      {/* 3 Hot Issues Indonesia Showcase (Colorful Redesign) */}
-      <TopHotIssuesCards issues={priorityIssues} />
-
       {/* Executive Priority Board (FR-03 - Orientasi Aksi, PIC & SLA) */}
       <ExecutivePriorityBoard issues={priorityIssues} />
 
@@ -325,9 +353,9 @@ export default function DashboardPage() {
       )}
 
       {/* Trend & Threat Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left 7 Cols: 7-Day Trend Chart */}
-        <section className="lg:col-span-7 panel p-6 flex flex-col justify-between bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
+      <div className="grid grid-cols-1 gap-5">
+        {/* Tren 7 hari */}
+        <section className="panel p-6 flex flex-col justify-between bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
               <div>
@@ -391,7 +419,8 @@ export default function DashboardPage() {
                   const y = padTop + (plotHeight - barHeight);
                   const w = colWidth * 0.56;
                   return (
-                    <g key={t.day} className="cursor-pointer group">
+                    <g key={t.day} className="group">
+                      <title>{`${t.label || t.day}: ${t.volume} berita, ${t.negative_pct ?? 0}% negatif`}</title>
                       <rect
                         x={x}
                         y={y}
@@ -463,89 +492,20 @@ export default function DashboardPage() {
                 ? `Puncak volume: ${peakDay.label || peakDay.day} (${peakDay.volume} berita, ${peakDay.negative_pct ?? 0}% sentimen negatif)`
                 : "Semua kanal terpantau stabil dalam 7 hari terakhir."}
             </span>
-            <Link
-              href="/peta"
-              className="font-bold text-zinc-900 dark:text-white hover:underline"
-            >
-              Lihat Peta Wilayah &rarr;
-            </Link>
-          </div>
-        </section>
-
-        {/* Right 5 Cols: Priority Issues Radar */}
-        <section className="lg:col-span-5 panel p-6 flex flex-col justify-between bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
-          <div>
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
-              <div>
-                <h2 className="text-sm font-bold font-mono text-zinc-900 dark:text-white uppercase tracking-wider">
-                  RADAR ISU &amp; ANCAMAN
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono">
-                  Isu terkluster dengan skor risiko tertinggi
-                </p>
-              </div>
-              <Link
-                href="/isu"
-                className="text-xs font-bold font-mono text-zinc-900 dark:text-white hover:underline"
-              >
-                Semua ({priorityIssues.length})
+            <span className="flex items-center gap-4">
+              <Link href="/peta" className="font-bold text-zinc-900 dark:text-white hover:underline">
+                Peta Wilayah &rarr;
               </Link>
-            </div>
-
-            {priorityIssues.length === 0 ? (
-              <div className="py-12 text-center text-xs font-mono text-zinc-400">
-                <p className="font-semibold text-zinc-700 dark:text-zinc-300">
-                  Tidak ada isu kritis atau risiko tinggi saat ini.
-                </p>
-                <p className="mt-1">
-                  Gunakan tombol &ldquo;Tarik Berita Nyata&rdquo; untuk menyinkronkan
-                  feed portal resmi.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-800/80">
-                {priorityIssues.slice(0, 5).map((issue) => (
-                  <Link
-                    key={issue.id}
-                    href={`/isu/${issue.id}`}
-                    className="block py-3 px-2 -mx-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors group"
-                  >
-                    <div className="flex items-start justify-between gap-2.5">
-                      <div className="min-w-0 pr-2">
-                        <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:underline line-clamp-2 leading-snug">
-                          {issue.judul}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
-                          <span className="text-zinc-700 dark:text-zinc-300 font-semibold">
-                            {issue.wilayah}
-                          </span>
-                          <span>&bull;</span>
-                          <span>{issue.kategori}</span>
-                        </div>
-                      </div>
-                      <ThreatLevelPill level={issue.level} score={issue.skor} />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-2 gap-2.5">
-            <Link
-              href="/kasus"
-              className="min-h-[38px] inline-flex items-center justify-center px-3 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-mono font-bold transition-colors text-center"
-            >
-              Papan Kasus
-            </Link>
-            <Link
-              href="/laporan"
-              className="min-h-[38px] inline-flex items-center justify-center px-3 py-2 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs font-mono font-bold border border-zinc-300 dark:border-zinc-800 transition-colors text-center"
-            >
-              Laporan Eksekutif
-            </Link>
+              <Link href="/kasus" className="font-bold text-zinc-900 dark:text-white hover:underline">
+                Papan Kasus &rarr;
+              </Link>
+              <Link href="/laporan" className="font-bold text-zinc-900 dark:text-white hover:underline">
+                Laporan &rarr;
+              </Link>
+            </span>
           </div>
         </section>
+
       </div>
 
       {/* Monitored Media & Sources Deep Dive */}

@@ -46,12 +46,12 @@ export function ExecutivePriorityBoard({ issues }: ExecutivePriorityBoardProps) 
         <div>
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-rose-500" />
-            <h3 className="text-sm font-bold font-mono text-zinc-900 dark:text-white uppercase tracking-wider">
-              PAPAN PRIORITAS EKSEKUTIF (EXECUTIVE PRIORITY BOARD)
-            </h3>
+            <h2 className="text-sm font-bold font-mono text-zinc-900 dark:text-white uppercase tracking-wider">
+              Isu prioritas
+            </h2>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Daftar isu prioritas terkluster berorientasi tindakan &amp; penetapan batas respon (SLA)
+            Instansi dan target respons diusulkan otomatis dari kategori dan level risiko. PIC dan tenggat resmi ditetapkan di Papan Kasus.
           </p>
         </div>
 
@@ -70,8 +70,8 @@ export function ExecutivePriorityBoard({ issues }: ExecutivePriorityBoardProps) 
             <tr className="border-b border-zinc-200 dark:border-zinc-800/80 text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300 uppercase">
               <th className="py-2.5 px-3">Isu &amp; Wilayah</th>
               <th className="py-2.5 px-3">Tingkat Risiko</th>
-              <th className="py-2.5 px-3">Penanggung Jawab (PIC)</th>
-              <th className="py-2.5 px-3">Batas Waktu (SLA)</th>
+              <th className="py-2.5 px-3">Usulan Instansi</th>
+              <th className="py-2.5 px-3">Target Respons</th>
               <th className="py-2.5 px-3">Status Verifikasi</th>
               <th className="py-2.5 px-3 text-right">Tindakan</th>
             </tr>

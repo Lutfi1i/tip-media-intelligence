@@ -3,9 +3,18 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AuthUser, fetchCurrentUser, pollSources } from "@/lib/api";
+import {
+  AuthUser,
+  DATA_SYNCED_EVENT,
+  checkBackendOnline,
+  fetchCurrentUser,
+  pollSources,
+} from "@/lib/api";
+import { Menu, Search, X } from "lucide-react";
 import { BrandMark } from "./RadarUi";
 import { ThemeToggle } from "./ThemeToggle";
+import { GlobalSearch } from "./GlobalSearch";
+import { NotificationBell } from "./NotificationBell";
 
 const navSections = [
   {
@@ -172,15 +181,62 @@ const navSections = [
   },
 ];
 
-const allItems = navSections.flatMap((s) => s.items);
+/** Menu yang butuh peran tertentu. Backend juga menolak akses; ini hanya menyembunyikan menu. */
+const ROLE_ONLY: Record<string, string[]> = {
+  "/pengguna": ["admin"],
+};
+
+function canSee(href: string, user: AuthUser | null): boolean {
+  const roles = ROLE_ONLY[href];
+  // Tanpa login (AUTH_REQUIRED=false) semua menu tampil, seperti perilaku backend.
+  if (!roles || !user) return true;
+  return roles.includes(user.role);
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [role, setRole] = useState("Pimpinan");
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isPolling, setIsPolling] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Ctrl+K / Cmd+K membuka pencarian dari halaman mana pun.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Tutup drawer mobile setiap pindah halaman.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // Indikator koneksi: cek backend saat dibuka lalu tiap 60 detik.
+  useEffect(() => {
+    let alive = true;
+    const check = () => checkBackendOnline().then((ok) => alive && setBackendOnline(ok));
+    check();
+    const id = window.setInterval(check, 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!syncMessage) return;
+    const id = window.setTimeout(() => setSyncMessage(null), 8000);
+    return () => window.clearTimeout(id);
+  }, [syncMessage]);
 
   useEffect(() => {
     if (pathname === "/login") return;
@@ -200,9 +256,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
-  const activeNav =
-    allItems.find((i) => (i.href === "/" ? pathname === "/" : pathname.startsWith(i.href))) ||
-    allItems[0];
+  const visibleSections = navSections
+    .map((sec) => ({ ...sec, items: sec.items.filter((i) => canSee(i.href, authUser)) }))
+    .filter((sec) => sec.items.length > 0);
+  const visibleItems = visibleSections.flatMap((sec) => sec.items);
 
   const handleSyncRealData = async () => {
     setIsPolling(true);
@@ -211,14 +268,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const res = await pollSources(true);
       const totalBaru = res.total_baru ?? 0;
       const totalDibaca = res.total_dibaca ?? 0;
-      setSyncMessage(
-        `Sinkronisasi tuntas: ${totalDibaca} artikel dibaca dari feed, ${totalBaru} berita baru terintegrasi ke database.`
-      );
-      setTimeout(() => {
-        window.location.reload();
-      }, 1200);
+      setSyncMessage({
+        tone: "ok",
+        text: `Selesai: ${totalDibaca} artikel dibaca, ${totalBaru} berita baru masuk.`,
+      });
+      setBackendOnline(true);
+      // Halaman yang terbuka memuat ulang datanya sendiri; filter dan posisi scroll tetap.
+      window.dispatchEvent(new Event(DATA_SYNCED_EVENT));
     } catch (err: any) {
-      setSyncMessage(err.message || "Gagal menyinkronkan data berita nyata");
+      setSyncMessage({ tone: "error", text: err.message || "Gagal menarik berita. Periksa koneksi ke backend." });
     } finally {
       setIsPolling(false);
     }
@@ -228,7 +286,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col bg-white dark:bg-black text-zinc-900 dark:text-zinc-100 antialiased selection:bg-sky-500/20 transition-colors">
       {/* Top Tactical Command Header */}
       <header className="bg-white/95 dark:bg-black/95 backdrop-blur border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 h-14 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center space-x-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Buka menu"
+            aria-expanded={drawerOpen}
+            className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900"
+          >
+            <Menu className="h-5 w-5" aria-hidden="true" />
+          </button>
           <Link href="/" className="flex items-center gap-2.5 group">
             <div className="relative p-1.5 rounded-lg bg-gradient-to-br from-sky-500/20 to-blue-600/20 border border-sky-500/40 text-sky-500 group-hover:border-sky-500 transition-colors shadow-xs">
               <BrandMark className="w-5 h-5 text-sky-500" />
@@ -247,7 +314,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
 
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Cari (Ctrl+K)"
+            className="inline-flex h-9 items-center gap-2 rounded-md border border-zinc-200 bg-zinc-100 px-2.5 text-xs text-zinc-500 hover:bg-zinc-200 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            <Search className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden lg:inline">Cari isu...</span>
+            <kbd className="hidden lg:inline rounded border border-zinc-300 px-1 text-3xs dark:border-zinc-700">Ctrl K</kbd>
+          </button>
+
           <button
             type="button"
             onClick={handleSyncRealData}
@@ -259,59 +337,80 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 isPolling ? "bg-amber-300 animate-pulse" : "bg-emerald-300"
               }`}
             />
-            {isPolling ? "Menarik Feed..." : "Tarik Berita Nyata"}
+            <span className="hidden sm:inline">{isPolling ? "Menarik Feed..." : "Tarik Berita Nyata"}</span>
+            <span className="sm:hidden">{isPolling ? "Menarik..." : "Tarik"}</span>
           </button>
 
-          <div className="hidden md:flex items-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md px-2.5 py-1">
-            <label htmlFor="role-select" className="text-xs text-zinc-500 dark:text-zinc-400 mr-1.5 font-medium font-mono">
-              Peran:
-            </label>
-            <select
-              id="role-select"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
-            >
-              <option value="Pimpinan" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">Pimpinan</option>
-              <option value="Analis" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">Analis / Verifikator</option>
-              <option value="Supervisor" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">Supervisor</option>
-              <option value="PIC Unit" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">PIC Unit</option>
-              <option value="Admin" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">Admin</option>
-              <option value="Auditor" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">Auditor</option>
-            </select>
-          </div>
+          <NotificationBell userNama={authUser?.nama || "Pengguna tanpa login"} />
 
-          <ThemeToggle />
+          <div className="hidden sm:block">
+            <ThemeToggle />
+          </div>
 
           {authUser ? (
             <button
               onClick={handleLogout}
-              className="px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800"
-              title={`Masuk sebagai ${authUser.email} (${authUser.role})`}
+              className="hidden sm:inline-block px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800"
+              title={`Masuk sebagai ${authUser.email}`}
             >
-              {authUser.nama} &bull; Keluar
+              <span className="hidden sm:inline">{authUser.nama} </span>
+              <span className="hidden md:inline text-zinc-500 dark:text-zinc-400 capitalize">({authUser.role}) </span>
+              Keluar
             </button>
           ) : (
             <Link
               href="/login"
-              className="px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800"
+              className="hidden sm:inline-block px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800"
             >
               Masuk
             </Link>
           )}
 
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span className="hidden sm:inline">Feed Live</span>
-            <span className="sm:hidden">Live</span>
+          <span
+            role="status"
+            title={
+              backendOnline === false
+                ? "Backend tidak menjawab. Data di layar mungkin sudah usang."
+                : "Backend terhubung"
+            }
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium border ${
+              backendOnline === false
+                ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30"
+                : backendOnline === null
+                ? "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/30"
+                : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                backendOnline === false ? "bg-red-500" : backendOnline === null ? "bg-zinc-400" : "bg-emerald-500"
+              }`}
+            />
+            <span className="hidden sm:inline">
+              {backendOnline === false ? "Terputus" : backendOnline === null ? "Memeriksa" : "Terhubung"}
+            </span>
           </span>
         </div>
       </header>
 
       {syncMessage && (
-        <div className="bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-200 text-xs px-6 py-2 flex items-center justify-between border-b border-sky-200 dark:border-sky-800 font-mono">
-          <span className="font-medium">{syncMessage}</span>
-          <span className="text-[11px] text-sky-600 dark:text-sky-400">Memperbarui tampilan...</span>
+        <div
+          role={syncMessage.tone === "error" ? "alert" : "status"}
+          className={`text-xs px-6 py-2 flex items-center justify-between gap-3 border-b font-mono ${
+            syncMessage.tone === "error"
+              ? "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 border-red-200 dark:border-red-900"
+              : "bg-sky-50 dark:bg-sky-950/40 text-sky-800 dark:text-sky-200 border-sky-200 dark:border-sky-800"
+          }`}
+        >
+          <span className="font-medium">{syncMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setSyncMessage(null)}
+            aria-label="Tutup pesan"
+            className="opacity-70 hover:opacity-100"
+          >
+            &times;
+          </button>
         </div>
       )}
 
@@ -321,7 +420,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="hidden md:flex md:w-60 lg:w-64 fixed left-0 top-14 bottom-0 bg-white dark:bg-[#07090E] border-r border-zinc-200 dark:border-zinc-800/80 flex-col justify-between shrink-0 select-none z-30 overflow-y-auto">
           <div className="p-4 space-y-6">
             <nav className="space-y-6" aria-label="Menu Navigasi">
-              {navSections.map((sec) => (
+              {visibleSections.map((sec) => (
                 <div key={sec.group} className="space-y-1.5">
                   <div className="px-3 flex items-center justify-between">
                     <p className={`text-[10px] font-mono font-bold tracking-wider uppercase ${sec.groupColor}`}>
@@ -368,46 +467,91 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        {/* Mobile Navigation Bar (< md) */}
-        <nav
-          className="flex md:hidden overflow-x-auto bg-white dark:bg-black px-3 py-2 space-x-1.5 border-b border-zinc-200 dark:border-zinc-800"
-          aria-label="Menu Mobile"
-        >
-          {allItems.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`whitespace-nowrap min-h-[40px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  isActive
-                    ? item.activeClass
-                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white"
-                }`}
-              >
-                <span
-                  className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 text-white ${
-                    isActive
-                      ? "bg-white/20 ring-1 ring-white/35 shadow-[inset_0_1px_1px_rgba(255,255,255,0.55),inset_0_-1px_2px_rgba(0,0,0,0.2)]"
-                      : `bg-gradient-to-br ${item.icon3dGradient} ring-1 ring-white/25 shadow-[0_2px_6px_-1px_rgba(0,0,0,0.22),inset_0_1px_1px_rgba(255,255,255,0.5),inset_0_-1px_2px_rgba(0,0,0,0.25)]`
-                  }`}
+        {/* Drawer navigasi mobile (< md) */}
+        {drawerOpen && (
+          <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Menu navigasi">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setDrawerOpen(false)} />
+            <nav className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] overflow-y-auto bg-white dark:bg-[#07090E] border-r border-zinc-200 dark:border-zinc-800 p-4 space-y-5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Menu</span>
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  aria-label="Tutup menu"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
                 >
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+              {visibleSections.map((sec) => (
+                <div key={sec.group} className="space-y-1">
+                  <p className={`px-3 text-[10px] font-mono font-bold tracking-wider uppercase ${sec.groupColor}`}>{sec.group}</p>
+                  {sec.items.map((item) => {
+                    const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={isActive ? "page" : undefined}
+                        className={`flex min-h-[44px] items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold ${
+                          isActive ? item.activeClass : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                        }`}
+                      >
+                        <span
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white ${
+                            isActive ? "bg-white/20" : `bg-gradient-to-br ${item.icon3dGradient}`
+                          }`}
+                        >
+                          {item.icon}
+                        </span>
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between px-3">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-400">Tema</span>
+                  <ThemeToggle />
+                </div>
+                {authUser ? (
+                  <div className="px-3 space-y-2">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                      {authUser.nama} <span className="capitalize">({authUser.role})</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full min-h-[40px] rounded-md border border-zinc-200 dark:border-zinc-800 text-sm font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    >
+                      Keluar
+                    </button>
+                  </div>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="mx-3 flex min-h-[40px] items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-800 text-sm font-semibold text-zinc-700 dark:text-zinc-200"
+                  >
+                    Masuk
+                  </Link>
+                )}
+              </div>
+            </nav>
+          </div>
+        )}
 
         {/* Main Content Area (Offset with ml for fixed sidebar on md+) */}
         <main className="flex-1 min-w-0 md:ml-60 lg:ml-64 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>
+
+      <GlobalSearch
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        pages={visibleItems.map((i) => ({ label: i.label, href: i.href }))}
+      />
     </div>
   );
 }

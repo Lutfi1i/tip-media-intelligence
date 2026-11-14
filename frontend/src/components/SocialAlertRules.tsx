@@ -16,6 +16,7 @@ import {
   updateSocialAlertRule,
 } from "@/lib/api";
 import { formatWib } from "@/components/SocialCharts";
+import { ConfirmDialog } from "@/components/ui";
 
 const NAME_KEY = "tip.analystName";
 const PLATFORMS = ["", "X (Twitter)", "TikTok", "YouTube", "Threads", "Instagram", "Reddit", "Telegram"];
@@ -47,6 +48,8 @@ export function SocialAlertRules({
   onEventsChanged: () => void;
 }) {
   const [rules, setRules] = useState<SocialAlertRule[]>([]);
+  const [pendingRemove, setPendingRemove] = useState<SocialAlertRule | null>(null);
+  const [removing, setRemoving] = useState(false);
   const [metrics, setMetrics] = useState<Record<string, string>>({});
   const [events, setEvents] = useState<SocialAlertEvent[]>([]);
   const [form, setForm] = useState<SocialAlertRuleInput>({ ...EMPTY, scope_kode: scopeKode });
@@ -106,11 +109,21 @@ export function SocialAlertRules({
     }
   };
 
-  const remove = async (r: SocialAlertRule) => {
-    if (!window.confirm(`Hapus aturan "${r.nama}" beserta riwayat alert-nya?`)) return;
-    await deleteSocialAlertRule(r.id);
-    await load();
-    onEventsChanged();
+  const remove = (r: SocialAlertRule) => setPendingRemove(r);
+
+  const confirmRemove = async () => {
+    if (!pendingRemove) return;
+    setRemoving(true);
+    try {
+      await deleteSocialAlertRule(pendingRemove.id);
+      await load();
+      onEventsChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Aturan gagal dihapus.");
+    } finally {
+      setRemoving(false);
+      setPendingRemove(null);
+    }
   };
 
   const test = async (r: SocialAlertRule) => {
@@ -144,6 +157,15 @@ export function SocialAlertRules({
 
   return (
     <div className="space-y-5">
+      <ConfirmDialog
+        open={!!pendingRemove}
+        title={`Hapus aturan "${pendingRemove?.nama ?? ""}"?`}
+        description="Aturan dan seluruh riwayat alert-nya ikut terhapus. Tindakan ini tidak bisa dibatalkan."
+        confirmLabel="Ya, hapus aturan"
+        busy={removing}
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={confirmRemove}
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Aturan Alert</h2>

@@ -41,6 +41,13 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* font-mono dipetakan ke Plus Jakarta Sans (proporsional). Angka tabular
+   menjaga skor, jam, dan hitungan tetap sejajar di tabel dan KPI. */
+.font-mono,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Authentic Radar Intelligence Panels */
 .panel {
   background-color: var(--panel);

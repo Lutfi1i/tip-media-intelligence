@@ -33,6 +33,7 @@ import { SocialHeatmap } from "@/components/SocialHeatmap";
 import { SocialWatchedAccounts } from "@/components/SocialWatchedAccounts";
 import { SocialContentSearch } from "@/components/SocialContentSearch";
 import { LiveSocialFeed } from "@/components/LiveSocialFeed";
+import { SocialHashtagCooccurrence } from "@/components/SocialHashtagCooccurrence";
 import { SocialSpreadTrace } from "@/components/SocialSpreadTrace";
 import { SocialFilterBar } from "@/components/SocialFilterBar";
 import { SocialAgencyBoard } from "@/components/SocialAgencyBoard";
@@ -362,19 +363,39 @@ export default function SocialPulsePage() {
   const baselineIncomplete = baseline && baseline.windows_available < baseline.windows_target;
   const surgingCount = trends.filter((t) => t.velocity_status === "LONJAKAN TINGGI").length;
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "live", label: "Live Medsos Lokasi" },
-    { id: "tren", label: `Topik Tren (${trends.length})` },
-    { id: "cari", label: "Cari Konten" },
-    { id: "alert", label: unreadAlerts ? `Aturan Alert (${unreadAlerts} baru)` : "Aturan Alert" },
-    { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
-    { id: "akun", label: "Akun Pantauan" },
-    { id: "peta", label: "Peta Panas" },
-    { id: "bandingkan", label: "Bandingkan Periode" },
-    { id: "watchlist", label: `Watchlist (${watchlist?.active_terms ?? 0}/${watchlist?.total_terms ?? 0})` },
-    { id: "perbandingan", label: "Bandingkan Wilayah" },
-    { id: "platform", label: `Status Platform (${healthSummary.aktif}/${healthSummary.total})` },
-    { id: "korelasi", label: `Korelasi Isu RADAR (${correlations.length})` },
+  const tabGroups: { group: string; tabs: { id: Tab; label: string }[] }[] = [
+    {
+      group: "Pantau",
+      tabs: [
+        { id: "live", label: "Live Medsos Lokasi" },
+        { id: "tren", label: `Topik Tren (${trends.length})` },
+        { id: "cari", label: "Cari Konten" },
+        { id: "akun", label: "Akun Pantauan" },
+      ],
+    },
+    {
+      group: "Analisis",
+      tabs: [
+        { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
+        { id: "peta", label: "Peta Panas" },
+        { id: "korelasi", label: `Korelasi Isu RADAR (${correlations.length})` },
+      ],
+    },
+    {
+      group: "Bandingkan",
+      tabs: [
+        { id: "bandingkan", label: "Antar Periode" },
+        { id: "perbandingan", label: "Antar Wilayah" },
+      ],
+    },
+    {
+      group: "Pengaturan",
+      tabs: [
+        { id: "alert", label: unreadAlerts ? `Aturan Alert (${unreadAlerts} baru)` : "Aturan Alert" },
+        { id: "watchlist", label: `Watchlist (${watchlist?.active_terms ?? 0}/${watchlist?.total_terms ?? 0})` },
+        { id: "platform", label: `Status Platform (${healthSummary.aktif}/${healthSummary.total})` },
+      ],
+    },
   ];
 
   return (
@@ -613,21 +634,31 @@ export default function SocialPulsePage() {
       )}
 
       {/* TABS */}
-      <div className="flex items-center overflow-x-auto border-b border-zinc-200 dark:border-zinc-800" role="tablist">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={activeTab === t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold transition-all ${
-              activeTab === t.id
-                ? "border-fuchsia-600 text-fuchsia-600 dark:border-fuchsia-400 dark:text-fuchsia-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            }`}
+      <div className="flex items-end overflow-x-auto border-b border-zinc-200 dark:border-zinc-800" role="tablist" aria-label="Bagian Social Pulse">
+        {tabGroups.map((g, gi) => (
+          <div
+            key={g.group}
+            className={`flex shrink-0 flex-col ${gi > 0 ? "ml-2 border-l border-zinc-200 pl-2 dark:border-zinc-800" : ""}`}
           >
-            {t.label}
-          </button>
+            <span className="px-4 pt-1 text-3xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{g.group}</span>
+            <div className="flex">
+              {g.tabs.map((t) => (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={activeTab === t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`shrink-0 border-b-2 px-4 py-2.5 text-sm font-semibold transition-all ${
+                    activeTab === t.id
+                      ? "border-fuchsia-600 text-fuchsia-600 dark:border-fuchsia-400 dark:text-fuchsia-400"
+                      : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
@@ -866,6 +897,14 @@ export default function SocialPulsePage() {
               </table>
             </div>
           </div>
+          <SocialHashtagCooccurrence
+            timeRange={timeRange}
+            scopeKode={scopeKode}
+            scopeMode={scopeMode}
+            multiCodes={multiParam}
+            platform={selectedPlatform}
+            filters={{ category: category || undefined, agency: agency || undefined }}
+          />
         </div>
       )}
 

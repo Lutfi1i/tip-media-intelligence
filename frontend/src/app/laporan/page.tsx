@@ -8,12 +8,45 @@ import {
   getReportViewUrl,
   getReportPdfUrl,
 } from "@/lib/api";
+import { fmtDateTime } from "@/lib/format";
+import { Notice } from "@/components/ui";
+
+type JenisId = "harian" | "mingguan" | "bulanan" | "insidental" | "social-24h" | "social-7d";
+
+const JENIS_OPTIONS: { id: JenisId; label: string; social?: "24h" | "7d" }[] = [
+  { id: "harian", label: "Harian" },
+  { id: "mingguan", label: "Mingguan" },
+  { id: "bulanan", label: "Bulanan" },
+  { id: "insidental", label: "Insidental" },
+  { id: "social-24h", label: "Social Pulse 24 jam", social: "24h" },
+  { id: "social-7d", label: "Social Pulse 7 hari", social: "7d" },
+];
+
+function defaultPeriode(jenis: JenisId): string {
+  const now = new Date();
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
+  if (jenis === "harian") return fmt(now);
+  if (jenis === "mingguan") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    return `${fmt(start)} - ${fmt(now)}`;
+  }
+  if (jenis === "bulanan") {
+    return now.toLocaleDateString("id-ID", { month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
+  }
+  return "";
+}
 
 export default function LaporanPage() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [genSuccess, setGenSuccess] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [jenis, setJenis] = useState<JenisId>("harian");
+  const [periode, setPeriode] = useState(() => defaultPeriode("harian"));
+  const [filterJenis, setFilterJenis] = useState("");
 
   const loadReports = async () => {
     setLoading(true);
@@ -21,7 +54,7 @@ export default function LaporanPage() {
       const data = await fetchReports();
       setReports(data);
     } catch (err) {
-      console.error(err);
+      setErrorMsg(err instanceof Error ? err.message : "Gagal memuat arsip laporan");
     } finally {
       setLoading(false);
     }
@@ -31,41 +64,33 @@ export default function LaporanPage() {
     loadReports();
   }, []);
 
-  const handleGenerate = async (jenis: "harian" | "mingguan") => {
+  const handleGenerate = async () => {
+    const opt = JENIS_OPTIONS.find((o) => o.id === jenis)!;
+    if (!opt.social && !periode.trim()) {
+      setErrorMsg("Isi periode laporan dulu.");
+      return;
+    }
     setGenerating(true);
     setGenSuccess(null);
+    setErrorMsg(null);
     try {
-      const today = new Date().toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-      const periode = jenis === "harian" ? today : "Periode 7 Hari Terakhir";
-      await generateNewReport(jenis, periode);
-      setGenSuccess(
-        `Laporan ${jenis.toUpperCase()} (${periode}) berhasil disusun dari data terkini.`
-      );
+      if (opt.social) {
+        const rep = await generateSocialReport(opt.social);
+        setGenSuccess(`Laporan Social Pulse (${rep.periode}) selesai disusun.`);
+      } else {
+        await generateNewReport(jenis, periode.trim());
+        setGenSuccess(`Laporan ${opt.label.toLowerCase()} (${periode.trim()}) selesai disusun.`);
+      }
       await loadReports();
     } catch (err: any) {
-      alert(err.message || "Gagal menghasilkan laporan");
+      setErrorMsg(err.message || "Gagal menyusun laporan");
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleSocialReport = async (range: "24h" | "7d") => {
-    setGenerating(true);
-    setGenSuccess(null);
-    try {
-      const rep = await generateSocialReport(range);
-      setGenSuccess(`Laporan Social Pulse (${rep.periode}) berhasil disusun.`);
-      await loadReports();
-    } catch (err: any) {
-      alert(err.message || "Gagal menyusun laporan Social Pulse");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  const jenisInArchive = Array.from(new Set(reports.map((r) => String(r.jenis)))).sort();
+  const filteredReports = filterJenis ? reports.filter((r) => r.jenis === filterJenis) : reports;
 
   const latestReport = reports.length > 0 ? reports[0] : null;
 
@@ -74,54 +99,72 @@ export default function LaporanPage() {
       <div className="pb-3 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-zinc-500 dark:text-zinc-400">
-            EXECUTIVE INTELLIGENCE &bull; BRIEFING PACK
+            Briefing pimpinan
           </p>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
             Laporan &amp; Dokumen Eksekutif
           </h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2 font-mono">
-          <button
-            type="button"
-            onClick={() => handleGenerate("harian")}
-            disabled={generating}
-            className="min-h-[38px] px-3.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-md border border-zinc-300 dark:border-zinc-800 text-xs font-bold transition-colors disabled:opacity-50"
-          >
-            + Susun Laporan Harian
-          </button>
-          <button
-            type="button"
-            onClick={() => handleGenerate("mingguan")}
-            disabled={generating}
-            className="min-h-[38px] px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 rounded-md text-xs font-bold transition-colors disabled:opacity-50 shadow-xs"
-          >
-            + Susun Laporan Mingguan
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSocialReport("24h")}
-            disabled={generating}
-            className="min-h-[38px] px-3.5 py-1.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-md text-xs font-bold transition-colors disabled:opacity-50"
-          >
-            + Social Pulse 24 Jam
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSocialReport("7d")}
-            disabled={generating}
-            className="min-h-[38px] px-3.5 py-1.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-md text-xs font-bold transition-colors disabled:opacity-50"
-          >
-            + Social Pulse 7 Hari
-          </button>
-        </div>
       </div>
 
-      {genSuccess && (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-xs text-emerald-700 dark:text-emerald-300 font-mono font-semibold flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          {genSuccess}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleGenerate();
+        }}
+        className="panel p-4 grid grid-cols-1 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] items-end gap-3 bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800"
+      >
+        <div>
+          <label htmlFor="jenis-laporan" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+            Jenis laporan
+          </label>
+          <select
+            id="jenis-laporan"
+            value={jenis}
+            onChange={(e) => {
+              const v = e.target.value as JenisId;
+              setJenis(v);
+              setPeriode(defaultPeriode(v));
+            }}
+            className="w-full min-h-[40px] text-sm border border-zinc-300 dark:border-zinc-800 rounded-md px-3 py-2 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+          >
+            {JENIS_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+        <div>
+          <label htmlFor="periode-laporan" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+            Periode
+          </label>
+          {JENIS_OPTIONS.find((o) => o.id === jenis)?.social ? (
+            <p className="min-h-[40px] flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+              Otomatis: {jenis === "social-24h" ? "24 jam terakhir" : "7 hari terakhir"}
+            </p>
+          ) : (
+            <input
+              id="periode-laporan"
+              value={periode}
+              onChange={(e) => setPeriode(e.target.value)}
+              placeholder={jenis === "insidental" ? "Contoh: Banjir Jakarta Timur, 14 November 2026" : ""}
+              className="w-full min-h-[40px] text-sm border border-zinc-300 dark:border-zinc-800 rounded-md px-3 py-2 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+            />
+          )}
+        </div>
+        <button
+          type="submit"
+          disabled={generating}
+          className="min-h-[40px] px-5 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 rounded-md text-sm font-bold transition-colors disabled:opacity-50"
+        >
+          {generating ? "Menyusun..." : "Susun laporan"}
+        </button>
+      </form>
+
+      {generating && <Notice tone="info" message="Menyusun laporan dari data terkini. Biasanya butuh beberapa detik..." />}
+      {genSuccess && <Notice tone="success" message={genSuccess} onClose={() => setGenSuccess(null)} />}
+      {errorMsg && <Notice tone="error" message={errorMsg} onRetry={loadReports} onClose={() => setErrorMsg(null)} />}
 
       {/* Main Split: Executive Artifact & Archive */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -225,24 +268,34 @@ export default function LaporanPage() {
           <section className="panel overflow-hidden bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-zinc-800">
             <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-200 font-mono">
-                ARSIP LAPORAN INTELIJEN
+                Arsip laporan ({filteredReports.length})
               </h3>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                {reports.length} dokumen tersimpan
-              </span>
+              <select
+                value={filterJenis}
+                onChange={(e) => setFilterJenis(e.target.value)}
+                aria-label="Filter jenis laporan"
+                className="text-xs border border-zinc-300 dark:border-zinc-800 rounded-md px-2 py-1.5 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200"
+              >
+                <option value="">Semua jenis</option>
+                {jenisInArchive.map((j) => (
+                  <option key={j} value={j}>
+                    {j}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {loading ? (
               <div className="p-8 text-center text-xs text-zinc-500 dark:text-zinc-400 font-mono">
                 Memuat arsip laporan...
               </div>
-            ) : reports.length === 0 ? (
+            ) : filteredReports.length === 0 ? (
               <div className="p-8 text-center text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                Belum ada arsip laporan. Klik tombol &ldquo;+ Susun Laporan Mingguan&rdquo; di atas.
+                Belum ada arsip laporan. Pilih jenis dan periode di atas, lalu klik &ldquo;Susun laporan&rdquo;.
               </div>
             ) : (
               <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {reports.map((rep) => (
+                {filteredReports.map((rep) => (
                   <div
                     key={rep.id}
                     className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors"
@@ -257,7 +310,7 @@ export default function LaporanPage() {
                           {rep.jenis}
                         </strong>{" "}
                         &bull; Periode: {rep.periode} &bull; Dibuat:{" "}
-                        {new Date(rep.created_at).toLocaleDateString("id-ID")}
+                        {fmtDateTime(rep.created_at)}
                       </div>
                     </div>
 
