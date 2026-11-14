@@ -46,7 +46,7 @@ export default function AkunPopulerPage() {
   return (
     <div className="space-y-6">
       <TrendPageHeader
-        title="Influencer & Akun Populer"
+        title="Akun Populer"
         description={
           filters.lokasi === "ID"
             ? "Akun yang paling aktif dan paling banyak ditonton dalam percakapan yang terpantau."

@@ -126,8 +126,8 @@ export default function HashtagKeywordPage() {
   return (
     <div className="space-y-6">
       <TrendPageHeader
-        title="Hashtag & Keyword"
-        description="Hashtag dan keyword yang sedang ramai, yang mulai naik, yang khas wilayah ini, dan riwayatnya selama 30 hari."
+        title="Hashtag Trending"
+        description="Hashtag dan frasa yang sedang ramai, yang mulai naik, yang khas wilayah ini, dan riwayatnya selama 30 hari."
       />
 
       <Section

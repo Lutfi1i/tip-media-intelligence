@@ -25,6 +25,11 @@
   --series-4: #eda100;
   --series-5: #e87ba4;
   --chart-grid: #e4e4e7;
+  /* Sentimen (divergen: hijau, abu-abu netral, merah). Divalidasi skrip dataviz:
+     kontras >= 3:1 pada panel, selalu didampingi label dan angka. */
+  --sent-pos: #16a34a;
+  --sent-neu: #85858e;
+  --sent-neg: #dc2626;
 }
 
 .dark {
@@ -41,6 +46,9 @@
   --series-4: #c98500;
   --series-5: #d55181;
   --chart-grid: #27272a;
+  --sent-pos: #1faa55;
+  --sent-neu: #8b8b94;
+  --sent-neg: #ef4444;
 }
 
 *, *::before, *::after, html, body, button, input, select, textarea, pre, code, kbd, samp, table, th, td {

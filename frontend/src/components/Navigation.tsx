@@ -23,6 +23,7 @@ import {
   Sparkles,
   Users,
   X,
+  Target,
 } from "lucide-react";
 import { BrandMark } from "./RadarUi";
 import { ThemeToggle } from "./ThemeToggle";
@@ -60,14 +61,15 @@ const trendSection: NavSection = {
   group: "TREN SOSIAL",
   groupColor: "text-fuchsia-500 dark:text-fuchsia-400",
   items: [
-    trendItem("Dashboard Tren", "/tren", LayoutDashboard),
+    trendItem("Ringkasan Tren", "/tren", LayoutDashboard),
+    trendItem("Pantau Keyword", "/tren/keyword", Target),
     trendItem("Tren Wilayah", "/tren/wilayah", MapPinned),
-    trendItem("Live Social Monitoring", "/tren/live", Radio),
+    trendItem("Percakapan Live", "/tren/live", Radio),
     trendItem("Konten Viral", "/tren/viral", Flame),
-    trendItem("Hashtag & Keyword", "/tren/hashtag", Hash),
-    trendItem("Influencer & Akun", "/tren/akun", Users),
-    trendItem("AI Trend Analysis", "/tren/ai", Sparkles),
-    trendItem("Laporan & Insight", "/tren/laporan", ScrollText),
+    trendItem("Hashtag Trending", "/tren/hashtag", Hash),
+    trendItem("Akun Populer", "/tren/akun", Users),
+    trendItem("Analisis AI", "/tren/ai", Sparkles),
+    trendItem("Laporan Tren", "/tren/laporan", ScrollText),
   ],
 };
 
@@ -80,19 +82,17 @@ function isNavActive(href: string, pathname: string): boolean {
 const navSections: NavSection[] = [
   trendSection,
   {
-    group: "MONITORING LIVE",
+    group: "PERINGATAN DINI",
     groupColor: "text-sky-500 dark:text-sky-400",
     items: [
       {
-        label: "Dashboard Krisis",
+        label: "Situasi Terkini",
         href: "/",
         pathDisplay: "radar.tipmedia.id/dashboard",
         iconColor: "text-sky-500",
         icon3dGradient: "from-sky-400 via-sky-500 to-blue-700 shadow-sky-500/35",
         activeClass: "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25",
         hoverClass: "hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400",
-        badge: "LIVE",
-        badgeColor: "bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -100,15 +100,13 @@ const navSections: NavSection[] = [
         ),
       },
       {
-        label: "Peta Wilayah",
+        label: "Peta Sebaran Isu",
         href: "/peta",
         pathDisplay: "radar.tipmedia.id/peta-sebaran",
         iconColor: "text-emerald-500",
         icon3dGradient: "from-emerald-400 via-emerald-500 to-teal-700 shadow-emerald-500/35",
         activeClass: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25",
         hoverClass: "hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400",
-        badge: "PIXEL",
-        badgeColor: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -116,31 +114,13 @@ const navSections: NavSection[] = [
         ),
       },
       {
-        label: "Monitoring Feed",
-        href: "/monitoring",
-        pathDisplay: "radar.tipmedia.id/listening-rules",
-        iconColor: "text-purple-500",
-        icon3dGradient: "from-purple-400 via-purple-500 to-indigo-700 shadow-purple-500/35",
-        activeClass: "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/25",
-        hoverClass: "hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400",
-        badge: "RULES",
-        badgeColor: "bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/30",
-        icon: (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        ),
-      },
-      {
-        label: "Social Pulse",
+        label: "Lonjakan Medsos",
         href: "/social-pulse",
         pathDisplay: "radar.tipmedia.id/social-pulse",
         iconColor: "text-fuchsia-500",
         icon3dGradient: "from-fuchsia-400 via-fuchsia-500 to-pink-700 shadow-fuchsia-500/35",
         activeClass: "bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-md shadow-fuchsia-500/25",
         hoverClass: "hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:hover:text-fuchsia-400",
-        badge: "PULSE",
-        badgeColor: "bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-300 border border-fuchsia-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -150,19 +130,17 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    group: "ANALISIS & RESPON",
+    group: "ISU & TINDAK LANJUT",
     groupColor: "text-amber-500 dark:text-amber-400",
     items: [
       {
-        label: "Isu",
+        label: "Antrean Isu",
         href: "/isu",
         pathDisplay: "radar.tipmedia.id/antrean-isu",
         iconColor: "text-amber-500",
         icon3dGradient: "from-amber-400 via-amber-500 to-orange-700 shadow-amber-500/35",
         activeClass: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/25",
         hoverClass: "hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400",
-        badge: "ANOMALI",
-        badgeColor: "bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -177,8 +155,6 @@ const navSections: NavSection[] = [
         icon3dGradient: "from-rose-400 via-rose-500 to-red-700 shadow-rose-500/35",
         activeClass: "bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-md shadow-rose-500/25",
         hoverClass: "hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400",
-        badge: "SLA",
-        badgeColor: "bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -186,15 +162,13 @@ const navSections: NavSection[] = [
         ),
       },
       {
-        label: "Laporan Eksekutif",
+        label: "Laporan Isu",
         href: "/laporan",
         pathDisplay: "radar.tipmedia.id/briefing-pimpinan",
         iconColor: "text-cyan-500",
         icon3dGradient: "from-cyan-400 via-sky-500 to-blue-700 shadow-cyan-500/35",
         activeClass: "bg-gradient-to-r from-cyan-500 to-blue-700 text-white shadow-md shadow-cyan-500/25",
         hoverClass: "hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400",
-        badge: "BRIEF",
-        badgeColor: "bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -204,19 +178,31 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    group: "TATA KELOLA",
+    group: "PENGATURAN",
     groupColor: "text-teal-500 dark:text-teal-400",
     items: [
       {
-        label: "Audit Trail",
+        label: "Profil & Ambang Alert",
+        href: "/monitoring",
+        pathDisplay: "radar.tipmedia.id/listening-rules",
+        iconColor: "text-purple-500",
+        icon3dGradient: "from-purple-400 via-purple-500 to-indigo-700 shadow-purple-500/35",
+        activeClass: "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/25",
+        hoverClass: "hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400",
+        icon: (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Audit & Akurasi AI",
         href: "/audit",
         pathDisplay: "radar.tipmedia.id/integritas-log",
         iconColor: "text-teal-500",
         icon3dGradient: "from-teal-400 via-emerald-500 to-teal-700 shadow-teal-500/35",
         activeClass: "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-500/25",
         hoverClass: "hover:bg-teal-500/10 hover:text-teal-600 dark:hover:text-teal-400",
-        badge: "AUDIT",
-        badgeColor: "bg-teal-500/20 text-teal-600 dark:text-teal-300 border border-teal-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -224,15 +210,13 @@ const navSections: NavSection[] = [
         ),
       },
       {
-        label: "Pengguna & RBAC",
+        label: "Pengguna & Akses",
         href: "/pengguna",
         pathDisplay: "radar.tipmedia.id/pengguna-rbac",
         iconColor: "text-indigo-500",
         icon3dGradient: "from-indigo-400 via-indigo-500 to-violet-700 shadow-indigo-500/35",
         activeClass: "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/25",
         hoverClass: "hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400",
-        badge: "RBAC",
-        badgeColor: "bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30",
         icon: (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -356,7 +340,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       aria-expanded={crisisOpen}
       className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-[11px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
     >
-      <span>Modul monitoring krisis ({crisisCount})</span>
+      <span>Modul peringatan dini ({crisisCount})</span>
       <ChevronDown className={`h-3.5 w-3.5 transition-transform ${crisisOpen ? "rotate-180" : ""}`} aria-hidden="true" />
     </button>
   );

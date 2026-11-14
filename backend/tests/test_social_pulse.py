@@ -680,7 +680,7 @@ def test_social_report_renders_and_escapes_post_text(db):
     html = _json.loads(report.data_snapshot_json)["rendered_html"]
     assert report.jenis == "social_harian"
     assert report.file_url == f"/api/v1/reports/{report.id}/view"
-    assert "Laporan Social Pulse" in html and "Ringkasan" in html and "PLN" in html
+    assert "Laporan Lonjakan Medsos" in html and "Ringkasan" in html and "PLN" in html
     assert "<script" not in html.lower()
 
 

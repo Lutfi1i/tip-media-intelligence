@@ -148,7 +148,7 @@ export default function MonitoringPage() {
             Aturan pemantauan
           </p>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
-            Konfigurasi Profil &amp; Ambang Alert
+            Profil &amp; Ambang Alert
           </h1>
         </div>
         <div className="text-xs font-mono text-zinc-500 dark:text-zinc-400">

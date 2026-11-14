@@ -15,6 +15,7 @@ from typing import Optional
 from backend.app.database import SessionLocal
 from backend.app.services.collector import collect_all
 from backend.app.services.issue_clustering import cluster_and_sync_issues
+from backend.app.services.keyword_monitor import match_new_content
 from backend.app.services.social_escalation import escalate_social_surges
 from backend.app.services.social_alert_rules import evaluate_rules
 
@@ -29,6 +30,9 @@ def run_cycle() -> None:
     try:
         hasil = collect_all(db, force=False)
         cluster_and_sync_issues(db)
+        keywords = match_new_content(db)
+        if keywords["sebutan_baru"]:
+            logger.info("Pantau Keyword: %d sebutan baru", keywords["sebutan_baru"])
         eskalasi = escalate_social_surges(db)
         alerts = evaluate_rules(db)
         if alerts["triggered"]:

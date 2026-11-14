@@ -24,7 +24,7 @@ export default function LaporanInsightPage() {
   return (
     <div className="space-y-6">
       <TrendPageHeader
-        title="Laporan & Insight"
+        title="Laporan Tren"
         description="Pilih periode Hari ini, 7 hari, atau 30 hari untuk laporan harian, mingguan, atau bulanan. Isi unduhan sama dengan pratinjau di bawah."
         actions={
           <div className="flex flex-wrap gap-2">

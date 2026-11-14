@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 from urllib.robotparser import RobotFileParser
 
 import feedparser
@@ -392,7 +392,27 @@ def fetch_source_entries(
     feed_title = _strip_html(parsed.feed.get("title"), 200) if parsed.feed else ""
     for entry in entries:
         entry["_feed_title"] = feed_title
+        _unwrap_bing_news(entry)
     return entries, None
+
+
+_ON_MSN_RE = re.compile(r"\s+on MSN$", re.IGNORECASE)
+
+
+def _unwrap_bing_news(entry: Any) -> None:
+    """Bing News RSS membungkus tautan artikel dalam pengalih apiclick.aspx yang berubah tiap tarikan.
+
+    Tautan asli diambil dari parameter `url`, supaya deduplikasi per URL bekerja dan
+    nama media asli (elemen <News:Source>) dipakai sebagai penerbit.
+    """
+    link = entry.get("link") or ""
+    if "bing.com/news/apiclick" not in link.lower():
+        return
+    real = parse_qs(urlparse(link).query).get("url", [None])[0]
+    if real:
+        entry["link"] = real
+    name = _ON_MSN_RE.sub("", str(entry.get("news_source") or "")).strip()
+    entry["source"] = {"href": real or link, "title": name or None}
 
 
 def collect_source(db: Session, source: Source, force: bool = False) -> Dict[str, Any]:

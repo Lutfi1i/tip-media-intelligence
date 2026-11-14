@@ -91,6 +91,8 @@ class Settings:
 
     # Penarikan data otomatis (menit). 0 = nonaktif via thread lokal (gunakan Celery Beat di produksi).
     AUTO_COLLECT_MINUTES: int = int(os.getenv("AUTO_COLLECT_MINUTES", "0"))
+    # Tarikan ulang sumber milik keyword pantauan (menu Pantau Keyword). 0 = hanya saat dibuat atau diperbarui manual.
+    KEYWORD_COLLECT_MINUTES: int = int(os.getenv("KEYWORD_COLLECT_MINUTES", "60"))
 
     # Retensi & Observability
     RETENTION_DAYS: int = int(os.getenv("RETENTION_DAYS", "365"))

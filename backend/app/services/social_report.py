@@ -73,7 +73,7 @@ TEMPLATE = _ENV.from_string("""<!DOCTYPE html>
 <body><div class="wrap">
 <div class="actions"><button onclick="window.print()">Cetak / Simpan PDF</button></div>
 <header>
-  <div class="brand">TIP Media Intelligence · RADAR Social Pulse</div>
+  <div class="brand">TIP Media Intelligence · Lonjakan Medsos</div>
   <h1>{{ judul }}</h1>
   <div class="meta">Cakupan: {{ scope_name }} · Periode: {{ period.label }} · Disusun {{ dibuat }} WIB</div>
 </header>
@@ -163,7 +163,7 @@ def generate_social_report(db: Session, time_range: str = "24h", scope_kode: str
 
     period = overview["period"]
     jenis = {"today": "social_harian", "24h": "social_harian", "7d": "social_mingguan", "30d": "social_bulanan"}.get(time_range, "social_kustom")
-    judul = f"Laporan Social Pulse: {overview['scope_name']}, {period['label']}"
+    judul = f"Laporan Lonjakan Medsos: {overview['scope_name']}, {period['label']}"
     dibuat = (datetime.utcnow() + timedelta(hours=7)).strftime("%d-%m-%Y %H:%M")
 
     html = TEMPLATE.render(

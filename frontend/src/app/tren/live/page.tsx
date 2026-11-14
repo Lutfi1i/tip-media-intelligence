@@ -83,7 +83,7 @@ export default function LiveMonitoringPage() {
   return (
     <div className="space-y-6">
       <TrendPageHeader
-        title="Live Social Monitoring"
+        title="Percakapan Live"
         description="Percakapan terbaru: jumlah postingan, interaksi, sentimen, kata yang sering muncul, platform, dan lokasi. Diperbarui otomatis tiap menit."
         actions={
           <button

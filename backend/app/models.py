@@ -1,7 +1,7 @@
 from datetime import datetime
 import json
 from sqlalchemy import (
-    Column, Integer, String, Float, Text, Boolean, DateTime, ForeignKey, Enum, Table
+    Column, Integer, String, Float, Text, Boolean, DateTime, ForeignKey, Enum, Table, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from backend.app.database import Base
@@ -74,6 +74,8 @@ class Source(Base):
     last_fetch_error = Column(String(512), nullable=True)
     last_fetch_count = Column(Integer, nullable=True)
     last_success_at = Column(DateTime, nullable=True)
+    # Terisi bila sumber dibuat otomatis untuk satu keyword pantauan (menu Pantau Keyword).
+    keyword_project_id = Column(Integer, ForeignKey("keyword_projects.id"), nullable=True, index=True)
 
     raw_items = relationship("RawItem", back_populates="source")
 
@@ -348,3 +350,46 @@ class CaseEvidence(Base):
     uploaded_by = Column(String(120), default="Analis")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
+
+class KeywordProject(Base):
+    """Keyword yang dipantau terus-menerus (menu Pantau Keyword), mirip proyek di Brand24.
+
+    `kata_kunci_json` berisi daftar kata yang dicari (cocok bila salah satunya disebut).
+    `kecualikan_json` berisi kata yang membuat sebutan diabaikan.
+    """
+    __tablename__ = "keyword_projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nama = Column(String(120), nullable=False)
+    kata_kunci_json = Column(Text, default="[]")
+    kecualikan_json = Column(Text, default="[]")
+    aktif = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_collected_at = Column(DateTime, nullable=True)
+    # menunggu, berjalan, ok, gagal
+    last_collect_status = Column(String(20), nullable=True)
+    last_collect_error = Column(String(512), nullable=True)
+    last_collect_new = Column(Integer, nullable=True)
+
+    mentions = relationship("KeywordMention", back_populates="project", cascade="all, delete-orphan")
+
+
+class KeywordMention(Base):
+    """Satu konten yang menyebut keyword. Sentimen dinilai terhadap keyword itu, bukan terhadap konten secara umum."""
+    __tablename__ = "keyword_mentions"
+    __table_args__ = (UniqueConstraint("project_id", "item_id", name="uq_keyword_mention"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("keyword_projects.id"), nullable=False, index=True)
+    item_id = Column(Integer, ForeignKey("raw_items.id"), nullable=False, index=True)
+    sentimen = Column(String(20), default="netral")  # positif, netral, negatif
+    # kamus (penilaian awal leksikon), ai, atau manual (dikoreksi analis; tidak ditimpa AI)
+    sentimen_sumber = Column(String(20), default="kamus")
+    sentimen_alasan = Column(String(300), nullable=True)
+    # Label isu spesifik dari AI (mis. "Korupsi kredit bank BUMN"), dipakai untuk menghitung sebutan per isu.
+    isu = Column(String(120), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("KeywordProject", back_populates="mentions")
+    raw_item = relationship("RawItem")

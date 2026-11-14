@@ -120,7 +120,7 @@ export default function AiTrendPage() {
   return (
     <div className="space-y-6">
       <TrendPageHeader
-        title="AI Trend Analysis"
+        title="Analisis AI"
         description="Ringkasan tren, penyebab viral, ide konten, caption, hashtag, dan brief video dari AI, berdasarkan postingan yang terkumpul."
       />
 

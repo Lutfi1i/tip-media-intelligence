@@ -134,3 +134,58 @@ Menunggu persetujuan pemilik, karena mengubah database dan menyalakan pengambila
 Belum dikerjakan (di luar sumber gratis):
 - Metrik TikTok, Instagram, X, dan Threads. Reddit JSON publik tidak dipakai karena syarat API Reddit
   mewajibkan OAuth untuk aplikasi.
+
+---
+
+## 8. Pantau Keyword (ditambahkan 14 November 2026)
+
+Permintaan pemilik: fitur mirip app.brand24.com. Tulis keyword (contoh "BUMN"), lihat jumlah sebutan,
+berapa positif dan negatif, isu yang dibicarakan, dan infografis yang bisa dibagikan.
+
+Keputusan pemilik: tarikan langsung saat keyword dibuat lalu diulang tiap 60 menit
+(`KEYWORD_COLLECT_MINUTES`, terpisah dari `AUTO_COLLECT_MINUTES`); sentimen dinilai AI gpt-4o-mini
+terhadap keyword itu, bukan terhadap teks secara umum; antislop diterapkan selama pengerjaan.
+
+- Menu `/tren/keyword`, API `/api/v1/keyword`, layanan `backend/app/services/keyword_monitor.py`.
+- Tabel `keyword_projects` dan `keyword_mentions`; kolom `sources.keyword_project_id`.
+- Sumber per keyword: Bing News RSS (`mkt=id-ID`), GDELT, pencarian YouTube, dan Bluesky. Sebutan juga
+  dicocokkan ke semua konten 60 hari terakhir (RSS berita, Telegram).
+- **Google News RSS diblokir robots.txt** (`/rss/search`), jadi semua sumber lama berbasis
+  `news.google.com/rss/search` sebenarnya selalu gagal. Bing News dipakai sebagai gantinya untuk berita.
+- AI memberi label isu per sebutan (2 sampai 5 kata) untuk hitungan per isu; label yang sudah ada
+  dikirim ulang ke prompt agar dipakai ulang. Batas 60 panggilan per jam, 20 sebutan per panggilan.
+- Koreksi sentimen manual tidak ditimpa AI.
+- Persen naik/turun disembunyikan bila keyword baru dipantau di tengah periode pembanding.
+- X, TikTok, Instagram, dan Threads tetap tanpa sumber gratis yang diizinkan.
+
+### 8.1 Sumber gratis tambahan (14 November 2026)
+
+Disetujui pemilik ("pakai yang gratis dulu"):
+- `AUTO_COLLECT_MINUTES=10` dinyalakan di `.env`. Langkah 2 di bagian 7 selesai.
+- 14 RSS portal berita lewat `backend/scripts/seed_free_news_sources.py` (Tempo, CNBC Indonesia,
+  Sindonews, Viva, JPNN, Okezone Ekonomi, Antara Ekonomi, Detik Finance, Liputan6 Bisnis, Katadata,
+  iNews, Republika Ekonomi). Batalkan dengan `--hapus`.
+- Kanal Telegram CNBC, Kompas, Okezone, dan Katadata diuji tetapi sudah tidak aktif, jadi tidak dipakai.
+- Tiap keyword mendapat kueri Bing News tambahan: urut relevansi dan satu per isu teratas (maks 4).
+- Siklus otomatis global langsung mencocokkan konten baru ke semua keyword (`match_new_content`).
+- Hasil BUMN 7 hari: 48 menjadi 79 sebutan; dari berita 14 menjadi 38.
+- GDELT masih menolak IP ini (HTTP 429) walau sudah diberi jeda; dicoba ulang tiap tarikan.
+- Belum: YouTube Data API (komentar video), Instagram Graph API (hashtag), Reddit OAuth. Ketiganya gratis
+  tetapi butuh pendaftaran oleh pemilik.
+
+---
+
+## 9. Catatan: langkah berikutnya (ditunda pemilik, 14 November 2026)
+
+Sumber gratis yang butuh pendaftaran atau kunci dari pemilik:
+1. **YouTube Data API v3**: buat API key di Google Cloud Console. Dipakai untuk mengambil komentar video
+   (sumber sentimen warga terbesar yang masih gratis) dan pencarian yang lebih stabil daripada yt-dlp.
+2. **Instagram Graph API (Hashtag Search)**: perlu akun Instagram Bisnis dan aplikasi Meta yang ditinjau.
+   Postingan publik per hashtag beserta like dan komentar, batas 30 hashtag per 7 hari.
+3. **Reddit API (OAuth)**: daftarkan aplikasi di reddit.com/prefs/apps.
+
+Berbayar (dibahas nanti): X API, penyedia data social listening untuk TikTok dan Instagram.
+
+Perbaikan kecil yang tertunda:
+- Gabungkan label isu AI yang mirip (mis. "Konsolidasi Danareksa" dan "Konsolidasi BUMN").
+- Nonaktifkan sumber lama berbasis `news.google.com/rss/search` yang selalu gagal karena robots.txt.

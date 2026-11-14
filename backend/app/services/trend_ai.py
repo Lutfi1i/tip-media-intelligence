@@ -74,10 +74,12 @@ def _reserve_call() -> None:
         _calls.append(now)
 
 
-def _chat_json(system: str, user: str, max_tokens: int = 1400) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def _chat_json(system: str, user: str, max_tokens: int = 1400, reserve: bool = True) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Panggil model dan kembalikan (JSON jawaban, meta). `reserve=False` bila pemanggil punya batas sendiri."""
     if not ai_configured():
         raise AiUnavailable("AI belum dikonfigurasi (AI_API_KEY kosong).")
-    _reserve_call()
+    if reserve:
+        _reserve_call()
     payload = {
         "model": settings.AI_MODEL_NAME,
         "temperature": 0.3,

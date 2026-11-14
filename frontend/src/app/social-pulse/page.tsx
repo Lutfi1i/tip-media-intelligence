@@ -12,7 +12,6 @@ import {
   fetchAgencyBoard,
   fetchSocialBrief,
   fetchSocialAlertEvents,
-  fetchSocialHeatmap,
   escalateSocialSurges,
   generateSocialReport,
   getReportViewUrl,
@@ -27,9 +26,7 @@ import {
   SocialAgencyBoard as AgencyBoardData,
   SocialSort,
   SocialBrief,
-  SocialHeatmap as SocialHeatmapData,
 } from "@/lib/api";
-import { SocialHeatmap } from "@/components/SocialHeatmap";
 import { SocialWatchedAccounts } from "@/components/SocialWatchedAccounts";
 import { SocialContentSearch } from "@/components/SocialContentSearch";
 import { LiveSocialFeed } from "@/components/LiveSocialFeed";
@@ -48,7 +45,7 @@ import { GeographicComparisonTable } from "@/components/GeographicComparisonTabl
 import { SocialWatchlistPanel } from "@/components/SocialWatchlistPanel";
 import { Sparkline, VelocityBadge, VolumeTimeline, formatCompact, formatWib } from "@/components/SocialCharts";
 
-type Tab = "live" | "tren" | "cari" | "alert" | "instansi" | "akun" | "peta" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
+type Tab = "live" | "tren" | "cari" | "alert" | "instansi" | "akun" | "bandingkan" | "watchlist" | "perbandingan" | "platform" | "korelasi";
 type ScopeMode = "context" | "strict" | "regional";
 
 
@@ -146,7 +143,6 @@ export default function SocialPulsePage() {
   const [facets, setFacets] = useState<SocialFacets | null>(null);
   const [agencyBoard, setAgencyBoard] = useState<AgencyBoardData | null>(null);
   const [brief, setBrief] = useState<SocialBrief | null>(null);
-  const [heatmap, setHeatmap] = useState<SocialHeatmapData | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const refreshUnread = useCallback(() => {
     fetchSocialAlertEvents("baru", 1)
@@ -189,7 +185,7 @@ export default function SocialPulsePage() {
     if (urut && ["laju", "terbaru", "volume", "negatif"].includes(urut)) setSort(urut as SocialSort);
     if (q.get("kanal")) setSelectedPlatform(q.get("kanal") as string);
     const tab = q.get("tab");
-    if (tab && ["live", "tren", "cari", "alert", "instansi", "akun", "peta", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
+    if (tab && ["live", "tren", "cari", "alert", "instansi", "akun", "bandingkan", "watchlist", "perbandingan", "platform", "korelasi"].includes(tab)) setActiveTab(tab as Tab);
     const wilayah = q.get("wilayah");
     if (wilayah) {
       setScopeKode(wilayah);
@@ -210,7 +206,7 @@ export default function SocialPulsePage() {
     try {
       const filters = { category: category || undefined, agency: agency || undefined };
       const plat = selectedPlatform === "Semua" ? undefined : selectedPlatform;
-      const [ovData, trData, pfData, crData, wlData, fcData, agData, brData, hmData] = await Promise.all([
+      const [ovData, trData, pfData, crData, wlData, fcData, agData, brData] = await Promise.all([
         fetchSocialPulseOverview(timeRange, scopeKode, scopeMode, multiParam, filters),
         fetchSocialTrends(plat, timeRange, 30, scopeKode, scopeMode, multiParam, filters, sort),
         fetchSocialPlatforms(scopeKode, scopeMode, multiParam, timeRange),
@@ -219,9 +215,7 @@ export default function SocialPulsePage() {
         fetchSocialFacets(timeRange, scopeKode, scopeMode, multiParam, plat, filters),
         fetchAgencyBoard(timeRange, scopeKode, scopeMode, multiParam, category || undefined),
         fetchSocialBrief(timeRange, scopeKode, scopeMode, multiParam, filters),
-        fetchSocialHeatmap(timeRange, scopeKode, scopeMode, multiParam, plat, agency || undefined),
       ]);
-      setHeatmap(hmData);
       setBrief(brData);
       refreshUnread();
       setFacets(fcData);
@@ -233,8 +227,8 @@ export default function SocialPulsePage() {
       setWatchlist(wlData);
       setLastRefreshed(new Date());
     } catch (err) {
-      console.error("Gagal memuat data Social Pulse:", err);
-      setLoadError("Data Social Pulse gagal dimuat. Periksa apakah backend berjalan, lalu muat ulang.");
+      console.error("Gagal memuat data lonjakan medsos:", err);
+      setLoadError("Data lonjakan medsos gagal dimuat. Periksa apakah backend berjalan, lalu muat ulang.");
     } finally {
       setIsLoading(false);
     }
@@ -377,7 +371,6 @@ export default function SocialPulsePage() {
       group: "Analisis",
       tabs: [
         { id: "instansi", label: `Instansi (${agencyBoard?.agencies.filter((a) => a.mention_count > 0).length ?? 0})` },
-        { id: "peta", label: "Peta Panas" },
         { id: "korelasi", label: `Korelasi Isu RADAR (${correlations.length})` },
       ],
     },
@@ -408,13 +401,13 @@ export default function SocialPulsePage() {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-500/20 px-3 py-1 text-xs font-semibold text-fuchsia-300 ring-1 ring-fuchsia-500/30">
                 <span className="h-2 w-2 rounded-full bg-fuchsia-400" />
-                SOCIAL PULSE
+                MEDSOS
               </span>
               <span className="text-xs text-zinc-400">
                 Diperbarui: {lastRefreshed ? lastRefreshed.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" }) : "-"} WIB
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white lg:text-3xl">RADAR Social Pulse</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white lg:text-3xl">Lonjakan Medsos</h1>
             <p className="max-w-2xl text-sm text-zinc-300">
               Pantau topik yang sedang naik di X, TikTok, YouTube, Threads, Instagram, Reddit, dan Telegram. Laju dihitung terhadap baseline periode
               sebelumnya, dan lonjakan bisa diteruskan ke antrean verifikasi analis.
@@ -634,7 +627,7 @@ export default function SocialPulsePage() {
       )}
 
       {/* TABS */}
-      <div className="flex items-end overflow-x-auto border-b border-zinc-200 dark:border-zinc-800" role="tablist" aria-label="Bagian Social Pulse">
+      <div className="flex items-end overflow-x-auto border-b border-zinc-200 dark:border-zinc-800" role="tablist" aria-label="Bagian Lonjakan Medsos">
         {tabGroups.map((g, gi) => (
           <div
             key={g.group}
@@ -925,17 +918,6 @@ export default function SocialPulsePage() {
 
       {activeTab === "akun" && (
         <SocialWatchedAccounts timeRange={timeRange} scopeKode={scopeKode} scopeMode={scopeMode} multiCodes={multiParam} />
-      )}
-
-      {activeTab === "peta" && (
-        <SocialHeatmap
-          data={heatmap}
-          isLoading={isLoading}
-          onPickCategory={(id) => {
-            setCategory(id);
-            setActiveTab("tren");
-          }}
-        />
       )}
 
       {activeTab === "bandingkan" && (

@@ -494,7 +494,7 @@ export default function DashboardPage() {
             </span>
             <span className="flex items-center gap-4">
               <Link href="/peta" className="font-bold text-zinc-900 dark:text-white hover:underline">
-                Peta Wilayah &rarr;
+                Peta Sebaran Isu &rarr;
               </Link>
               <Link href="/kasus" className="font-bold text-zinc-900 dark:text-white hover:underline">
                 Papan Kasus &rarr;

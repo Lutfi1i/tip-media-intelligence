@@ -1,7 +1,7 @@
 """Ekspor laporan Tren Sosial ke Excel (openpyxl) dan PDF (fpdf2).
 
 Input adalah keluaran trend_service.get_report_data, sehingga isi file sama dengan yang
-tampil di halaman Laporan & Insight.
+tampil di halaman Laporan Tren.
 """
 
 from __future__ import annotations

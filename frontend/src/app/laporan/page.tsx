@@ -18,8 +18,8 @@ const JENIS_OPTIONS: { id: JenisId; label: string; social?: "24h" | "7d" }[] = [
   { id: "mingguan", label: "Mingguan" },
   { id: "bulanan", label: "Bulanan" },
   { id: "insidental", label: "Insidental" },
-  { id: "social-24h", label: "Social Pulse 24 jam", social: "24h" },
-  { id: "social-7d", label: "Social Pulse 7 hari", social: "7d" },
+  { id: "social-24h", label: "Medsos 24 jam", social: "24h" },
+  { id: "social-7d", label: "Medsos 7 hari", social: "7d" },
 ];
 
 function defaultPeriode(jenis: JenisId): string {
@@ -76,7 +76,7 @@ export default function LaporanPage() {
     try {
       if (opt.social) {
         const rep = await generateSocialReport(opt.social);
-        setGenSuccess(`Laporan Social Pulse (${rep.periode}) selesai disusun.`);
+        setGenSuccess(`Laporan medsos (${rep.periode}) selesai disusun.`);
       } else {
         await generateNewReport(jenis, periode.trim());
         setGenSuccess(`Laporan ${opt.label.toLowerCase()} (${periode.trim()}) selesai disusun.`);
@@ -102,7 +102,7 @@ export default function LaporanPage() {
             Briefing pimpinan
           </p>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
-            Laporan &amp; Dokumen Eksekutif
+            Laporan Isu
           </h1>
         </div>
       </div>
@@ -175,7 +175,7 @@ export default function LaporanPage() {
               PRATINJAU DOKUMEN BRIEFING
             </div>
             <div className="text-base font-extrabold mt-1">
-              {latestReport ? latestReport.judul : "Laporan Eksekutif"}
+              {latestReport ? latestReport.judul : "Laporan Isu"}
             </div>
             <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
               {latestReport ? latestReport.periode : "Terkini"}

@@ -121,7 +121,7 @@ export default function TrenDashboardPage() {
   return (
     <div className="space-y-6">
       <TrendPageHeader
-        title="Dashboard Tren"
+        title="Ringkasan Tren"
         description="Ringkasan tren percakapan media sosial untuk lokasi, periode, dan platform yang dipilih."
       />
 

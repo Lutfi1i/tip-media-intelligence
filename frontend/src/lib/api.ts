@@ -281,7 +281,7 @@ export async function generateSocialReport(timeRange: string = "24h", scopeKode:
   const res = await fetch(`${API_BASE_URL}/reports/social?${params.toString()}`, { method: "POST" });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(typeof body?.detail === "string" ? body.detail : "Gagal menyusun laporan Social Pulse");
+    throw new Error(typeof body?.detail === "string" ? body.detail : "Gagal menyusun laporan medsos");
   }
   return res.json() as Promise<{ id: number; judul: string; periode: string }>;
 }
@@ -967,7 +967,7 @@ export async function fetchSocialPulseOverview(
   appendFilters(params, filters);
 
   const res = await fetch(`${API_BASE_URL}/social-pulse/overview?${params.toString()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Gagal mengambil overview Social Pulse");
+  if (!res.ok) throw new Error("Gagal mengambil ringkasan medsos");
   return res.json();
 }
 
@@ -992,7 +992,7 @@ export async function fetchSocialTrends(
   appendFilters(params, filters);
 
   const res = await fetch(`${API_BASE_URL}/social-pulse/trends?${params.toString()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Gagal mengambil tren Social Pulse");
+  if (!res.ok) throw new Error("Gagal mengambil tren medsos");
   return res.json();
 }
 
@@ -1010,7 +1010,7 @@ export async function fetchSocialPlatforms(
   if (multiCodes) params.append("multi_codes", multiCodes);
 
   const res = await fetch(`${API_BASE_URL}/social-pulse/platforms?${params.toString()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Gagal mengambil metrik platform Social Pulse");
+  if (!res.ok) throw new Error("Gagal mengambil metrik platform medsos");
   return res.json();
 }
 
@@ -1026,7 +1026,7 @@ export async function fetchSocialCorrelations(
   if (multiCodes) params.append("multi_codes", multiCodes);
 
   const res = await fetch(`${API_BASE_URL}/social-pulse/correlations?${params.toString()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Gagal mengambil korelasi isu Social Pulse");
+  if (!res.ok) throw new Error("Gagal mengambil korelasi isu medsos");
   return res.json();
 }
 

@@ -13,7 +13,7 @@ export default function PetaWilayahPage() {
             Pemantauan Geospasial Pulau Jawa &amp; Nusantara
           </p>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
-            Peta Sebaran Isu &amp; Wilayah
+            Peta Sebaran Isu
           </h1>
         </div>
         <p className="text-xs text-zinc-600 dark:text-zinc-400">

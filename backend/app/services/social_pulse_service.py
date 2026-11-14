@@ -1040,7 +1040,7 @@ def get_social_brief(
 
     filters = [category_label(category) if category else None, agency_label(agency) if agency else None]
     filter_txt = f" (filter: {', '.join(f for f in filters if f)})" if any(filters) else ""
-    title = f"Ringkasan Social Pulse {scope_name}, {ds.period.label}{filter_txt}"
+    title = f"Ringkasan Lonjakan Medsos {scope_name}, {ds.period.label}{filter_txt}"
 
     if not posts:
         points.append({"kind": "volume", "text": "Belum ada percakapan medsos yang tercatat untuk periode dan filter ini."})

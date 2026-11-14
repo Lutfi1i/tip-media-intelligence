@@ -81,7 +81,7 @@ export default function AuditPage() {
             Tata kelola &bull; log tidak dapat diubah
           </p>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white tracking-tight mt-0.5">
-            Audit Trail &amp; Evaluasi Akurasi AI
+            Audit &amp; Akurasi AI
           </h1>
         </div>
       </div>
