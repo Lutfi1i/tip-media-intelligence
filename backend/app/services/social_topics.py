@@ -65,8 +65,12 @@ STOPWORDS = set(
     on com www http https net
     jangan lupa subscribe like share komen comment lonceng notifikasi aktifkan follow ikuti
     dukung channel kanal tonton nonton saksikan streaming breaking news official
+    januari februari maret april mei juni juli agustus september oktober november desember
+    sumber dok foto
     """.split()
 )
+# Nama bulan dan "sumber"/"dok"/"foto": pola tanggal dan kredit berita ("12 November. Sumber: ...")
+# bukan topik percakapan.
 # Kelompok terakhir: ajakan baku di deskripsi YouTube/siaran ("jangan lupa subscribe dan
 # aktifkan lonceng notifikasi", "breaking news"). Tanpa ini frasanya terbaca sebagai tren.
 
@@ -100,6 +104,20 @@ def category_label(text: str) -> Optional[str]:
     return taxonomy_label(cats[0]) if cats and cats[0] != UNCATEGORIZED else None
 
 
+_REGION_PHRASES: Optional[Set[str]] = None
+
+
+def _region_phrases() -> Set[str]:
+    """Nama provinsi dan kota/kabupaten dua kata, huruf kecil (dimuat sekali)."""
+    global _REGION_PHRASES
+    if _REGION_PHRASES is None:
+        from backend.app.services.geo_hierarchy import KABUPATEN_DATA, PROVINCES_DATA, short_region_name
+
+        names = [p["nama"].lower() for p in PROVINCES_DATA] + [short_region_name(k["nama"]) for k in KABUPATEN_DATA]
+        _REGION_PHRASES = {n for n in names if len(n.split()) == 2}
+    return _REGION_PHRASES
+
+
 def extract_keys(text: str, analysis_topic: Optional[str] = None) -> Set[str]:
     """Kunci kandidat topik untuk satu konten.
 
@@ -115,10 +133,15 @@ def extract_keys(text: str, analysis_topic: Optional[str] = None) -> Set[str]:
         keys.add(normalize_hashtag(tag))
 
     tokens = tokenize(text)
+    region_phrases = _region_phrases()
     for a, b in zip(tokens, tokens[1:]):
         if a == b or (a in GENERIC_PLACES and b in GENERIC_PLACES):
             continue
-        keys.add(f"p:{a} {b}")
+        phrase = f"{a} {b}"
+        # Nama wilayah ("jawa barat", "jakarta selatan") bukan topik; lokasi ditangani filter wilayah.
+        if phrase in region_phrases:
+            continue
+        keys.add(f"p:{phrase}")
 
     label = category_label(text)
     if label:

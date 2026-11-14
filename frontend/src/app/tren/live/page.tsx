@@ -8,7 +8,7 @@ import { platformLabel } from "@/lib/trendFilters";
 import { fetchLiveStats } from "@/lib/trendApi";
 import { useTrendFilters } from "@/components/trend/TrendFiltersContext";
 import { TrendPageHeader } from "@/components/trend/TrendPageHeader";
-import { Kpi, Metric, Section, SentimentBar, TrendState, useTrendData } from "@/components/trend/TrendUi";
+import { Kpi, Section, SentimentBar, TrendState, useTrendData } from "@/components/trend/TrendUi";
 import { Notice } from "@/components/ui";
 
 const AUTO_REFRESH_MS = 60_000;
@@ -215,16 +215,23 @@ export default function LiveMonitoringPage() {
                   <span className={`font-semibold capitalize ${SENTIMENT_TEXT[p.sentimen] || SENTIMENT_TEXT.netral}`}>{p.sentimen}</span>
                 </div>
                 {p.url ? (
-                  <a href={p.url} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sm font-semibold text-zinc-900 hover:underline dark:text-zinc-100">
+                  <a
+                    href={p.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 line-clamp-3 block break-words text-sm font-semibold text-zinc-900 [overflow-wrap:anywhere] hover:underline dark:text-zinc-100"
+                  >
                     {p.judul}
                   </a>
                 ) : (
-                  <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{p.judul}</p>
+                  <p className="mt-1 line-clamp-3 break-words text-sm font-semibold text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100">{p.judul}</p>
                 )}
-                <div className="mt-1 flex gap-4 text-2xs text-zinc-500 dark:text-zinc-400">
-                  <span>Views: <Metric value={p.engagement.views} /></span>
-                  <span>Interaksi: <Metric value={p.engagement.interactions} /></span>
-                </div>
+                {(p.engagement.views !== null || p.engagement.interactions !== null) && (
+                  <div className="mt-1 flex gap-4 text-2xs text-zinc-500 dark:text-zinc-400">
+                    {p.engagement.views !== null && <span>{fmtNum(p.engagement.views)} views</span>}
+                    {p.engagement.interactions !== null && <span>{fmtNum(p.engagement.interactions)} interaksi</span>}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

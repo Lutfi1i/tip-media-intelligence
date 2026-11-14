@@ -77,10 +77,16 @@ export function TrendState({
 }
 
 export function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  // Nilai berupa teks panjang (nama topik/wilayah) memakai ukuran lebih kecil dan boleh dua baris,
+  // supaya tidak terpotong menjadi "Politik & Pe...".
+  const long = value.length > 12;
   return (
-    <div className="panel border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#09090B]">
+    <div className="panel min-w-0 border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#09090B]">
       <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{label}</div>
-      <div className="mt-1 truncate text-xl font-black text-zinc-900 dark:text-white" title={value}>
+      <div
+        className={`mt-1 line-clamp-2 break-words font-black leading-tight text-zinc-900 dark:text-white ${long ? "text-base" : "text-xl"}`}
+        title={value}
+      >
         {value}
       </div>
       {hint && <div className="mt-1 text-2xs text-zinc-500 dark:text-zinc-400">{hint}</div>}
@@ -100,7 +106,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="panel border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#09090B]">
+    <section className="panel min-w-0 border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#09090B]">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-sm font-bold text-zinc-900 dark:text-white">{title}</h2>
@@ -125,17 +131,26 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
 export function StatusBadge({ status, growth }: { status: string; growth?: number | null }) {
   const s = STATUS_LABEL[status] || { text: status, cls: STATUS_LABEL.STABIL.cls };
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-bold ${s.cls}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-2xs font-bold ${s.cls}`}>
       {s.text}
       {growth !== undefined && growth !== null && <span className="font-mono">{growth > 0 ? "+" : ""}{fmtNum(growth)}%</span>}
     </span>
   );
 }
 
-/** Angka metrik; null berarti platform tidak menyediakan data, bukan nol. */
-export function Metric({ value, suffix = "" }: { value: number | null | undefined; suffix?: string }) {
+/**
+ * Angka metrik; null berarti platform tidak menyediakan data, bukan nol.
+ * `compact` untuk sel tabel: tampil "-" dengan penjelasan di tooltip dan untuk pembaca layar.
+ */
+export function Metric({ value, suffix = "", compact = false }: { value: number | null | undefined; suffix?: string; compact?: boolean }) {
   if (value === null || value === undefined) {
-    return <span className="text-zinc-400 dark:text-zinc-600" title="Platform tidak menyediakan angka ini">tidak tersedia</span>;
+    return compact ? (
+      <span className="text-zinc-400 dark:text-zinc-600" title="Platform tidak menyediakan angka ini">
+        -<span className="sr-only">tidak tersedia</span>
+      </span>
+    ) : (
+      <span className="text-zinc-400 dark:text-zinc-600" title="Platform tidak menyediakan angka ini">tidak tersedia</span>
+    );
   }
   return <span className="font-mono">{fmtNum(value)}{suffix}</span>;
 }
@@ -189,13 +204,13 @@ export function PostItem({ p, extra }: { p: PostBrief; extra?: ReactNode }) {
               href={p.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="line-clamp-2 text-sm font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+              className="line-clamp-2 break-words text-sm font-semibold text-zinc-900 [overflow-wrap:anywhere] hover:underline dark:text-zinc-100"
             >
               {p.judul}
               <ExternalLink className="ml-1 inline h-3 w-3 text-zinc-400" aria-hidden="true" />
             </a>
           ) : (
-            <span className="line-clamp-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{p.judul}</span>
+            <span className="line-clamp-2 break-words text-sm font-semibold text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100">{p.judul}</span>
           )}
           <div className="mt-0.5 text-2xs text-zinc-500 dark:text-zinc-400">
             {platformLabel(p.platform)} &bull; {p.penulis || "akun tidak diketahui"} &bull; {fmtRelative(p.published_at)}

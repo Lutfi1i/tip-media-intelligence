@@ -17,6 +17,8 @@ import { TrendPageHeader } from "@/components/trend/TrendPageHeader";
 import { EmptyState, ErrorPanel, Notice } from "@/components/ui";
 import { Kpi, Section, StatusBadge } from "@/components/trend/TrendUi";
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
+import { TimelineBars } from "@/components/trend/TrendCharts";
 
 const TREND_LIMIT = 50;
 const RISING = new Set(["LONJAKAN TINGGI", "MENINGKAT"]);
@@ -24,19 +26,27 @@ const EARLY = new Set(["LONJAKAN TINGGI", "MENINGKAT", "BARU"]);
 // Kategori yang biasanya bisa diangkat jadi konten hiburan/informasi, bukan isu sensitif.
 const CONTENT_FRIENDLY = new Set(["kuliner", "wisata", "hiburan", "olahraga", "teknologi"]);
 
+/** Baris tren yang bisa diklik untuk langsung dianalisis di menu AI. */
 function TrendRow({ t, right }: { t: SocialTrendingTopic; right?: React.ReactNode }) {
   return (
-    <li className="flex items-start justify-between gap-3 py-2.5">
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{t.topic}</div>
-        <div className="mt-0.5 truncate text-2xs text-zinc-500 dark:text-zinc-400">
-          {t.hashtags.slice(0, 3).join(" ") || t.categories[0]?.label || "-"}
+    <li>
+      <Link
+        href={`/tren/ai?topik=${encodeURIComponent(t.topic_key)}`}
+        className="group -mx-2 flex items-start justify-between gap-3 rounded-md px-2 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+        title="Analisis tren ini dengan AI"
+      >
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-zinc-900 group-hover:underline dark:text-zinc-100">{t.topic}</div>
+          <div className="mt-0.5 truncate text-2xs text-zinc-500 dark:text-zinc-400">
+            {t.hashtags.slice(0, 3).join(" ") || t.related_phrases.slice(0, 2).join(", ") || "-"}
+          </div>
         </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {right}
-        <span className="font-mono text-xs text-zinc-600 dark:text-zinc-300">{fmtNum(t.mention_count)}</span>
-      </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {right}
+          <span className="font-mono text-xs text-zinc-600 dark:text-zinc-300">{fmtNum(t.mention_count)}</span>
+          <Sparkles className="h-3.5 w-3.5 text-zinc-300 group-hover:text-fuchsia-500 dark:text-zinc-600" aria-hidden="true" />
+        </div>
+      </Link>
     </li>
   );
 }
@@ -89,7 +99,9 @@ export default function TrenDashboardPage() {
   const contentIdeas = useMemo(
     () =>
       topics
-        .filter((t) => t.categories.some((c) => CONTENT_FRIENDLY.has(c.id)) && (t.sentiment_pct?.negatif ?? 0) < 30)
+        // Hanya kategori UTAMA topik: topik lalu lintas yang kebetulan menyebut aplikasi tidak
+        // boleh terbaca sebagai "Teknologi & Digital".
+        .filter((t) => CONTENT_FRIENDLY.has(t.categories[0]?.id ?? "") && (t.sentiment_pct?.negatif ?? 0) < 30)
         .slice(0, 6),
     [topics]
   );
@@ -182,6 +194,17 @@ export default function TrenDashboardPage() {
             />
           </div>
 
+          {overview && overview.timeline.length > 0 && (
+            <Section
+              title="Volume percakapan"
+              hint={`Jumlah postingan per interval, ${overview.period?.label ?? ""}${
+                filters.platform !== "Semua" ? " (semua platform)" : ""
+              }. Arahkan kursor ke batang untuk melihat angkanya.`}
+            >
+              <TimelineBars points={overview.timeline} />
+            </Section>
+          )}
+
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <Section title="Tren naik dan mulai viral" hint="Diurutkan dari laju tercepat dibanding periode sebelumnya.">
               {early.length === 0 ? (
@@ -236,7 +259,7 @@ export default function TrenDashboardPage() {
                       t={t}
                       right={
                         <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-2xs font-bold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
-                          {t.categories.find((c) => CONTENT_FRIENDLY.has(c.id))?.label}
+                          {t.categories[0]?.label}
                         </span>
                       }
                     />

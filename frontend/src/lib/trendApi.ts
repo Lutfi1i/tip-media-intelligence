@@ -66,6 +66,7 @@ export interface RegionTrends {
     status: string;
     pertumbuhan_pct: number | null;
     platform: string[];
+    hashtag: string[];
   }[];
   bagian: { id: string; judul: string; postingan: number; kata_kunci: KeyCount[]; contoh: PostBrief[] }[];
   berita: { id: number; judul: string; url: string; penerbit: string; published_at: string }[];
@@ -166,7 +167,7 @@ export interface ReportData {
     engagement: Engagement;
   };
   baseline: Baseline;
-  topik: { topik: string; kategori: string; postingan: number; status: string; pertumbuhan_pct: number | null; negatif_pct: number }[];
+  topik: { topik: string; kategori: string; postingan: number; status: string; pertumbuhan_pct: number | null; negatif_pct: number; hashtag: string[] }[];
   platform: { platform: string; postingan: number; akun: number; interaksi: number | null; views: number | null; negatif_pct: number }[];
   wilayah: { kode: string; nama: string; postingan: number; negatif: number }[];
   harian: { tanggal: string; postingan: number }[];

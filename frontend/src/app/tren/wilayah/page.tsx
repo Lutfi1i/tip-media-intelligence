@@ -70,7 +70,7 @@ export default function TrenWilayahPage() {
                           <tr className="border-b border-zinc-200 dark:border-zinc-800">
                             <th className="py-2 pr-3">#</th>
                             <th className="py-2 pr-3">Topik</th>
-                            <th className="py-2 pr-3">Kategori</th>
+                            <th className="hidden py-2 pr-3 sm:table-cell">Kategori</th>
                             <th className="py-2 pr-3">Tren</th>
                             <th className="py-2 text-right">Postingan</th>
                           </tr>
@@ -79,8 +79,15 @@ export default function TrenWilayahPage() {
                           {data.top_tren.map((t, i) => (
                             <tr key={t.topic_key}>
                               <td className="py-2 pr-3 font-mono text-xs text-zinc-500">{i + 1}</td>
-                              <td className="py-2 pr-3 font-semibold text-zinc-900 dark:text-zinc-100">{t.topik}</td>
-                              <td className="py-2 pr-3 text-zinc-600 dark:text-zinc-300">{t.kategori}</td>
+                              <td className="py-2 pr-3">
+                                <div className="font-semibold text-zinc-900 dark:text-zinc-100">{t.topik}</div>
+                                {t.hashtag.length > 0 && (
+                                  <div className="mt-0.5 truncate text-2xs text-zinc-500 dark:text-zinc-400">{t.hashtag.join(" ")}</div>
+                                )}
+                              </td>
+                              <td className="hidden py-2 pr-3 text-zinc-600 dark:text-zinc-300 sm:table-cell">
+                                {t.kategori === t.topik ? <span className="text-zinc-400">-</span> : t.kategori}
+                              </td>
                               <td className="py-2 pr-3">
                                 <StatusBadge status={t.status} growth={t.pertumbuhan_pct} />
                               </td>

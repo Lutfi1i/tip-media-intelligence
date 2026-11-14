@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, RefreshCw, Sparkles } from "lucide-react";
 import { fetchSocialTrends, SocialTrendingTopic } from "@/lib/api";
 import { fmtNum, fmtRelative } from "@/lib/format";
@@ -62,6 +62,12 @@ export default function AiTrendPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // ?topik=... dari Dashboard: dibaca saat mount, sebelum provider filter menulis ulang URL.
+  const pendingTopic = useRef<string | null>(null);
+  useEffect(() => {
+    pendingTopic.current = new URLSearchParams(window.location.search).get("topik");
+  }, []);
+
   // Hasil lama tidak berlaku lagi bila filter berubah.
   useEffect(() => {
     setSummary(null);
@@ -70,6 +76,18 @@ export default function AiTrendPage() {
     setErr(null);
     setSummaryErr(null);
   }, [filters]);
+
+  useEffect(() => {
+    const key = pendingTopic.current;
+    if (!key || !trends.data) return;
+    pendingTopic.current = null;
+    if (trends.data.some((t) => t.topic_key === key)) runAnalysis(key);
+    else {
+      setSelected(key);
+      setErr("Tren yang dipilih dari Dashboard tidak ada pada filter ini. Pilih tren lain dari daftar.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trends.data]);
 
   const runSummary = async (refresh = false) => {
     setSummaryBusy(true);

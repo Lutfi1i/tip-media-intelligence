@@ -124,11 +124,11 @@ export default function AkunPopulerPage() {
                               <div className="text-2xs text-zinc-500">{a.platform.map(platformLabel).join(", ")}</div>
                             </td>
                             <td className="py-2 pr-3 text-right font-mono">{fmtNum(a.postingan)}</td>
-                            <td className="py-2 pr-3 text-right"><Metric value={a.followers} /></td>
+                            <td className="py-2 pr-3 text-right"><Metric value={a.followers} compact /></td>
                             <td className="py-2 pr-3 text-right"><Growth v={a.pertumbuhan_followers} /></td>
-                            <td className="py-2 pr-3 text-right"><Metric value={a.rata_views} /></td>
+                            <td className="py-2 pr-3 text-right"><Metric value={a.rata_views} compact /></td>
                             <td className="py-2 pr-3 text-right">
-                              {a.engagement_rate_pct === null ? <Metric value={null} /> : <span className="font-mono">{fmtNum(a.engagement_rate_pct, 2)}%</span>}
+                              {a.engagement_rate_pct === null ? <Metric value={null} compact /> : <span className="font-mono">{fmtNum(a.engagement_rate_pct, 2)}%</span>}
                             </td>
                             <td className="py-2 pr-3 text-xs text-zinc-600 dark:text-zinc-300">{a.kategori.join(", ") || "-"}</td>
                             <td className="py-2 text-xs text-zinc-600 dark:text-zinc-300">{a.wilayah || "-"}</td>

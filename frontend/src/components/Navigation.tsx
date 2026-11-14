@@ -11,6 +11,7 @@ import {
   pollSources,
 } from "@/lib/api";
 import {
+  ChevronDown,
   Flame,
   Hash,
   LayoutDashboard,
@@ -263,6 +264,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [crisisPref, setCrisisPref] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem("tip_nav_krisis");
+      if (v === "1" || v === "0") setCrisisPref(v === "1");
+    } catch {
+      // abaikan
+    }
+  }, []);
 
   // Ctrl+K / Cmd+K membuka pencarian dari halaman mana pun.
   useEffect(() => {
@@ -321,6 +332,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     .map((sec) => ({ ...sec, items: sec.items.filter((i) => canSee(i.href, authUser)) }))
     .filter((sec) => sec.items.length > 0);
   const visibleItems = visibleSections.flatMap((sec) => sec.items);
+
+  // Modul krisis lama dilipat agar menu Tren Sosial tetap ringkas; terbuka otomatis bila
+  // halaman aktif ada di dalamnya, dan pilihan buka/tutup diingat.
+  const crisisSections = visibleSections.filter((sec) => sec.group !== trendSection.group);
+  const inCrisis = crisisSections.some((sec) => sec.items.some((i) => isNavActive(i.href, pathname)));
+  const crisisOpen = crisisPref ?? inCrisis;
+  const toggleCrisis = () => {
+    const next = !crisisOpen;
+    setCrisisPref(next);
+    try {
+      window.localStorage.setItem("tip_nav_krisis", next ? "1" : "0");
+    } catch {
+      // abaikan
+    }
+  };
+  const shownSections = crisisOpen ? visibleSections : visibleSections.filter((sec) => sec.group === trendSection.group);
+  const crisisCount = crisisSections.reduce((n, sec) => n + sec.items.length, 0);
+  const crisisToggle = (
+    <button
+      type="button"
+      onClick={toggleCrisis}
+      aria-expanded={crisisOpen}
+      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-[11px] font-semibold text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900"
+    >
+      <span>Modul monitoring krisis ({crisisCount})</span>
+      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${crisisOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+    </button>
+  );
 
   const handleSyncRealData = async () => {
     setIsPolling(true);
@@ -481,8 +520,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="hidden md:flex md:w-60 lg:w-64 fixed left-0 top-14 bottom-0 bg-white dark:bg-[#07090E] border-r border-zinc-200 dark:border-zinc-800/80 flex-col justify-between shrink-0 select-none z-30 overflow-y-auto">
           <div className="p-4 space-y-6">
             <nav className="space-y-6" aria-label="Menu Navigasi">
-              {visibleSections.map((sec) => (
+              {shownSections.map((sec, si) => (
                 <div key={sec.group} className="space-y-1.5">
+                  {si === 1 && <div className="-mt-3 mb-3">{crisisToggle}</div>}
                   <div className="px-3 flex items-center justify-between">
                     <p className={`text-[10px] font-mono font-bold tracking-wider uppercase ${sec.groupColor}`}>
                       {sec.group}
@@ -539,6 +579,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
               ))}
+              {!crisisOpen && crisisCount > 0 && <div className="-mt-3">{crisisToggle}</div>}
             </nav>
           </div>
         </aside>
@@ -559,8 +600,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
-              {visibleSections.map((sec) => (
+              {shownSections.map((sec, si) => (
                 <div key={sec.group} className="space-y-1">
+                  {si === 1 && <div className="mb-2">{crisisToggle}</div>}
                   <p className={`px-3 text-[10px] font-mono font-bold tracking-wider uppercase ${sec.groupColor}`}>{sec.group}</p>
                   {sec.items.map((item) => {
                     if (item.disabled) {
@@ -603,6 +645,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   })}
                 </div>
               ))}
+              {!crisisOpen && crisisCount > 0 && crisisToggle}
               <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
                 <div className="flex items-center justify-between px-3">
                   <span className="text-xs text-zinc-600 dark:text-zinc-400">Tema</span>

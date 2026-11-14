@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { fmtNum } from "@/lib/format";
 import { platformLabel } from "@/lib/trendFilters";
@@ -11,6 +11,7 @@ import { CompareLines, seriesColor } from "@/components/trend/TrendCharts";
 import { BaselineNotice, Section, StatusBadge, TrendState, useTrendData } from "@/components/trend/TrendUi";
 
 const MAX_COMPARE = 5;
+const INITIAL_ROWS = 10;
 
 function KeyTable({
   rows,
@@ -23,7 +24,9 @@ function KeyTable({
   onToggle: (key: string) => void;
   extra?: { header: string; cell: (r: KeyRow) => React.ReactNode };
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (rows.length === 0) return <p className="text-xs text-zinc-500">Belum ada data untuk filter ini.</p>;
+  const visible = showAll ? rows : rows.slice(0, INITIAL_ROWS);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -31,14 +34,14 @@ function KeyTable({
           <tr className="border-b border-zinc-200 dark:border-zinc-800">
             <th className="py-2 pr-3">Kata</th>
             <th className="py-2 pr-3 text-right">Postingan</th>
-            <th className="py-2 pr-3 text-right">Sumber</th>
+            <th className="hidden py-2 pr-3 text-right sm:table-cell">Sumber</th>
             {extra && <th className="py-2 pr-3 text-right">{extra.header}</th>}
             <th className="py-2 pr-3">Tren</th>
             <th className="py-2"><span className="sr-only">Bandingkan</span></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {rows.map((r) => {
+          {visible.map((r) => {
             const idx = selected.indexOf(r.key);
             return (
               <tr key={r.key}>
@@ -47,7 +50,7 @@ function KeyTable({
                   <div className="text-2xs text-zinc-500">{r.platform.map(platformLabel).join(", ")}</div>
                 </td>
                 <td className="py-2 pr-3 text-right font-mono">{fmtNum(r.jumlah)}</td>
-                <td className="py-2 pr-3 text-right">
+                <td className="hidden py-2 pr-3 text-right sm:table-cell">
                   <span className="font-mono">{fmtNum(r.sumber)}</span>
                   {r.sumber < 2 && (
                     <span className="ml-1 rounded bg-amber-100 px-1 text-2xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" title="Hanya dipakai satu akun atau sumber, belum menyebar">
@@ -77,6 +80,15 @@ function KeyTable({
           })}
         </tbody>
       </table>
+      {rows.length > INITIAL_ROWS && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-2 text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
+        >
+          {showAll ? "Tampilkan lebih sedikit" : `Tampilkan semua (${rows.length})`}
+        </button>
+      )}
     </div>
   );
 }
@@ -90,6 +102,16 @@ export default function HashtagKeywordPage() {
     (f) => (selected.length ? fetchKeyHistory(f, selected) : Promise.resolve(null)),
     [selected.join("|")]
   );
+
+  // Isi grafik dengan 3 hashtag multi-sumber teratas agar tidak kosong saat pertama dibuka.
+  // Hanya sekali; pilihan pengguna setelahnya tidak ditimpa.
+  const autoPicked = useRef(false);
+  useEffect(() => {
+    if (autoPicked.current || !data) return;
+    autoPicked.current = true;
+    const top = data.hashtag.filter((r) => r.sumber >= 2).slice(0, 3).map((r) => r.key);
+    if (top.length) setSelected((s) => (s.length ? s : top));
+  }, [data]);
 
   const toggle = (key: string) =>
     setSelected((s) => (s.includes(key) ? s.filter((k) => k !== key) : s.length >= MAX_COMPARE ? s : [...s, key]));

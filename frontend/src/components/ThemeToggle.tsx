@@ -37,28 +37,23 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="w-8 h-8 rounded border border-zinc-300 dark:border-zinc-800" />
+      <div className="h-9 w-9 rounded-md border border-zinc-300 dark:border-zinc-800" />
     );
   }
 
+  const label = theme === "dark" ? "Ganti ke mode terang" : "Ganti ke mode gelap";
   return (
     <button
       onClick={toggleTheme}
       type="button"
-      className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-mono font-medium rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 transition-colors"
-      title={theme === "dark" ? "Beralih ke Mode Terang (White)" : "Beralih ke Mode Gelap (OLED Black)"}
-      aria-label="Toggle Black/White theme"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 transition-colors"
+      title={label}
+      aria-label={label}
     >
       {theme === "dark" ? (
-        <>
-          <Sun className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden sm:inline">LIGHT</span>
-        </>
+        <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" />
       ) : (
-        <>
-          <Moon className="w-3.5 h-3.5 text-zinc-700" />
-          <span className="hidden sm:inline">DARK</span>
-        </>
+        <Moon className="w-4 h-4 text-zinc-700" aria-hidden="true" />
       )}
     </button>
   );

@@ -177,6 +177,7 @@ def get_region_trends(db: Session, periode: str, lokasi: str, platform: Optional
                 "status": t["velocity_status"],
                 "pertumbuhan_pct": t["growth_pct"],
                 "platform": t["platforms"][:4],
+                "hashtag": t["hashtags"][:3],
             }
             for t in trends[:10]
         ],
@@ -529,6 +530,7 @@ def get_report_data(db: Session, periode: str, lokasi: str, platform: Optional[s
                 "status": t["velocity_status"],
                 "pertumbuhan_pct": t["growth_pct"],
                 "negatif_pct": t["sentiment_pct"].get("negatif", 0),
+                "hashtag": t["hashtags"][:3],
             }
             for t in trends[:15]
         ],

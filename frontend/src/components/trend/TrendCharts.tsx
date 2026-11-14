@@ -17,10 +17,51 @@ function niceMax(v: number): number {
 const shortDate = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
-/** Grafik batang satu seri (mis. postingan per hari). Judul di luar komponen menamai serinya. */
+export interface BarPoint {
+  key: string;
+  /** Label sumbu X (singkat). */
+  axis: string;
+  /** Label lengkap di tooltip. */
+  tip: string;
+  value: number;
+}
+
+/** Grafik postingan per hari untuk laporan. */
 export function DailyBars({ data, unit = "postingan" }: { data: { tanggal: string; postingan: number }[]; unit?: string }) {
+  return (
+    <BarSeries
+      unit={unit}
+      data={data.map((d) => ({ key: d.tanggal, axis: shortDate(d.tanggal), tip: shortDate(d.tanggal), value: d.postingan }))}
+    />
+  );
+}
+
+/** Grafik volume dari timeline backend (interval mengikuti panjang periode). */
+export function TimelineBars({ points, unit = "postingan" }: { points: { t: string; count: number }[]; unit?: string }) {
+  const spanHours = points.length > 1 ? (Date.parse(`${points[points.length - 1].t}Z`) - Date.parse(`${points[0].t}Z`)) / 3_600_000 : 0;
+  const fmt = (iso: string, withDate: boolean) =>
+    new Date(`${iso}Z`).toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      ...(withDate ? { day: "numeric", month: "short" } : {}),
+      ...(spanHours <= 48 || !withDate ? { hour: "2-digit", minute: "2-digit", hour12: false } : {}),
+    });
+  return (
+    <BarSeries
+      unit={unit}
+      data={points.map((p) => ({
+        key: p.t,
+        axis: spanHours <= 30 ? fmt(p.t, false) : shortDate(new Date(`${p.t}Z`).toISOString().slice(0, 10)),
+        tip: `${fmt(p.t, true)} WIB`,
+        value: p.count,
+      }))}
+    />
+  );
+}
+
+/** Grafik batang satu seri. Judul di luar komponen menamai serinya, jadi tanpa legenda. */
+export function BarSeries({ data, unit = "postingan" }: { data: BarPoint[]; unit?: string }) {
   const [hover, setHover] = useState<number | null>(null);
-  const max = niceMax(Math.max(1, ...data.map((d) => d.postingan)));
+  const max = niceMax(Math.max(1, ...data.map((d) => d.value)));
   if (!data.length) return <p className="text-xs text-zinc-500">Belum ada data.</p>;
   const labelEvery = Math.ceil(data.length / 7);
 
@@ -41,20 +82,20 @@ export function DailyBars({ data, unit = "postingan" }: { data: { tanggal: strin
           <div className="flex h-[160px] items-end gap-[2px]">
             {data.map((d, i) => (
               <div
-                key={d.tanggal}
+                key={d.key}
                 className="relative flex h-full flex-1 items-end"
                 onMouseEnter={() => setHover(i)}
                 onMouseLeave={() => setHover(null)}
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover(null)}
                 tabIndex={0}
-                aria-label={`${shortDate(d.tanggal)}: ${d.postingan} ${unit}`}
+                aria-label={`${d.tip}: ${d.value} ${unit}`}
               >
                 <div
                   className="w-full rounded-t-[4px] transition-opacity"
                   style={{
-                    height: `${(d.postingan / max) * 100}%`,
-                    minHeight: d.postingan > 0 ? 2 : 0,
+                    height: `${(d.value / max) * 100}%`,
+                    minHeight: d.value > 0 ? 2 : 0,
                     background: "var(--series-1)",
                     opacity: hover === null || hover === i ? 1 : 0.45,
                   }}
@@ -64,20 +105,22 @@ export function DailyBars({ data, unit = "postingan" }: { data: { tanggal: strin
           </div>
           <div className="mt-1 flex h-4 gap-[2px]">
             {data.map((d, i) => (
-              <div key={d.tanggal} className="flex-1 truncate text-center">
-                {i % labelEvery === 0 || i === data.length - 1 ? shortDate(d.tanggal) : ""}
+              <div key={d.key} className="min-w-0 flex-1 whitespace-nowrap text-center">
+                {i % labelEvery === 0 ? d.axis : ""}
               </div>
             ))}
           </div>
           {hover !== null && (
             <div
               role="tooltip"
-              className="pointer-events-none absolute -top-2 z-10 -translate-x-1/2 -translate-y-full rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs shadow-md dark:border-zinc-700 dark:bg-zinc-900"
+              className={`pointer-events-none absolute -top-2 z-10 -translate-y-full rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs shadow-md dark:border-zinc-700 dark:bg-zinc-900 ${
+                hover < data.length * 0.15 ? "" : hover > data.length * 0.85 ? "-translate-x-full" : "-translate-x-1/2"
+              }`}
               style={{ left: `${((hover + 0.5) / data.length) * 100}%` }}
             >
-              <div className="font-semibold text-zinc-900 dark:text-zinc-100">{shortDate(data[hover].tanggal)}</div>
+              <div className="whitespace-nowrap font-semibold text-zinc-900 dark:text-zinc-100">{data[hover].tip}</div>
               <div className="font-mono text-zinc-600 dark:text-zinc-300">
-                {fmtNum(data[hover].postingan)} {unit}
+                {fmtNum(data[hover].value)} {unit}
               </div>
             </div>
           )}
