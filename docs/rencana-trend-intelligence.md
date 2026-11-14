@@ -1,6 +1,6 @@
 # Rencana: Perubahan ke Social Trend Intelligence
 
-Status: Fase 0 selesai dan menu 1 (Dashboard Tren) sudah dibangun (14 November 2026). Berikutnya Fase 1 menu 2-5.
+Status: semua 8 menu sudah dibangun (14 November 2026). Tersisa dua langkah yang menunggu persetujuan pemilik (bagian 7).
 
 Arah baru: dari monitoring krisis untuk instansi (isu, verifikasi, kasus SLA) menjadi
 pemantauan tren sosial per wilayah dan rekomendasi ide konten, dengan 8 menu:
@@ -117,7 +117,20 @@ Kesimpulan: menu 1, 2, 3, 5, dan 8 bisa dibangun dari data yang ada. Menu 7 bisa
 
 ---
 
-## 7. Langkah berikutnya
+## 7. Status dan langkah berikutnya
 
-1. Fase 1: Tren Wilayah, Live Social Monitoring, Hashtag & Keyword, lalu lengkapi gazetteer.
-2. Satu commit per menu. Saat sebuah menu selesai, hapus `disabled` di `trendSection` (`components/Navigation.tsx`).
+Selesai (branch `feat/ui-ux-perbaikan`):
+- Gazetir nasional 514 kota/kabupaten, filter provinsi mencakup kotanya, kode Papua diperbaiki.
+- API `/api/v1/tren/*` dan 8 halaman di `/tren`, analisis AI dengan cache dan batas 30 panggilan per jam.
+- Ekspor laporan PDF (fpdf2) dan Excel (openpyxl).
+
+Menunggu persetujuan pemilik, karena mengubah database dan menyalakan pengambilan data otomatis ke Google News:
+1. Tambahkan sumber medsos per provinsi (37 sumber, frekuensi 60 menit):
+   `backend/venv/bin/python -m backend.scripts.seed_national_social_sources` (batalkan dengan `--hapus`).
+2. Nyalakan pengumpulan otomatis: tambahkan `AUTO_COLLECT_MINUTES=10` ke `.env`, lalu restart backend.
+   Tanpa ini data hanya bertambah saat tombol "Tarik Berita Nyata" diklik, sehingga periode "Hari ini"
+   sering kosong dan baseline laju tidak pernah terisi.
+
+Belum dikerjakan (di luar sumber gratis):
+- Metrik TikTok, Instagram, X, dan Threads. Reddit JSON publik tidak dipakai karena syarat API Reddit
+  mewajibkan OAuth untuk aplikasi.
