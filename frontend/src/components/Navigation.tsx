@@ -10,19 +10,80 @@ import {
   fetchCurrentUser,
   pollSources,
 } from "@/lib/api";
-import { Menu, Search, X } from "lucide-react";
+import {
+  Flame,
+  Hash,
+  LayoutDashboard,
+  MapPinned,
+  Menu,
+  Radio,
+  ScrollText,
+  Search,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import { BrandMark } from "./RadarUi";
 import { ThemeToggle } from "./ThemeToggle";
 import { GlobalSearch } from "./GlobalSearch";
 import { NotificationBell } from "./NotificationBell";
 
-const navSections = [
+type NavItem = {
+  label: string;
+  href: string;
+  icon3dGradient: string;
+  activeClass: string;
+  hoverClass: string;
+  icon: React.ReactNode;
+  /** Menu yang belum dibangun: tampil redup dan tidak bisa diklik. */
+  disabled?: boolean;
+  [extra: string]: unknown;
+};
+
+type NavSection = { group: string; groupColor: string; items: NavItem[] };
+
+function trendItem(label: string, href: string, Icon: typeof Flame, disabled = false): NavItem {
+  return {
+    label,
+    href,
+    disabled,
+    icon3dGradient: "from-fuchsia-400 via-fuchsia-500 to-violet-700 shadow-fuchsia-500/35",
+    activeClass: "bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white shadow-md shadow-fuchsia-500/25",
+    hoverClass: "hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:hover:text-fuchsia-400",
+    icon: <Icon className="w-4 h-4" aria-hidden="true" />,
+  };
+}
+
+// Menu Tren Sosial (docs/rencana-trend-intelligence.md). disabled = belum dibangun.
+const trendSection: NavSection = {
+  group: "TREN SOSIAL",
+  groupColor: "text-fuchsia-500 dark:text-fuchsia-400",
+  items: [
+    trendItem("Dashboard Tren", "/tren", LayoutDashboard),
+    trendItem("Tren Wilayah", "/tren/wilayah", MapPinned, true),
+    trendItem("Live Social Monitoring", "/tren/live", Radio, true),
+    trendItem("Konten Viral", "/tren/viral", Flame, true),
+    trendItem("Hashtag & Keyword", "/tren/hashtag", Hash, true),
+    trendItem("Influencer & Akun", "/tren/akun", Users, true),
+    trendItem("AI Trend Analysis", "/tren/ai", Sparkles, true),
+    trendItem("Laporan & Insight", "/tren/laporan", ScrollText, true),
+  ],
+};
+
+function isNavActive(href: string, pathname: string): boolean {
+  // "/" dan "/tren" adalah induk menu lain, jadi harus cocok persis.
+  if (href === "/" || href === "/tren") return pathname === href;
+  return pathname.startsWith(href);
+}
+
+const navSections: NavSection[] = [
+  trendSection,
   {
     group: "MONITORING LIVE",
     groupColor: "text-sky-500 dark:text-sky-400",
     items: [
       {
-        label: "Dashboard",
+        label: "Dashboard Krisis",
         href: "/",
         pathDisplay: "radar.tipmedia.id/dashboard",
         iconColor: "text-sky-500",
@@ -429,10 +490,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="space-y-1">
                     {sec.items.map((item) => {
-                      const isActive =
-                        item.href === "/"
-                          ? pathname === "/"
-                          : pathname.startsWith(item.href);
+                      if (item.disabled) {
+                        return (
+                          <div
+                            key={item.href}
+                            aria-disabled="true"
+                            title="Belum tersedia"
+                            className="flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-zinc-100 dark:bg-zinc-900">
+                                {item.icon}
+                              </span>
+                              <span>{item.label}</span>
+                            </div>
+                            <span className="text-[10px] font-semibold">Segera</span>
+                          </div>
+                        );
+                      }
+                      const isActive = isNavActive(item.href, pathname);
                       return (
                         <Link
                           key={item.href}
@@ -487,7 +563,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div key={sec.group} className="space-y-1">
                   <p className={`px-3 text-[10px] font-mono font-bold tracking-wider uppercase ${sec.groupColor}`}>{sec.group}</p>
                   {sec.items.map((item) => {
-                    const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                    if (item.disabled) {
+                      return (
+                        <div
+                          key={item.href}
+                          aria-disabled="true"
+                          className="flex min-h-[44px] items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold text-zinc-400 dark:text-zinc-600"
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-zinc-100 dark:bg-zinc-900">
+                              {item.icon}
+                            </span>
+                            {item.label}
+                          </span>
+                          <span className="text-[10px]">Segera</span>
+                        </div>
+                      );
+                    }
+                    const isActive = isNavActive(item.href, pathname);
                     return (
                       <Link
                         key={item.href}
@@ -550,7 +643,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <GlobalSearch
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
-        pages={visibleItems.map((i) => ({ label: i.label, href: i.href }))}
+        pages={visibleItems.filter((i) => !i.disabled).map((i) => ({ label: i.label, href: i.href }))}
       />
     </div>
   );

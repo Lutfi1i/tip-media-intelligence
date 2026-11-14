@@ -74,10 +74,17 @@ class Period:
     n_windows: int
     bucket_minutes: int
     label: str
+    # Jarak antar jendela baseline. None = sama dengan panjang periode (jendela berurutan).
+    # "today" memakai 1 hari agar dibandingkan dengan jam yang sama pada hari-hari sebelumnya.
+    stride: Optional[timedelta] = None
 
     @property
     def span(self) -> timedelta:
         return self.end - self.start
+
+    @property
+    def step(self) -> timedelta:
+        return self.stride or self.span
 
     @property
     def n_buckets(self) -> int:
@@ -103,9 +110,21 @@ def custom_period_key(start: str, end: str) -> str:
     return f"custom:{start}:{end}"
 
 
+TODAY_BASELINE_DAYS = 7
+
+
 def resolve_period(time_range: str, now: Optional[datetime] = None) -> Period:
-    """Terjemahkan preset ("24h") atau "custom:2026-11-01:2026-11-10" menjadi Period. ValueError bila tidak valid."""
+    """Terjemahkan preset ("24h", "today") atau "custom:2026-11-01:2026-11-10" menjadi Period. ValueError bila tidak valid."""
     now = now or datetime.utcnow()
+    if time_range == "today":
+        # Sejak 00:00 WIB hari ini sampai sekarang, dibandingkan dengan rentang jam yang
+        # sama pada 7 hari sebelumnya (bukan jendela berurutan yang jatuh di malam hari).
+        start = datetime.combine((now + WIB).date(), datetime.min.time()) - WIB
+        end = max(now, start + timedelta(minutes=1))
+        return Period(
+            "today", start, end, TODAY_BASELINE_DAYS, _auto_bucket_minutes(end - start),
+            "Hari ini (sejak 00.00 WIB)", stride=timedelta(days=1),
+        )
     if time_range in WINDOW_HOURS:
         window = timedelta(hours=WINDOW_HOURS[time_range])
         n_buckets, minutes = TIMELINE_BUCKETS[time_range]
@@ -284,9 +303,9 @@ def _load_dataset(
     now = datetime.utcnow()
     period = period or resolve_period(time_range, now)
     n_windows = period.n_windows
-    window = period.span
+    span, step = period.span, period.step
     window_start, window_end = period.start, period.end
-    history_start = window_start - window * n_windows
+    history_start = window_start - step * n_windows
 
     rows: List[Tuple[RawItem, Optional[ItemAnalysis]]] = (
         db.query(RawItem, ItemAnalysis)
@@ -359,15 +378,18 @@ def _load_dataset(
             if conf == "High":
                 direct += 1
         else:
-            idx = int((window_start - it.published_at) / window)
-            if 0 <= idx < n_windows:
+            # Jendela ke-k (0-based) = [start - (k+1)*step, start - (k+1)*step + span).
+            # Dengan step == span ini sama dengan jendela berurutan.
+            offset = window_start - it.published_at
+            idx = math.ceil(offset / step) - 1
+            if 0 <= idx < n_windows and offset > (idx + 1) * step - span:
                 history.append(post)
                 history_index[it.id] = idx
 
     coverage_since = _social_coverage_since(db)
     covered = [
         i for i in range(n_windows)
-        if coverage_since is not None and window_start - window * (i + 1) >= coverage_since - timedelta(minutes=1)
+        if coverage_since is not None and window_start - step * (i + 1) >= coverage_since - timedelta(minutes=1)
     ]
 
     ids = [p.id for p in current]
@@ -1084,14 +1106,20 @@ def get_social_brief(
 
 
 def previous_period(p: Period) -> Period:
-    """Periode tepat sebelum p dengan panjang sama (pembanding default)."""
+    """Periode pembanding default: tepat sebelum p dengan panjang sama.
+
+    Untuk "today" (stride 1 hari) pembandingnya kemarin pada rentang jam yang sama.
+    """
+    start = p.start - p.step
+    end = start + p.span
     return Period(
         key=f"sebelum:{p.key}",
-        start=p.start - p.span,
-        end=p.start,
+        start=start,
+        end=end,
         n_windows=p.n_windows,
         bucket_minutes=p.bucket_minutes,
-        label=f"periode sebelumnya ({(p.start - p.span + WIB).strftime('%Y-%m-%d %H:%M')} s.d. {(p.start + WIB).strftime('%Y-%m-%d %H:%M')} WIB)",
+        label=f"periode sebelumnya ({(start + WIB).strftime('%Y-%m-%d %H:%M')} s.d. {(end + WIB).strftime('%Y-%m-%d %H:%M')} WIB)",
+        stride=p.stride,
     )
 
 

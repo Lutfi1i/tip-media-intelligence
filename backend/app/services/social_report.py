@@ -162,7 +162,7 @@ def generate_social_report(db: Session, time_range: str = "24h", scope_kode: str
     platforms = get_platform_metrics(db, scope_kode=scope_kode, time_range=time_range)
 
     period = overview["period"]
-    jenis = {"24h": "social_harian", "7d": "social_mingguan", "30d": "social_bulanan"}.get(time_range, "social_kustom")
+    jenis = {"today": "social_harian", "24h": "social_harian", "7d": "social_mingguan", "30d": "social_bulanan"}.get(time_range, "social_kustom")
     judul = f"Laporan Social Pulse: {overview['scope_name']}, {period['label']}"
     dibuat = (datetime.utcnow() + timedelta(hours=7)).strftime("%d-%m-%Y %H:%M")
 

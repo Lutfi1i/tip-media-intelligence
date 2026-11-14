@@ -59,7 +59,7 @@ router = APIRouter(prefix="/social-pulse", tags=["Social Pulse"])
 
 
 def period_param(
-    time_range: str = Query("24h", description="Preset: 1h, 6h, 24h, 7d, 30d. Diabaikan bila start diisi."),
+    time_range: str = Query("24h", description="Preset: today (sejak 00.00 WIB), 1h, 6h, 24h, 7d, 30d. Diabaikan bila start diisi."),
     start: Optional[str] = Query(None, description="Tanggal mulai WIB (YYYY-MM-DD) untuk periode kustom"),
     end: Optional[str] = Query(None, description="Tanggal akhir WIB (YYYY-MM-DD), ikut dihitung. Default = start"),
 ) -> str:
