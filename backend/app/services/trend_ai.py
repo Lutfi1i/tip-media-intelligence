@@ -20,7 +20,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from backend.app.config import settings
-from backend.app.services.social_pulse_service import _build_trends, _load_dataset
+from backend.app.services.social_pulse_service import _build_trends, _load_dataset, _scope_display_name
 from backend.app.services.social_topics import SocialPost
 from backend.app.services.trend_service import _platform_arg, _post_brief, _reach
 
@@ -80,7 +80,7 @@ def _chat_json(system: str, user: str, max_tokens: int = 1400) -> Tuple[Dict[str
     _reserve_call()
     payload = {
         "model": settings.AI_MODEL_NAME,
-        "temperature": 0.4,
+        "temperature": 0.3,
         "max_tokens": max_tokens,
         "response_format": {"type": "json_object"},
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -155,6 +155,9 @@ def detect_and_project(trend: Dict[str, Any]) -> Dict[str, Any]:
 
 TOPIC_SYSTEM = """Anda analis tren media sosial Indonesia yang membantu kreator konten.
 Gunakan HANYA fakta dari postingan yang diberikan. Jangan mengarang angka, nama, atau kejadian.
+Arti data: "status" adalah laju dibanding periode sebelumnya. BARU = belum ada data pembanding, jadi JANGAN
+menyebut naik atau turun. SINYAL LEMAH = postingan terlalu sedikit. MENINGKAT/LONJAKAN TINGGI = naik, MENURUN = turun.
+"negatif %" adalah porsi postingan bernada negatif; di bawah 20% berarti mayoritas tidak negatif.
 Bila bukti tidak cukup untuk suatu bagian, katakan terus terang di bagian itu.
 Tulis dalam Bahasa Indonesia yang lugas. Jangan memakai tanda pisah panjang (em dash).
 Jawab dalam JSON dengan kunci persis:
@@ -246,7 +249,7 @@ def analyze_topic(
 
     user = "\n".join([
         f"Topik: {trend['topic']}",
-        f"Periode: {ds.period.label}. Lokasi filter: {lokasi}. Platform: {platform or 'Semua'}.",
+        f"Periode: {ds.period.label}. Lokasi filter: {_scope_display_name(lokasi or 'ID')}. Platform: {platform or 'Semua'}.",
         f"Jumlah postingan: {trend['mention_count']}. Status laju: {trend['velocity_status']}.",
         f"Sentimen (%): {json.dumps(trend['sentiment_pct'], ensure_ascii=False)}.",
         f"Platform: {', '.join(trend['platforms'])}. Kategori: {', '.join(c['label'] for c in trend['categories']) or '-'}.",
@@ -270,6 +273,9 @@ def analyze_topic(
 
 SUMMARY_SYSTEM = """Anda analis tren media sosial Indonesia. Dari daftar tren berikut, tulis ringkasan untuk kreator konten.
 Gunakan hanya data yang diberikan, jangan mengarang angka. Bahasa Indonesia lugas, tanpa tanda pisah panjang (em dash).
+Arti data: "status" adalah laju dibanding periode sebelumnya. BARU = belum ada data pembanding, jadi JANGAN
+menyebut naik atau turun. SINYAL LEMAH = postingan terlalu sedikit. MENINGKAT/LONJAKAN TINGGI = naik, MENURUN = turun.
+"negatif %" adalah porsi postingan bernada negatif; di bawah 20% berarti mayoritas tidak negatif.
 Jawab JSON: {"ringkasan": "3-4 kalimat", "poin": [{"topik": "...", "insight": "1 kalimat"}], "rekomendasi_topik": [{"topik": "...", "alasan": "...", "platform": ["TikTok"]}]}
 Maksimal 5 poin dan 3 rekomendasi. Rekomendasi hanya untuk topik yang aman dan cocok dijadikan konten."""
 
@@ -287,7 +293,10 @@ def summarize_trends(db: Session, periode: str, lokasi: str, platform: Optional[
     if hit:
         return {**hit, "tren": len(trends), "cache": True}
 
-    lines = [f"Periode: {ds.period.label}. Lokasi: {lokasi}. Platform: {platform or 'Semua'}. Total postingan: {len(ds.current)}."]
+    lines = [
+        f"Periode: {ds.period.label}. Lokasi: {_scope_display_name(lokasi or 'ID')} (sebut wilayah ini, bukan Indonesia, "
+        f"bila bukan nasional). Platform: {platform or 'Semua'}. Total postingan: {len(ds.current)}."
+    ]
     for t in trends:
         samples = "; ".join(m["judul"][:90] for m in t["sample_mentions"][:2])
         lines.append(
