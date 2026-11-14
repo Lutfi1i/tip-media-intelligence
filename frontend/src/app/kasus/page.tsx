@@ -9,6 +9,8 @@ import {
   fetchCurrentUser,
   onDataSynced,
   uploadCaseEvidence,
+  downloadCaseEvidence,
+  isStoredEvidenceUrl,
   CaseCard,
   IssueItem,
 } from "@/lib/api";
@@ -405,11 +407,24 @@ export default function PapanKasusPage() {
                       {fmtDateTime(b.waktu)} &bull; {b.oleh}
                     </div>
                     <div className="text-zinc-800 dark:text-zinc-200">{b.catatan}</div>
-                    {b.url && (
-                      <a href={b.url} target="_blank" rel="noopener noreferrer" className="text-sky-600 dark:text-sky-400 hover:underline break-all">
-                        {b.url}
-                      </a>
-                    )}
+                    {b.url &&
+                      (isStoredEvidenceUrl(b.url) ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            downloadCaseEvidence(b.url!, b.catatan.replace(/^Lampiran: /, "") || "bukti").catch((err) =>
+                              setFormError(err instanceof Error ? err.message : "Gagal mengunduh bukti")
+                            )
+                          }
+                          className="text-sky-600 dark:text-sky-400 hover:underline"
+                        >
+                          Unduh file
+                        </button>
+                      ) : (
+                        <a href={b.url} target="_blank" rel="noopener noreferrer" className="text-sky-600 dark:text-sky-400 hover:underline break-all">
+                          {b.url}
+                        </a>
+                      ))}
                   </div>
                 ))}
               </div>

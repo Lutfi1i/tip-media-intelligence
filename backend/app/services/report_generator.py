@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from jinja2 import Template
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from backend.app.models import Case, Issue, RawItem, Region, Report, Source
 from backend.app.services.storage import get_object, put_object
@@ -400,7 +401,7 @@ REPORT_HTML_TEMPLATE = """<!DOCTYPE html>
       {% endfor %}
     </tbody>
   </table>
-  <div class="table-source">Sumber: Agregasi gazetteer wilayah Kemendagri pada TIP Media Intelligence.</div>
+  <div class="table-source">Sumber: Agregasi gazetteer wilayah Kemendagri pada TIP Media Intelligence. Tabel ini menggambarkan kondisi saat laporan disusun, bukan khusus periode laporan.</div>
 
   <h1>4. Kualitas Data dan Keterbatasan</h1>
   <p class="prose">
@@ -610,22 +611,54 @@ def render_report_pdf_bytes(
         return bytes(pdf.output())
 
 
+# Rentang data per jenis laporan. Insidental tidak dibatasi waktu karena
+# periodenya ditulis bebas oleh analis (nama kejadian, tanggal kejadian).
+REPORT_WINDOWS: Dict[str, Optional[timedelta]] = {
+    "harian": timedelta(hours=24),
+    "mingguan": timedelta(days=7),
+    "bulanan": timedelta(days=30),
+    "insidental": None,
+}
+
+
+def report_window_start(jenis: str, now: Optional[datetime] = None) -> Optional[datetime]:
+    """Awal rentang data (naive UTC, sama seperti kolom DB) atau None bila tanpa batas.
+
+    Jenis yang tidak dikenal diperlakukan seperti mingguan, nilai default endpoint.
+    """
+    window = REPORT_WINDOWS.get(jenis, REPORT_WINDOWS["mingguan"])
+    if window is None:
+        return None
+    return (now or datetime.utcnow()) - window
+
+
 def generate_report_document(
     db: Session,
     jenis: str = "mingguan",
     periode: str = "9-15 November 2026",
 ) -> Report:
     """Generate laporan kedinasan HTML & PDF dan simpan ke storage + database (FR-20)."""
-    issues = db.query(Issue).order_by(Issue.skor.desc()).all()
+    since = report_window_start(jenis)
+
+    issue_q = db.query(Issue)
+    raw_q = db.query(RawItem)
+    case_q = db.query(Case)
+    if since is not None:
+        issue_q = issue_q.filter(Issue.last_updated >= since)
+        raw_q = raw_q.filter(func.coalesce(RawItem.published_at, RawItem.fetched_at) >= since)
+        case_q = case_q.filter(Case.updated_at >= since)
+    issues = issue_q.order_by(Issue.skor.desc()).all()
+    cases = case_q.all()
+    total_mention = raw_q.count()
+
+    # Region menyimpan agregat terkini tanpa riwayat waktu, jadi tabel wilayah
+    # menggambarkan kondisi saat laporan disusun (dijelaskan di template).
     regions = db.query(Region).order_by(Region.mention_count.desc()).all()
     sumber_aktif = db.query(Source).filter(Source.status_izin == "aktif").count()
 
-    raw_count = db.query(RawItem).count()
-    total_mention = sum(r.mention_count for r in regions) or raw_count
     priority_count = len([i for i in issues if i.level in ("CRITICAL", "HIGH")])
-    cases = db.query(Case).all()
     completed_cases = len([c for c in cases if c.status == "selesai"])
-    affected_regions = len([r for r in regions if r.mention_count > 0])
+    affected_regions = len({i.wilayah for i in issues if i.wilayah})
     unmapped_pct = 0
 
     existing_count = db.query(Report).count()
@@ -682,6 +715,7 @@ def generate_report_document(
             "doc_number": doc_num,
             "kpi": kpi,
             "total_issues": len(issues),
+            "rentang_mulai_utc": since.isoformat() if since else None,
             "rendered_html": rendered_html,
             "pdf_key": pdf_key,
         }),

@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.models import Case, CaseEvidence, Issue
+from backend.app.models import Case, CaseEvidence, Issue, User
 from backend.app.schemas import CaseOut, CaseUpdate
 from backend.app.services.audit import record_audit
+from backend.app.services.auth import get_current_user
 from backend.app.services.storage import get_object, put_object
 
 router = APIRouter(prefix="/cases", tags=["Case Management"])
@@ -120,8 +121,15 @@ async def upload_case_evidence(
     file: UploadFile = File(...),
     uploaded_by: str = Form("PIC Petugas"),
     db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user),
 ):
-    """FR-18: Unggah lampiran bukti tindak lanjut kasus ke MinIO/S3 atau storage lokal."""
+    """FR-18: Unggah lampiran bukti tindak lanjut kasus ke MinIO/S3 atau storage lokal.
+
+    Bila AUTH_REQUIRED aktif, get_current_user menolak permintaan tanpa token.
+    Nama pengunggah diambil dari akun yang login, bukan dari isian form.
+    """
+    if user is not None:
+        uploaded_by = user.nama
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Kasus tidak ditemukan")
@@ -159,7 +167,12 @@ async def upload_case_evidence(
 
 
 @router.get("/{case_id}/evidence/{evidence_id}/download")
-def download_case_evidence(case_id: int, evidence_id: int, db: Session = Depends(get_db)):
+def download_case_evidence(
+    case_id: int,
+    evidence_id: int,
+    db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user),
+):
     ev = db.query(CaseEvidence).filter(CaseEvidence.id == evidence_id, CaseEvidence.case_id == case_id).first()
     if not ev:
         raise HTTPException(status_code=404, detail="Lampiran bukti tidak ditemukan")

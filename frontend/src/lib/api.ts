@@ -334,6 +334,24 @@ export async function uploadCaseEvidence(caseId: number, file: File, uploadedBy:
   return res.json() as Promise<{ id: number; filename: string; download_url: string }>;
 }
 
+/** Bukti yang diunggah ke storage (bukan tautan luar) butuh token, jadi diunduh lewat fetch. */
+export function isStoredEvidenceUrl(url: string): boolean {
+  return /^\/api\/v1\/cases\/\d+\/evidence\/\d+\/download$/.test(url);
+}
+
+export async function downloadCaseEvidence(url: string, fallbackName: string) {
+  const res = await fetch(url, { headers: getAuthHeaders() });
+  if (res.status === 401) throw new Error("Sesi berakhir. Masuk lagi untuk mengunduh bukti.");
+  if (!res.ok) throw new Error("File bukti tidak ditemukan");
+  const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "");
+  const blobUrl = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = match?.[1] || fallbackName;
+  a.click();
+  URL.revokeObjectURL(blobUrl);
+}
+
 export interface AlertItem {
   id: number;
   issue_id: number;

@@ -43,12 +43,13 @@ def test_pairs_need_two_accounts_and_groups_follow_strong_links():
 
 
 def test_weak_links_do_not_merge_groups():
+    # Tag minimal 3 karakter: extract_keys mengabaikan tag yang lebih pendek.
     posts = [
-        _post(1, "a #x #y", "@a"), _post(2, "b #x #y", "@b"),
-        _post(3, "c #y #z", "@c"), _post(4, "d #z", "@d"), _post(5, "e #z", "@e"),
-        _post(6, "f #y #z", "@f"), _post(7, "g #z", "@g"), _post(8, "h #z", "@h"),
+        _post(1, "a #aaa #bbb", "@a"), _post(2, "b #aaa #bbb", "@b"),
+        _post(3, "c #bbb #ccc", "@c"), _post(4, "d #ccc", "@d"), _post(5, "e #ccc", "@e"),
+        _post(6, "f #bbb #ccc", "@f"), _post(7, "g #ccc", "@g"), _post(8, "h #ccc", "@h"),
     ]
     pairs = hashtag_pairs(posts)
-    yz = next(r for r in pairs if (r["a"], r["b"]) == ("#y", "#z"))
-    assert yz["jaccard"] < 0.5
-    assert [g["tags"] for g in hashtag_groups(posts, pairs)] == [["#x", "#y"]]
+    bc = next(r for r in pairs if (r["a"], r["b"]) == ("#bbb", "#ccc"))
+    assert bc["jaccard"] < 0.5
+    assert [g["tags"] for g in hashtag_groups(posts, pairs)] == [["#aaa", "#bbb"]]

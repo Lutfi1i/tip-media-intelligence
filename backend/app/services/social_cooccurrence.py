@@ -82,7 +82,9 @@ def hashtag_groups(
 
     groups = []
     for tags in members.values():
-        group_posts = [p for p in posts if _tags(p) & tags]
+        # Hanya konten yang memakai minimal dua tag kelompok sekaligus. Konten dengan satu
+        # tag saja (mis. "#viral" di video kucing) bukan bagian dari percakapan kelompok ini.
+        group_posts = [p for p in posts if len(_tags(p) & tags) >= 2]
         tag_counts = Counter(t for p in group_posts for t in _tags(p) & tags)
         groups.append({
             "tags": [t for t, _ in sorted(tag_counts.items(), key=lambda kv: (-kv[1], kv[0]))],
