@@ -63,8 +63,12 @@ STOPWORDS = set(
     via cek klik link bio selengkapnya baca simak video foto berita terkini terbaru update
     threads instagram tiktok youtube twitter facebook bluesky post posts postingan reels
     on com www http https net
+    jangan lupa subscribe like share komen comment lonceng notifikasi aktifkan follow ikuti
+    dukung channel kanal tonton nonton saksikan streaming breaking news official
     """.split()
 )
+# Kelompok terakhir: ajakan baku di deskripsi YouTube/siaran ("jangan lupa subscribe dan
+# aktifkan lonceng notifikasi", "breaking news"). Tanpa ini frasanya terbaca sebagai tren.
 
 # Nama wilayah yang menjadi bagian query pengumpulan: tidak membedakan topik bila berdiri sendiri.
 GENERIC_PLACES = {"jakarta", "bogor", "depok", "tangerang", "bekasi", "indonesia", "jabodetabek", "dki"}

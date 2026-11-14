@@ -8,7 +8,7 @@ from backend.app.services import scheduler
 from backend.app.services.audit import ensure_audit_append_only
 from backend.app.services.auth import ensure_default_admin
 from backend.app.routers import (
-    profiles, sources, issues, alerts, cases, reports, dashboard, audit, geo, social_pulse, auth, users
+    profiles, sources, issues, alerts, cases, reports, dashboard, audit, geo, social_pulse, auth, users, trend
 )
 
 if settings.SENTRY_DSN:
@@ -61,6 +61,7 @@ app.include_router(reports.router, prefix=settings.API_V1_STR)
 app.include_router(audit.router, prefix=settings.API_V1_STR)
 app.include_router(geo.router, prefix=settings.API_V1_STR)
 app.include_router(social_pulse.router, prefix=settings.API_V1_STR)
+app.include_router(trend.router, prefix=settings.API_V1_STR)
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(users.router, prefix=settings.API_V1_STR)
 

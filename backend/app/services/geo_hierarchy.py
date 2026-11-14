@@ -259,6 +259,41 @@ def region_keywords(kab: Dict[str, Any]) -> List[str]:
     return list(dict.fromkeys(words))
 
 
+_REGION_INDEX: Optional[List[Tuple[str, re.Pattern, str, Optional[str]]]] = None
+
+
+def _region_index() -> List[Tuple[str, re.Pattern, str, Optional[str]]]:
+    """(kata kunci, pola, kode provinsi, kode kota/kab atau None), dibangun sekali."""
+    global _REGION_INDEX
+    if _REGION_INDEX is None:
+        index: List[Tuple[str, re.Pattern, str, Optional[str]]] = []
+        for prov in PROVINCES_DATA:
+            kw = prov["nama"].lower()
+            index.append((kw, re.compile(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])"), prov["kode"], None))
+        for kab in KABUPATEN_DATA:
+            for kw in region_keywords(kab):
+                index.append((kw, re.compile(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])"), kab["provinsi_kode"], kab["kode"]))
+        _REGION_INDEX = index
+    return _REGION_INDEX
+
+
+def match_regions(text: str) -> Tuple[set, set]:
+    """Kode provinsi dan kode kota/kabupaten yang disebut dalam teks.
+
+    Dipakai untuk menghitung aktivitas per wilayah anak (provinsi di Indonesia, kota di
+    provinsi). Saringan substring dulu, regex hanya untuk kata yang memang muncul.
+    """
+    lower = text.lower()
+    provs: set = set()
+    kabs: set = set()
+    for kw, pattern, prov, kab in _region_index():
+        if kw in lower and pattern.search(lower):
+            provs.add(prov)
+            if kab:
+                kabs.add(kab)
+    return provs, kabs
+
+
 # Master Kecamatan (Kecamatan Kunci Kabupaten Bogor & sekitarnya)
 KECAMATAN_DATA = [
     # Kabupaten Bogor (32.01)
