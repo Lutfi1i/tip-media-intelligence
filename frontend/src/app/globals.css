@@ -16,6 +16,15 @@
   --border: #E4E4E7;
   --muted: #71717A;
   --accent: #18181B;
+  /* Warna seri grafik (palet kategori tervalidasi; lihat komponen trend/TrendCharts).
+     Urutan tetap, tidak diputar. Slot 3-5 di bawah 3:1 pada putih: grafik wajib
+     berlabel dan punya tampilan tabel. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --chart-grid: #e4e4e7;
 }
 
 .dark {
@@ -26,6 +35,12 @@
   --border: #27272A;
   --muted: #A1A1AA;
   --accent: #FFFFFF;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --chart-grid: #27272a;
 }
 
 *, *::before, *::after, html, body, button, input, select, textarea, pre, code, kbd, samp, table, th, td {

@@ -54,19 +54,19 @@ function trendItem(label: string, href: string, Icon: typeof Flame, disabled = f
   };
 }
 
-// Menu Tren Sosial (docs/rencana-trend-intelligence.md). disabled = belum dibangun.
+// Menu Tren Sosial (docs/rencana-trend-intelligence.md). Tandai disabled bila menu belum dibangun.
 const trendSection: NavSection = {
   group: "TREN SOSIAL",
   groupColor: "text-fuchsia-500 dark:text-fuchsia-400",
   items: [
     trendItem("Dashboard Tren", "/tren", LayoutDashboard),
-    trendItem("Tren Wilayah", "/tren/wilayah", MapPinned, true),
-    trendItem("Live Social Monitoring", "/tren/live", Radio, true),
-    trendItem("Konten Viral", "/tren/viral", Flame, true),
-    trendItem("Hashtag & Keyword", "/tren/hashtag", Hash, true),
-    trendItem("Influencer & Akun", "/tren/akun", Users, true),
-    trendItem("AI Trend Analysis", "/tren/ai", Sparkles, true),
-    trendItem("Laporan & Insight", "/tren/laporan", ScrollText, true),
+    trendItem("Tren Wilayah", "/tren/wilayah", MapPinned),
+    trendItem("Live Social Monitoring", "/tren/live", Radio),
+    trendItem("Konten Viral", "/tren/viral", Flame),
+    trendItem("Hashtag & Keyword", "/tren/hashtag", Hash),
+    trendItem("Influencer & Akun", "/tren/akun", Users),
+    trendItem("AI Trend Analysis", "/tren/ai", Sparkles),
+    trendItem("Laporan & Insight", "/tren/laporan", ScrollText),
   ],
 };
 

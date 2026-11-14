@@ -15,48 +15,14 @@ import { periodLabel, platformLabel } from "@/lib/trendFilters";
 import { useTrendFilters } from "@/components/trend/TrendFiltersContext";
 import { TrendPageHeader } from "@/components/trend/TrendPageHeader";
 import { EmptyState, ErrorPanel, Notice } from "@/components/ui";
+import { Kpi, Section, StatusBadge } from "@/components/trend/TrendUi";
+import Link from "next/link";
 
 const TREND_LIMIT = 50;
 const RISING = new Set(["LONJAKAN TINGGI", "MENINGKAT"]);
 const EARLY = new Set(["LONJAKAN TINGGI", "MENINGKAT", "BARU"]);
 // Kategori yang biasanya bisa diangkat jadi konten hiburan/informasi, bukan isu sensitif.
 const CONTENT_FRIENDLY = new Set(["kuliner", "wisata", "hiburan", "olahraga", "teknologi"]);
-
-const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
-  "LONJAKAN TINGGI": { text: "Melonjak", cls: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300" },
-  MENINGKAT: { text: "Naik", cls: "bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300" },
-  BARU: { text: "Baru muncul", cls: "bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300" },
-  STABIL: { text: "Stabil", cls: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300" },
-  MENURUN: { text: "Turun", cls: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
-  "SINYAL LEMAH": { text: "Sinyal lemah", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_LABEL[status] || { text: status, cls: STATUS_LABEL.STABIL.cls };
-  return <span className={`shrink-0 rounded px-1.5 py-0.5 text-2xs font-bold ${s.cls}`}>{s.text}</span>;
-}
-
-function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="panel border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#09090B]">
-      <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{label}</div>
-      <div className="mt-1 truncate text-xl font-black text-zinc-900 dark:text-white" title={value}>
-        {value}
-      </div>
-      {hint && <div className="mt-1 text-2xs text-zinc-500 dark:text-zinc-400">{hint}</div>}
-    </div>
-  );
-}
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="panel border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-[#09090B]">
-      <h2 className="text-sm font-bold text-zinc-900 dark:text-white">{title}</h2>
-      {hint && <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{hint}</p>}
-      <div className="mt-3">{children}</div>
-    </section>
-  );
-}
 
 function TrendRow({ t, right }: { t: SocialTrendingTopic; right?: React.ReactNode }) {
   return (
@@ -250,7 +216,15 @@ export default function TrenDashboardPage() {
 
             <Section
               title="Topik yang cocok dibuat konten"
-              hint="Dipilih otomatis dari kategori kuliner, wisata, hiburan, olahraga, dan teknologi dengan sentimen negatif di bawah 30%. Rekomendasi AI menyusul di menu AI Trend Analysis."
+              hint={
+                <>
+                  Dipilih otomatis dari kategori kuliner, wisata, hiburan, olahraga, dan teknologi dengan sentimen negatif
+                  di bawah 30%.{" "}
+                  <Link href="/tren/ai" className="font-semibold text-sky-600 hover:underline dark:text-sky-400">
+                    Minta rekomendasi AI
+                  </Link>
+                </>
+              }
             >
               {contentIdeas.length === 0 ? (
                 <p className="text-xs text-zinc-500">Belum ada topik dari kategori tersebut pada filter ini.</p>
